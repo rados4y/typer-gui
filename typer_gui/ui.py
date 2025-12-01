@@ -8,6 +8,10 @@ import flet as ft
 from .core import build_gui_model, _GUI_OPTIONS_ATTR
 from .types import GuiCommandOptions
 from .flet_ui import create_flet_app
+from . import ui_blocks
+
+# Global flag to track if we're in CLI mode
+_CLI_MODE = False
 
 
 def _run_gui(
@@ -58,6 +62,12 @@ class Ui:
         >>> if __name__ == "__main__":
         >>>     ui.app()
     """
+
+    # UI Blocks - accessible as ui.table(), ui.md(), etc.
+    table = staticmethod(ui_blocks.table)
+    md = staticmethod(ui_blocks.md)
+    link = staticmethod(ui_blocks.link)
+    button = staticmethod(ui_blocks.button)
 
     def __init__(
         self,
@@ -135,8 +145,12 @@ class Ui:
         """
         # Check if --cli flag is present
         if "--cli" in sys.argv:
+            global _CLI_MODE
+            _CLI_MODE = True
+
             # Remove --cli flag from arguments
             sys.argv.remove("--cli")
+
             # Run the Typer CLI directly
             self._typer_app()
         else:
@@ -146,6 +160,15 @@ class Ui:
                 title=self.title,
                 description=self.description,
             )
+
+    @staticmethod
+    def is_cli_mode() -> bool:
+        """Check if running in CLI mode.
+
+        Returns:
+            True if in CLI mode, False if in GUI mode.
+        """
+        return _CLI_MODE
 
     @property
     def typer_app(self) -> typer.Typer:

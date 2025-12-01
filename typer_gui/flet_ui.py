@@ -9,6 +9,7 @@ from typing import Any, Optional
 import flet as ft
 
 from .types import GuiApp, GuiCommand, GuiParam, ParamType, Markdown
+from .ui_blocks import UiBlock
 
 
 class _RealTimeWriter(io.StringIO):
@@ -446,6 +447,13 @@ class TyperGUI:
                         elif isinstance(result, Markdown):
                             # Backward compatibility with Markdown class
                             self._append_markdown(result.content)
+                        elif isinstance(result, UiBlock):
+                            # Render UI block
+                            self._append_ui_block(result)
+                        elif isinstance(result, list) and all(isinstance(item, UiBlock) for item in result):
+                            # Handle list of UI blocks
+                            for block in result:
+                                self._append_ui_block(block)
                         else:
                             self._append_output(f"Result: {result}")
 
@@ -545,6 +553,15 @@ class TyperGUI:
                     on_tap_link=lambda e: self.page.launch_url(e.data) if self.page else None,
                 )
             )
+            if self.page:
+                self.page.update()
+
+    def _append_ui_block(self, block: UiBlock) -> None:
+        """Append a UI block to the output console."""
+        if self.output_view:
+            # Render the block using its Flet representation
+            flet_component = block.render_flet()
+            self.output_view.controls.append(flet_component)
             if self.page:
                 self.page.update()
 
