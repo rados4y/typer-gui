@@ -117,15 +117,16 @@ if __name__ == "__main__":
 
 ```python
 # my_app_gui.py
-from typer_gui import run_gui
+import typer_gui
 from my_app import app
 
 if __name__ == "__main__":
-    run_gui(
+    ui = typer_gui.Ui(
         app,
         title="My App GUI",
         description="A graphical interface for my CLI app"
     )
+    ui.app()
 ```
 
 Run it:
@@ -363,24 +364,6 @@ python my_app.py --cli --help  # Show all commands
 ```
 
 This allows you to have a single entry point that supports both GUI and CLI modes, giving your users flexibility in how they interact with your application.
-
----
-
-### `run_gui(app, *, title=None, description=None)`
-
-Launch a Flet GUI for a Typer application (standalone function).
-
-**Parameters:**
-- `app` (typer.Typer): A Typer application instance
-- `title` (str, optional): Window title (defaults to "Typer GUI")
-- `description` (str, optional): Description text shown at the top of the GUI
-
-**Example:**
-```python
-from typer_gui import run_gui
-
-run_gui(app, title="My App", description="Welcome to my application!")
-```
 
 ---
 

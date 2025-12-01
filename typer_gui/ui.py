@@ -3,10 +3,34 @@
 from typing import Callable, Optional
 import sys
 import typer
+import flet as ft
 
 from .core import build_gui_model, _GUI_OPTIONS_ATTR
 from .types import GuiCommandOptions
-from .runner import run_gui
+from .flet_ui import create_flet_app
+
+
+def _run_gui(
+    app: typer.Typer,
+    *,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+) -> None:
+    """Internal function to launch a Flet GUI for a Typer application.
+
+    Args:
+        app: A Typer application instance
+        title: Optional window title (defaults to "Typer GUI")
+        description: Optional description text shown at the top of the GUI
+    """
+    # Build the GUI model from the Typer app
+    gui_app = build_gui_model(app, title=title, description=description)
+
+    # Create the Flet app function
+    flet_main = create_flet_app(gui_app)
+
+    # Run the Flet app
+    ft.app(target=flet_main)
 
 
 class Ui:
@@ -117,7 +141,7 @@ class Ui:
             self._typer_app()
         else:
             # Launch the GUI
-            run_gui(
+            _run_gui(
                 self._typer_app,
                 title=self.title,
                 description=self.description,
