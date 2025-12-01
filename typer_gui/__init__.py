@@ -5,7 +5,7 @@ from .types import Markdown, GuiCommandOptions
 from .ui import Ui
 from .ui_blocks import UiBlock, Table, Markdown as MarkdownBlock, Link, Button
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "build_gui_model",
     "Markdown",
