@@ -526,6 +526,41 @@ pytest
    - **Long-running commands** (`is_long=True`): Output is streamed in real-time as it's produced using custom IO writers
    - **Markdown commands** (`is_markdown=True`): Return values are rendered with GitHub-flavored markdown formatting
 
+## Publishing Releases
+
+For maintainers: To publish a new version to PyPI:
+
+1. **Update the version** in `pyproject.toml`:
+   ```toml
+   version = "0.2.0"  # Increment as appropriate
+   ```
+
+2. **Commit the version change**:
+   ```bash
+   git add pyproject.toml
+   git commit -m "Bump version to 0.2.0"
+   git push
+   ```
+
+3. **Run the release script**:
+   ```bash
+   # Cross-platform (recommended)
+   python release.py
+
+   # Or on Windows
+   release.bat
+
+   # Or on Linux/Mac
+   ./release.sh
+   ```
+
+The script will:
+- Clean previous builds
+- Build the package (source distribution + wheel)
+- Upload to PyPI (you'll be prompted for your API token)
+
+**Note**: You need a PyPI API token stored in `~/.pypirc` or will be prompted to enter it.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues or pull requests.
