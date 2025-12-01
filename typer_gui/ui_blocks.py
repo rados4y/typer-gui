@@ -93,9 +93,9 @@ class Table(UiBlock):
         table = ft.DataTable(
             columns=columns,
             rows=data_rows,
-            border=ft.border.all(1, ft.colors.GREY_400),
+            border=ft.border.all(1, ft.Colors.GREY_400),
             border_radius=10,
-            horizontal_lines=ft.border.BorderSide(1, ft.colors.GREY_300),
+            horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_300),
         )
 
         if self.title:
@@ -179,7 +179,7 @@ class Link(UiBlock):
         # For now, return a styled text button
         return ft.TextButton(
             text=self.text,
-            icon=ft.icons.LINK,
+            icon=ft.Icons.LINK,
             on_click=lambda e: self._on_click(e),
         )
 
@@ -213,7 +213,7 @@ class Button(UiBlock):
         # Map icon name to Flet icon
         icon_obj = None
         if self.icon:
-            icon_obj = getattr(ft.icons, self.icon.upper(), None)
+            icon_obj = getattr(ft.Icons, self.icon.upper(), None)
 
         return ft.ElevatedButton(
             text=self.text,
