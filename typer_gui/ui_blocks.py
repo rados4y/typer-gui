@@ -1,8 +1,70 @@
 """UI Blocks - Rich components that can be returned from commands."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional, List, Callable, Union
+from typing import Any, Optional, List, Callable, Union, TYPE_CHECKING
 from dataclasses import dataclass
+import threading
+
+if TYPE_CHECKING:
+    import flet as ft
+
+
+# Global context storage using thread-local storage
+_context_storage = threading.local()
+
+
+class UiContext:
+    """Execution context for UI blocks.
+
+    Tracks whether we're in CLI or GUI mode and provides rendering targets.
+    """
+
+    def __init__(self, mode: str, page: Optional[Any] = None, output_view: Optional[Any] = None, gui_app: Optional[Any] = None):
+        """Initialize UI context.
+
+        Args:
+            mode: "cli" or "gui"
+            page: Flet page object (GUI mode only)
+            output_view: Flet ListView for output (GUI mode only)
+            gui_app: Reference to GUI app for command execution (GUI mode only)
+        """
+        self.mode = mode
+        self.page = page
+        self.output_view = output_view
+        self.gui_app = gui_app
+
+    def is_cli(self) -> bool:
+        """Check if in CLI mode."""
+        return self.mode == "cli"
+
+    def is_gui(self) -> bool:
+        """Check if in GUI mode."""
+        return self.mode == "gui"
+
+    def render(self, block: 'UiBlock') -> None:
+        """Render a UI block to the current context."""
+        if self.is_cli():
+            # CLI mode - print if not GUI-only
+            if not block.is_gui_only():
+                print(block.render_cli())
+        else:
+            # GUI mode - append to output view
+            if self.output_view:
+                flet_component = block.render_flet(self)
+                if flet_component:
+                    self.output_view.controls.append(flet_component)
+                    if self.page:
+                        self.page.update()
+
+
+def get_context() -> Optional[UiContext]:
+    """Get the current UI context."""
+    return getattr(_context_storage, 'context', None)
+
+
+def set_context(context: Optional[UiContext]) -> None:
+    """Set the current UI context."""
+    _context_storage.context = context
 
 
 class UiBlock(ABC):
@@ -18,8 +80,11 @@ class UiBlock(ABC):
         pass
 
     @abstractmethod
-    def render_flet(self) -> Any:
+    def render_flet(self, context: UiContext) -> Any:
         """Render the block as a Flet component.
+
+        Args:
+            context: The UI context with page and app references
 
         Returns:
             Flet component (ft.Control) for GUI display.
@@ -33,6 +98,12 @@ class UiBlock(ABC):
             True if block is GUI-only, False otherwise.
         """
         return False
+
+    def present(self) -> None:
+        """Present this block in the current context."""
+        context = get_context()
+        if context:
+            context.render(self)
 
 
 @dataclass
@@ -74,7 +145,7 @@ class Table(UiBlock):
 
         return "\n".join(lines)
 
-    def render_flet(self) -> Any:
+    def render_flet(self, context: UiContext) -> Any:
         """Render table as Flet DataTable."""
         import flet as ft
 
@@ -147,7 +218,7 @@ class Markdown(UiBlock):
 
         return text
 
-    def render_flet(self) -> Any:
+    def render_flet(self, context: UiContext) -> Any:
         """Render markdown as Flet Markdown component."""
         import flet as ft
 
@@ -155,7 +226,7 @@ class Markdown(UiBlock):
             self.content,
             selectable=True,
             extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-            on_tap_link=lambda e: print(f"Link clicked: {e.data}"),
+            on_tap_link=lambda e: context.page.launch_url(e.data) if context.page else None,
         )
 
 
@@ -171,26 +242,28 @@ class Link(UiBlock):
         """Links are not rendered in CLI mode."""
         return ""
 
-    def render_flet(self) -> Any:
+    def render_flet(self, context: UiContext) -> Any:
         """Render as clickable link in Flet."""
         import flet as ft
 
-        # This will need to be wired up to actually trigger command selection
-        # For now, return a styled text button
+        def on_click(e):
+            """Handle link click to trigger command."""
+            if context.gui_app:
+                # Find and select the command
+                for cmd in context.gui_app.gui_app.commands:
+                    if cmd.name == self.command_name:
+                        context.gui_app.select_command(cmd)
+                        break
+
         return ft.TextButton(
             text=self.text,
             icon=ft.Icons.LINK,
-            on_click=lambda e: self._on_click(e),
+            on_click=on_click,
         )
 
     def is_gui_only(self) -> bool:
         """Links are GUI-only."""
         return True
-
-    def _on_click(self, e):
-        """Handle link click - to be implemented in Flet UI integration."""
-        # This will be connected to the command selection mechanism
-        print(f"Link clicked: {self.command_name} with params {self.params}")
 
 
 @dataclass
@@ -206,7 +279,7 @@ class Button(UiBlock):
         """Buttons are not rendered in CLI mode."""
         return ""
 
-    def render_flet(self) -> Any:
+    def render_flet(self, context: UiContext) -> Any:
         """Render as button in Flet."""
         import flet as ft
 
@@ -215,25 +288,30 @@ class Button(UiBlock):
         if self.icon:
             icon_obj = getattr(ft.Icons, self.icon.upper(), None)
 
+        def on_click(e):
+            """Handle button click to trigger command."""
+            if context.gui_app:
+                # Find and select the command
+                for cmd in context.gui_app.gui_app.commands:
+                    if cmd.name == self.command_name:
+                        context.gui_app.select_command(cmd)
+                        # If params provided, could pre-fill them here
+                        break
+
         return ft.ElevatedButton(
             text=self.text,
             icon=icon_obj,
-            on_click=lambda e: self._on_click(e),
+            on_click=on_click,
         )
 
     def is_gui_only(self) -> bool:
         """Buttons are GUI-only."""
         return True
 
-    def _on_click(self, e):
-        """Handle button click - to be implemented in Flet UI integration."""
-        # This will be connected to the command selection mechanism
-        print(f"Button clicked: {self.command_name} with params {self.params}")
 
-
-# Convenience functions for creating UI blocks
-def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> Table:
-    """Create a table UI block.
+# Convenience functions for creating and presenting UI blocks
+def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> None:
+    """Create and present a table UI block.
 
     Args:
         headers: List of column headers
@@ -241,7 +319,7 @@ def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None
         title: Optional title for the table
 
     Example:
-        >>> return ui.table(
+        >>> ui.table(
         ...     headers=["Name", "Age", "City"],
         ...     rows=[
         ...         ["Alice", 30, "NYC"],
@@ -250,27 +328,29 @@ def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None
         ...     title="Users"
         ... )
     """
-    return Table(headers=headers, rows=rows, title=title)
+    block = Table(headers=headers, rows=rows, title=title)
+    block.present()
 
 
-def md(content: str) -> Markdown:
-    """Create a markdown UI block.
+def md(content: str) -> None:
+    """Create and present a markdown UI block.
 
     Args:
         content: Markdown-formatted string
 
     Example:
-        >>> return ui.md(\"\"\"
+        >>> ui.md(\"\"\"
         ... # Hello World
         ...
         ... This is **bold** text.
         ... \"\"\")
     """
-    return Markdown(content=content)
+    block = Markdown(content=content)
+    block.present()
 
 
-def link(text: str, command_name: str, params: Optional[dict] = None) -> Link:
-    """Create a link UI block (GUI only).
+def link(text: str, command_name: str, params: Optional[dict] = None) -> None:
+    """Create and present a link UI block (GUI only).
 
     Args:
         text: Link text to display
@@ -278,13 +358,14 @@ def link(text: str, command_name: str, params: Optional[dict] = None) -> Link:
         params: Optional parameters to pass to command
 
     Example:
-        >>> return ui.link("View details", "show_details", {"id": 123})
+        >>> ui.link("View details", "show_details", {"id": 123})
     """
-    return Link(text=text, command_name=command_name, params=params)
+    block = Link(text=text, command_name=command_name, params=params)
+    block.present()
 
 
-def button(text: str, command_name: str, params: Optional[dict] = None, icon: Optional[str] = None) -> Button:
-    """Create a button UI block (GUI only).
+def button(text: str, command_name: str, params: Optional[dict] = None, icon: Optional[str] = None) -> None:
+    """Create and present a button UI block (GUI only).
 
     Args:
         text: Button text to display
@@ -293,9 +374,10 @@ def button(text: str, command_name: str, params: Optional[dict] = None, icon: Op
         icon: Optional icon name (Flet icon name)
 
     Example:
-        >>> return ui.button("Refresh", "refresh_data", icon="refresh")
+        >>> ui.button("Refresh", "refresh_data", icon="refresh")
     """
-    return Button(text=text, command_name=command_name, params=params, icon=icon)
+    block = Button(text=text, command_name=command_name, params=params, icon=icon)
+    block.present()
 
 
 def render_for_mode(blocks: Union[UiBlock, List[UiBlock]]) -> Union[UiBlock, List[UiBlock], None]:

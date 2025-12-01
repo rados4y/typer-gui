@@ -23,24 +23,23 @@ ui = typer_gui.Ui(
 @app.command()
 def users():
     """Display a table of users."""
-    return typer_gui.ui_blocks.render_for_mode(
-        ui.table(
-            headers=["Name", "Age", "City", "Status"],
-            rows=[
-                ["Alice Johnson", 30, "New York", "Active"],
-                ["Bob Smith", 25, "San Francisco", "Active"],
-                ["Charlie Brown", 35, "Los Angeles", "Inactive"],
-                ["Diana Prince", 28, "Chicago", "Active"],
-            ],
-            title="User Directory"
-        )
+    ui.table(
+        headers=["Name", "Age", "City", "Status"],
+        rows=[
+            ["Alice Johnson", 30, "New York", "Active"],
+            ["Bob Smith", 25, "San Francisco", "Active"],
+            ["Charlie Brown", 35, "Los Angeles", "Inactive"],
+            ["Diana Prince", 28, "Chicago", "Active"],
+        ],
+        title="User Directory",
     )
 
 
 @app.command()
 def report():
     """Generate a formatted report using markdown."""
-    return typer_gui.ui_blocks.render_for_mode(ui.md("""
+    ui.md(
+        """
 # System Status Report
 
 ## Overview
@@ -81,58 +80,74 @@ def check_system():
 ---
 
 *Report generated on: 2025-12-01*
-"""))
+"""
+    )
 
 
 @app.command()
+@ui.command(is_auto_exec=True)
 def dashboard():
     """Display a dashboard with multiple UI blocks."""
-    # Return a list of UI blocks
-    return typer_gui.ui_blocks.render_for_mode([
-        ui.md("# Welcome to the Dashboard\n\nHere's an overview of your system:"),
-        ui.table(
-            headers=["Metric", "Value", "Change"],
-            rows=[
-                ["Active Users", "1,234", "+12%"],
-                ["Revenue", "$45,678", "+8%"],
-                ["Orders", "567", "+15%"],
-            ],
-            title="Key Performance Indicators"
-        ),
-        ui.md("## Quick Actions\n\nUse the buttons below to perform common tasks:"),
-        ui.button("Refresh Data", "dashboard", icon="refresh"),
-        ui.link("View User Details", "users"),
-    ])
+    ui.md("# Welcome to the Dashboard")
+    print("Here's an overview of your system:")
+    ui.table(
+        headers=["Metric", "Value", "Change"],
+        rows=[
+            ["Active Users", "1,234", "+12%"],
+            ["Revenue", "$45,678", "+8%"],
+            ["Orders", "567", "+15%"],
+        ],
+        title="Key Performance Indicators",
+    )
+    ui.md("## Quick Actions")
+    print("Use the buttons below to perform common tasks:")
+    ui.button("Refresh Data", "dashboard", icon="refresh")
+    ui.button("View Quick Stats", "quick-stats", icon="analytics")
+    ui.link("View User Details", "users")
 
 
 @app.command()
 def products():
     """Display product catalog."""
-    return typer_gui.ui_blocks.render_for_mode([
-        ui.md("# Product Catalog"),
-        ui.table(
-            headers=["ID", "Product", "Price", "Stock"],
-            rows=[
-                ["001", "Laptop", "$999", "24"],
-                ["002", "Mouse", "$29", "150"],
-                ["003", "Keyboard", "$79", "89"],
-                ["004", "Monitor", "$299", "42"],
-            ]
-        ),
-        ui.button("Add New Product", "products", icon="add"),
-    ])
+    ui.md("# Product Catalog")
+    ui.table(
+        headers=["ID", "Product", "Price", "Stock"],
+        rows=[
+            ["001", "Laptop", "$999", "24"],
+            ["002", "Mouse", "$29", "150"],
+            ["003", "Keyboard", "$79", "89"],
+            ["004", "Monitor", "$299", "42"],
+        ],
+    )
+    ui.button("Add New Product", "products", icon="add")
+
+
+@app.command()
+@ui.command(is_auto_exec=True)
+def quick_stats():
+    """Show quick statistics (auto-executes when selected)."""
+    ui.md("# Quick Statistics\n\n*This command executes automatically when selected.*")
+    ui.table(
+        headers=["Metric", "Value"],
+        rows=[
+            ["Total Users", "1,234"],
+            ["Active Sessions", "89"],
+            ["Server Uptime", "99.9%"],
+            ["Last Backup", "2 hours ago"],
+        ],
+        title="System Stats",
+    )
 
 
 @app.command()
 def navigation():
     """Show navigation links (GUI only)."""
-    return typer_gui.ui_blocks.render_for_mode([
-        ui.md("# Navigation Menu\n\nClick a link to navigate:"),
-        ui.link("📊 View Dashboard", "dashboard"),
-        ui.link("👥 User Directory", "users"),
-        ui.link("📦 Product Catalog", "products"),
-        ui.link("📈 System Report", "report"),
-    ])
+    ui.md("# Navigation Menu\n\nClick a link to navigate:")
+    ui.link("📊 View Dashboard", "dashboard")
+    ui.link("👥 User Directory", "users")
+    ui.link("📦 Product Catalog", "products")
+    ui.link("📈 System Report", "report")
+    ui.link("⚡ Quick Stats (Auto-exec)", "quick-stats")
 
 
 @app.command()
@@ -142,18 +157,17 @@ def mixed_output():
     print("Loading data...")
 
     # You can mix print statements with UI blocks
-    result = ui.table(
+    ui.table(
         headers=["Step", "Status", "Duration"],
         rows=[
             ["Load Data", "✓ Complete", "1.2s"],
             ["Process", "✓ Complete", "2.5s"],
             ["Validate", "✓ Complete", "0.8s"],
         ],
-        title="Processing Summary"
+        title="Processing Summary",
     )
 
     print("Processing completed successfully!")
-    return typer_gui.ui_blocks.render_for_mode(result)
 
 
 if __name__ == "__main__":

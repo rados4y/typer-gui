@@ -9,6 +9,7 @@ from .core import build_gui_model, _GUI_OPTIONS_ATTR
 from .types import GuiCommandOptions
 from .flet_ui import create_flet_app
 from . import ui_blocks
+from .ui_blocks import UiContext, set_context
 
 # Global flag to track if we're in CLI mode
 _CLI_MODE = False
@@ -151,8 +152,16 @@ class Ui:
             # Remove --cli flag from arguments
             sys.argv.remove("--cli")
 
-            # Run the Typer CLI directly
-            self._typer_app()
+            # Set up CLI context
+            context = UiContext(mode="cli")
+            set_context(context)
+
+            try:
+                # Run the Typer CLI directly
+                self._typer_app()
+            finally:
+                # Clear context after CLI execution
+                set_context(None)
         else:
             # Launch the GUI
             _run_gui(

@@ -9,7 +9,7 @@ from typing import Any, Optional
 import flet as ft
 
 from .types import GuiApp, GuiCommand, GuiParam, ParamType, Markdown
-from .ui_blocks import UiBlock
+from .ui_blocks import UiBlock, UiContext, set_context
 
 
 class _RealTimeWriter(io.StringIO):
@@ -145,20 +145,7 @@ class TyperGUI:
                     padding=20,
                 ),
                 ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Text("Output", weight=ft.FontWeight.BOLD, size=12),
-                            ft.Container(
-                                content=self.output_view,
-                                border=ft.border.all(1, ft.Colors.GREY_400),
-                                border_radius=5,
-                                padding=10,
-                                expand=True,
-                            ),
-                        ],
-                        spacing=5,
-                        expand=True,
-                    ),
+                    content=self.output_view,
                     padding=ft.padding.only(left=20, right=20, bottom=20),
                     expand=True,
                 ),
@@ -243,15 +230,10 @@ class TyperGUI:
         form_controls.append(ft.Divider())
 
         # Create controls for each parameter
-        if not command.params:
-            form_controls.append(
-                ft.Text("This command has no parameters.", italic=True)
-            )
-        else:
-            for param in command.params:
-                control = self._create_param_control(param)
-                if control:
-                    form_controls.append(control)
+        for param in command.params:
+            control = self._create_param_control(param)
+            if control:
+                form_controls.append(control)
 
         # Add Run button only if not auto-exec
         if not command.gui_options.is_auto_exec:
@@ -373,8 +355,6 @@ class TyperGUI:
             # Clear previous output
             if self.output_view:
                 self.output_view.controls.clear()
-            self._append_output(f"Running command: {self.current_command.name}")
-            self._append_output("=" * 50)
 
             # Check if this is a long-running command
             is_long_running = self.current_command.gui_options.is_long
@@ -387,6 +367,15 @@ class TyperGUI:
                 )
 
                 try:
+                    # Set up UI context for this command execution
+                    context = UiContext(
+                        mode="gui",
+                        page=self.page,
+                        output_view=self.output_view,
+                        gui_app=self
+                    )
+                    set_context(context)
+
                     with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
                         result = self.current_command.callback(**kwargs)
 
@@ -403,10 +392,12 @@ class TyperGUI:
                     self._append_output("Traceback:")
                     self._append_output(traceback.format_exc())
                     return
+                finally:
+                    # Clear context after execution
+                    set_context(None)
 
                 # Handle result for long-running commands
                 if result is not None:
-                    self._append_output("")
                     if self.current_command.gui_options.is_markdown:
                         self._append_markdown(str(result))
                     elif isinstance(result, Markdown):
@@ -415,16 +406,21 @@ class TyperGUI:
                     else:
                         self._append_output(f"Result: {result}")
 
-                self._append_output("")
-                self._append_output("=" * 50)
-                self._append_output("Command completed successfully.")
-
             else:
                 # Buffer output for regular commands
                 stdout_capture = io.StringIO()
                 stderr_capture = io.StringIO()
 
                 try:
+                    # Set up UI context for this command execution
+                    context = UiContext(
+                        mode="gui",
+                        page=self.page,
+                        output_view=self.output_view,
+                        gui_app=self
+                    )
+                    set_context(context)
+
                     with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
                         result = self.current_command.callback(**kwargs)
 
@@ -441,25 +437,13 @@ class TyperGUI:
                         self._append_output(stderr_text)
 
                     if result is not None:
-                        self._append_output("")
                         if self.current_command.gui_options.is_markdown:
                             self._append_markdown(str(result))
                         elif isinstance(result, Markdown):
                             # Backward compatibility with Markdown class
                             self._append_markdown(result.content)
-                        elif isinstance(result, UiBlock):
-                            # Render UI block
-                            self._append_ui_block(result)
-                        elif isinstance(result, list) and all(isinstance(item, UiBlock) for item in result):
-                            # Handle list of UI blocks
-                            for block in result:
-                                self._append_ui_block(block)
                         else:
                             self._append_output(f"Result: {result}")
-
-                    self._append_output("")
-                    self._append_output("=" * 50)
-                    self._append_output("Command completed successfully.")
 
                 except Exception as e:
                     stderr_text = stderr_capture.getvalue()
@@ -473,6 +457,9 @@ class TyperGUI:
                     self._append_output("")
                     self._append_output("Traceback:")
                     self._append_output(traceback.format_exc())
+                finally:
+                    # Clear context after execution
+                    set_context(None)
 
         except Exception as e:
             self._append_output("")
