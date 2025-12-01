@@ -81,13 +81,18 @@ def add(a: int, b: int):
     print(f"{a} + {b} = {result}")
 
 if __name__ == "__main__":
-    # Launch the GUI (or use app() for CLI mode)
+    # Launch the GUI
     ui.app()
 ```
 
 Run it:
 ```bash
+# Launch GUI
 python my_app.py
+
+# Or run CLI directly with --cli flag
+python my_app.py --cli greet "World" --excited
+python my_app.py --cli add 5 10
 ```
 
 ### Option 2: Separate GUI Runner
@@ -336,13 +341,28 @@ if __name__ == "__main__":
 
 #### `ui.app()`
 
-Launch the GUI application.
+Launch the GUI application or run in CLI mode with `--cli` flag.
 
-**Example:**
+By default, `ui.app()` launches the GUI. However, you can bypass the GUI and run the CLI directly by passing the `--cli` flag.
+
+**GUI Mode (default):**
 ```python
 if __name__ == "__main__":
     ui.app()
 ```
+
+**CLI Mode:**
+```bash
+# Run with GUI (default)
+python my_app.py
+
+# Run with CLI (bypasses GUI)
+python my_app.py --cli greet "Alice" --excited
+python my_app.py --cli add 5 3
+python my_app.py --cli --help  # Show all commands
+```
+
+This allows you to have a single entry point that supports both GUI and CLI modes, giving your users flexibility in how they interact with your application.
 
 ---
 

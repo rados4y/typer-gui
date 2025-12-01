@@ -1,6 +1,7 @@
 """Main UI class for typer-gui - integrated API."""
 
 from typing import Callable, Optional
+import sys
 import typer
 
 from .core import build_gui_model, _GUI_OPTIONS_ATTR
@@ -97,19 +98,30 @@ class Ui:
         return decorator
 
     def app(self):
-        """Launch the GUI application.
+        """Launch the GUI application or CLI based on --cli flag.
 
         This should be called at the end of your script to start the GUI.
+        If --cli flag is present in command line arguments, the GUI is bypassed
+        and the Typer CLI is executed directly.
 
         Example:
             >>> if __name__ == "__main__":
-            >>>     ui.app()
+            >>>     ui.app()  # Launches GUI
+            >>>     # Or use: python script.py --cli command arg1 arg2
         """
-        run_gui(
-            self._typer_app,
-            title=self.title,
-            description=self.description,
-        )
+        # Check if --cli flag is present
+        if "--cli" in sys.argv:
+            # Remove --cli flag from arguments
+            sys.argv.remove("--cli")
+            # Run the Typer CLI directly
+            self._typer_app()
+        else:
+            # Launch the GUI
+            run_gui(
+                self._typer_app,
+                title=self.title,
+                description=self.description,
+            )
 
     @property
     def typer_app(self) -> typer.Typer:
