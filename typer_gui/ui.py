@@ -8,8 +8,8 @@ import flet as ft
 from .core import build_gui_model, _GUI_OPTIONS_ATTR
 from .types import GuiCommandOptions
 from .flet_ui import create_flet_app
-from . import ui_blocks
-from .ui_blocks import UiContext, set_context
+from .ui_blocks import UiContext, set_context, get_context, UiOutput
+from .ui_app import UIApp, UICommand
 
 # Global flag to track if we're in CLI mode
 _CLI_MODE = False
@@ -18,6 +18,7 @@ _CLI_MODE = False
 def _run_gui(
     app: typer.Typer,
     *,
+    ui_instance: 'Ui',
     title: Optional[str] = None,
     description: Optional[str] = None,
 ) -> None:
@@ -25,6 +26,7 @@ def _run_gui(
 
     Args:
         app: A Typer application instance
+        ui_instance: The Ui instance that launched the GUI
         title: Optional window title (defaults to "Typer GUI")
         description: Optional description text shown at the top of the GUI
     """
@@ -32,7 +34,7 @@ def _run_gui(
     gui_app = build_gui_model(app, title=title, description=description)
 
     # Create the Flet app function
-    flet_main = create_flet_app(gui_app)
+    flet_main = create_flet_app(gui_app, ui_instance=ui_instance)
 
     # Run the Flet app
     ft.app(target=flet_main)
@@ -64,12 +66,6 @@ class Ui:
         >>>     ui.app()
     """
 
-    # UI Blocks - accessible as ui.table(), ui.md(), etc.
-    table = staticmethod(ui_blocks.table)
-    md = staticmethod(ui_blocks.md)
-    link = staticmethod(ui_blocks.link)
-    button = staticmethod(ui_blocks.button)
-
     def __init__(
         self,
         app: typer.Typer,
@@ -87,13 +83,14 @@ class Ui:
         self.title = title
         self.description = description
         self._typer_app = app
+        self._ui_app_instance: Optional['UIApp'] = None
+        self.out = UiOutput()
 
-    def command(
+    def options(
         self,
         *,
         is_button: bool = False,
         is_long: bool = False,
-        is_markdown: bool = False,
         is_auto_exec: bool = False,
     ):
         """Decorator to add GUI-specific options to a Typer command.
@@ -104,12 +101,11 @@ class Ui:
         Args:
             is_button: Display as a button in the left panel
             is_long: Enable real-time output streaming for long-running commands
-            is_markdown: Render return value as Markdown
             is_auto_exec: Execute automatically when selected, hide 'Run Command' button
 
         Example:
             >>> @app.command()
-            >>> @ui.command(is_button=True, is_long=True)
+            >>> @ui.options(is_button=True, is_long=True)
             >>> def process():
             >>>     for i in range(10):
             >>>         print(f"Step {i}")
@@ -124,13 +120,44 @@ class Ui:
                 GuiCommandOptions(
                     is_button=is_button,
                     is_long=is_long,
-                    is_markdown=is_markdown,
                     is_auto_exec=is_auto_exec,
                 ),
             )
             return func
 
         return decorator
+
+    def command(self, name: str) -> 'UICommand':
+        """Get a command by name from the runtime context.
+
+        Args:
+            name: The command name (using hyphens, as registered with Typer)
+
+        Returns:
+            UICommand instance
+
+        Raises:
+            RuntimeError: If not in GUI runtime context
+            ValueError: If command with the given name is not found
+
+        Example:
+            >>> ui.command("refresh-data").select()
+            >>> ui.command("process").run(steps=5)
+        """
+        if not self.runtime:
+            raise RuntimeError(
+                f"Cannot access command '{name}': not in GUI runtime context. "
+                "ui.command() can only be called from within command execution in GUI mode."
+            )
+
+        cmd = self.runtime.get_command(name)
+        if not cmd:
+            available = [c.name for c in self.runtime.commands]
+            raise ValueError(
+                f"Command '{name}' not found. Available commands: {', '.join(available)}"
+            )
+
+        return cmd
 
     def app(self):
         """Launch the GUI application or CLI based on --cli flag.
@@ -166,6 +193,7 @@ class Ui:
             # Launch the GUI
             _run_gui(
                 self._typer_app,
+                ui_instance=self,
                 title=self.title,
                 description=self.description,
             )
@@ -186,3 +214,34 @@ class Ui:
         This allows advanced usage if you need direct access to the Typer app.
         """
         return self._typer_app
+
+    @property
+    def runtime(self) -> Optional[UIApp]:
+        """Access the UIApp runtime instance.
+
+        This provides access to commands, UI blocks, and application state.
+        Only available during GUI mode execution (returns None in CLI mode or before GUI starts).
+
+        Returns:
+            UIApp instance if in GUI mode during command execution, None otherwise.
+
+        Example:
+            >>> @app.command()
+            >>> def my_command():
+            >>>     # Access current command
+            >>>     current = ui.runtime.cmd
+            >>>     # Access all commands
+            >>>     all_cmds = ui.runtime.commands
+            >>>     # Access UI blocks
+            >>>     header = ui.runtime.blocks.header
+        """
+        # First check if we have a stored instance (available in GUI mode)
+        if self._ui_app_instance:
+            return self._ui_app_instance
+
+        # Fall back to context (for command execution)
+        context = get_context()
+        if context and context.ui_app:
+            return context.ui_app
+
+        return None

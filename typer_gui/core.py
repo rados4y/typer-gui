@@ -15,54 +15,6 @@ from .types import GuiApp, GuiCommand, GuiParam, ParamType, GuiCommandOptions
 _GUI_OPTIONS_ATTR = "__typer_gui_options__"
 
 
-def gui_command(*, is_button: bool = False, is_long: bool = False, is_markdown: bool = False, is_auto_exec: bool = False):
-    """Decorator to add GUI-specific options to a Typer command.
-
-    This decorator can be used alongside @app.command() to customize
-    how the command appears and behaves in the GUI.
-
-    Args:
-        is_button: If True, display the command as a button in the left panel
-                   instead of a text link. Useful for important or frequently
-                   used commands.
-        is_long: If True, the command is marked as long-running and the GUI
-                 will stream output in real-time as it's produced, instead of
-                 waiting for the command to complete.
-        is_markdown: If True, the command's return value will be treated as
-                     markdown-formatted text and rendered with formatting.
-        is_auto_exec: If True, the command is executed automatically when selected,
-                      and the 'Run Command' button is hidden.
-
-    Example:
-        >>> from typer_gui import gui_command
-        >>> import typer
-        >>>
-        >>> app = typer.Typer()
-        >>>
-        >>> @app.command()
-        >>> @gui_command(is_button=True, is_long=True)
-        >>> def process_data():
-        >>>     for i in range(10):
-        >>>         print(f"Processing {i}...")
-        >>>         time.sleep(1)
-        >>>
-        >>> @app.command()
-        >>> @gui_command(is_markdown=True)
-        >>> def info() -> str:
-        >>>     return "# Hello **World**!"
-    """
-    def decorator(func: Callable) -> Callable:
-        # Store GUI options as function attribute
-        setattr(func, _GUI_OPTIONS_ATTR, GuiCommandOptions(
-            is_button=is_button,
-            is_long=is_long,
-            is_markdown=is_markdown,
-            is_auto_exec=is_auto_exec,
-        ))
-        return func
-    return decorator
-
-
 def _get_param_type(annotation: Any) -> tuple[ParamType, Optional[type], Optional[list[str]]]:
     """
     Determine the ParamType from a Python type annotation.
@@ -214,6 +166,9 @@ def build_gui_model(app: typer.Typer, *, title: Optional[str] = None, descriptio
             command_name = command_info.name or (
                 command_info.callback.__name__ if command_info.callback else "unnamed"
             )
+
+            # Convert underscores to dashes to match Typer's CLI convention
+            command_name = command_name.replace("_", "-")
 
             gui_command = _extract_command_info(command_name, command_info)
             commands.append(gui_command)

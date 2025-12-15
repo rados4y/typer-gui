@@ -76,9 +76,6 @@ class GuiCommandOptions:
     is_long: bool = False
     """Command is long-running, enable real-time output streaming"""
 
-    is_markdown: bool = False
-    """Command returns markdown-formatted string that should be rendered as Markdown"""
-
     is_auto_exec: bool = False
     """Execute command automatically when selected, hide 'Run Command' button"""
 

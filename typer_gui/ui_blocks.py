@@ -19,7 +19,7 @@ class UiContext:
     Tracks whether we're in CLI or GUI mode and provides rendering targets.
     """
 
-    def __init__(self, mode: str, page: Optional[Any] = None, output_view: Optional[Any] = None, gui_app: Optional[Any] = None):
+    def __init__(self, mode: str, page: Optional[Any] = None, output_view: Optional[Any] = None, gui_app: Optional[Any] = None, ui_app: Optional[Any] = None):
         """Initialize UI context.
 
         Args:
@@ -27,11 +27,13 @@ class UiContext:
             page: Flet page object (GUI mode only)
             output_view: Flet ListView for output (GUI mode only)
             gui_app: Reference to GUI app for command execution (GUI mode only)
+            ui_app: Reference to UIApp instance (GUI mode only)
         """
         self.mode = mode
         self.page = page
         self.output_view = output_view
         self.gui_app = gui_app
+        self.ui_app = ui_app
 
     def is_cli(self) -> bool:
         """Check if in CLI mode."""
@@ -232,11 +234,10 @@ class Markdown(UiBlock):
 
 @dataclass
 class Link(UiBlock):
-    """Interactive link that triggers command selection (GUI only)."""
+    """Interactive link that executes a callable action (GUI only)."""
 
     text: str
-    command_name: str
-    params: Optional[dict] = None
+    do: Callable
 
     def render_cli(self) -> str:
         """Links are not rendered in CLI mode."""
@@ -247,13 +248,8 @@ class Link(UiBlock):
         import flet as ft
 
         def on_click(e):
-            """Handle link click to trigger command."""
-            if context.gui_app:
-                # Find and select the command
-                for cmd in context.gui_app.gui_app.commands:
-                    if cmd.name == self.command_name:
-                        context.gui_app.select_command(cmd)
-                        break
+            """Handle link click to execute the action."""
+            self.do()
 
         return ft.TextButton(
             text=self.text,
@@ -268,11 +264,10 @@ class Link(UiBlock):
 
 @dataclass
 class Button(UiBlock):
-    """Interactive button that triggers command selection (GUI only)."""
+    """Interactive button that executes a callable action (GUI only)."""
 
     text: str
-    command_name: str
-    params: Optional[dict] = None
+    do: Callable
     icon: Optional[str] = None
 
     def render_cli(self) -> str:
@@ -289,14 +284,8 @@ class Button(UiBlock):
             icon_obj = getattr(ft.Icons, self.icon.upper(), None)
 
         def on_click(e):
-            """Handle button click to trigger command."""
-            if context.gui_app:
-                # Find and select the command
-                for cmd in context.gui_app.gui_app.commands:
-                    if cmd.name == self.command_name:
-                        context.gui_app.select_command(cmd)
-                        # If params provided, could pre-fill them here
-                        break
+            """Handle button click to execute the action."""
+            self.do()
 
         return ft.ElevatedButton(
             text=self.text,
@@ -309,75 +298,154 @@ class Button(UiBlock):
         return True
 
 
-# Convenience functions for creating and presenting UI blocks
-def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> None:
-    """Create and present a table UI block.
+@dataclass
+class Row(UiBlock):
+    """Container for displaying UI blocks in a horizontal row.
 
-    Args:
-        headers: List of column headers
-        rows: List of rows, where each row is a list of cell values
-        title: Optional title for the table
-
-    Example:
-        >>> ui.table(
-        ...     headers=["Name", "Age", "City"],
-        ...     rows=[
-        ...         ["Alice", 30, "NYC"],
-        ...         ["Bob", 25, "SF"],
-        ...     ],
-        ...     title="Users"
-        ... )
+    In GUI mode, displays children side-by-side.
+    In CLI mode, displays children vertically (one per line).
     """
-    block = Table(headers=headers, rows=rows, title=title)
-    block.present()
+
+    children: List[UiBlock]
+
+    def render_cli(self) -> str:
+        """Render children vertically in CLI mode."""
+        lines = []
+        for child in self.children:
+            if not child.is_gui_only():
+                rendered = child.render_cli()
+                if rendered:
+                    lines.append(rendered)
+        return "\n".join(lines)
+
+    def render_flet(self, context: UiContext) -> Any:
+        """Render children horizontally in Flet."""
+        import flet as ft
+
+        # Render each child and collect the controls
+        controls = []
+        for child in self.children:
+            control = child.render_flet(context)
+            if control:
+                controls.append(control)
+
+        return ft.Row(controls=controls, spacing=10, wrap=True)
+
+    def is_gui_only(self) -> bool:
+        """Row is not GUI-only, but renders differently in CLI."""
+        return False
 
 
-def md(content: str) -> None:
-    """Create and present a markdown UI block.
+class UiOutput:
+    """Container for UI output methods.
 
-    Args:
-        content: Markdown-formatted string
-
-    Example:
-        >>> ui.md(\"\"\"
-        ... # Hello World
-        ...
-        ... This is **bold** text.
-        ... \"\"\")
+    Provides methods to create and present UI blocks like tables, markdown, links, and buttons.
+    Available as ui.out in command contexts.
     """
-    block = Markdown(content=content)
-    block.present()
 
+    @staticmethod
+    def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> Table:
+        """Create and present a table UI block.
 
-def link(text: str, command_name: str, params: Optional[dict] = None) -> None:
-    """Create and present a link UI block (GUI only).
+        Args:
+            headers: List of column headers
+            rows: List of rows, where each row is a list of cell values
+            title: Optional title for the table
 
-    Args:
-        text: Link text to display
-        command_name: Name of command to trigger
-        params: Optional parameters to pass to command
+        Returns:
+            The created Table block (can be used with ui.out.row())
 
-    Example:
-        >>> ui.link("View details", "show_details", {"id": 123})
-    """
-    block = Link(text=text, command_name=command_name, params=params)
-    block.present()
+        Example:
+            >>> ui.out.table(
+            ...     headers=["Name", "Age", "City"],
+            ...     rows=[
+            ...         ["Alice", 30, "NYC"],
+            ...         ["Bob", 25, "SF"],
+            ...     ],
+            ...     title="Users"
+            ... )
+        """
+        block = Table(headers=headers, rows=rows, title=title)
+        block.present()
+        return block
 
+    @staticmethod
+    def md(content: str) -> Markdown:
+        """Create and present a markdown UI block.
 
-def button(text: str, command_name: str, params: Optional[dict] = None, icon: Optional[str] = None) -> None:
-    """Create and present a button UI block (GUI only).
+        Args:
+            content: Markdown-formatted string
 
-    Args:
-        text: Button text to display
-        command_name: Name of command to trigger
-        params: Optional parameters to pass to command
-        icon: Optional icon name (Flet icon name)
+        Returns:
+            The created Markdown block (can be used with ui.out.row())
 
-    Example:
-        >>> ui.button("Refresh", "refresh_data", icon="refresh")
-    """
-    block = Button(text=text, command_name=command_name, params=params, icon=icon)
-    block.present()
+        Example:
+            >>> ui.out.md(\"\"\"
+            ... # Hello World
+            ...
+            ... This is **bold** text.
+            ... \"\"\")
+        """
+        block = Markdown(content=content)
+        block.present()
+        return block
+
+    @staticmethod
+    def link(text: str, do: Callable) -> Link:
+        """Create and present a link UI block (GUI only).
+
+        Args:
+            text: Link text to display
+            do: Callable to execute when clicked
+
+        Returns:
+            The created Link block (can be used with ui.out.row())
+
+        Example:
+            >>> ui.out.link("Refresh data", do=lambda: ui.runtime.get_command("refresh").select())
+        """
+        block = Link(text=text, do=do)
+        block.present()
+        return block
+
+    @staticmethod
+    def button(text: str, do: Callable, icon: Optional[str] = None) -> Button:
+        """Create and present a button UI block (GUI only).
+
+        Args:
+            text: Button text to display
+            do: Callable to execute when clicked
+            icon: Optional icon name (Flet icon name)
+
+        Returns:
+            The created Button block (can be used with ui.out.row())
+
+        Example:
+            >>> ui.out.button("Refresh", do=lambda: ui.runtime.get_command("refresh").run(), icon="refresh")
+        """
+        block = Button(text=text, do=do, icon=icon)
+        block.present()
+        return block
+
+    @staticmethod
+    def row(children: List[UiBlock]) -> None:
+        """Create and present a row container with UI blocks displayed horizontally.
+
+        In GUI mode, displays children side-by-side.
+        In CLI mode, displays children vertically.
+
+        Args:
+            children: List of UI blocks to display in the row
+
+        Example:
+            >>> from typer_gui import Link
+            >>> ui.out.row([
+            ...     Link("Link 1", do=lambda: ui.command("cmd1").select()),
+            ...     Link("Link 2", do=lambda: ui.command("cmd2").select()),
+            ... ])
+        """
+        block = Row(children=children)
+        block.present()
 
 
 def render_for_mode(blocks: Union[UiBlock, List[UiBlock]]) -> Union[UiBlock, List[UiBlock], None]:

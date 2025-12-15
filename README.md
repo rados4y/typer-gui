@@ -161,9 +161,9 @@ The generated GUI has three main areas:
 
 Typer-GUI provides decorators to customize how commands appear and behave in the GUI. These work alongside your Typer decorators.
 
-### Using `@ui.command()`
+### Using `@ui.options()`
 
-The `@ui.command()` decorator adds GUI-specific options to your commands:
+The `@ui.options()` decorator adds GUI-specific options to your commands:
 
 ```python
 import typer
@@ -173,7 +173,7 @@ app = typer.Typer()
 ui = typer_gui.Ui(app, title="My App")
 
 @app.command()
-@ui.command(is_button=True, is_long=True)
+@ui.options(is_button=True, is_long=True)
 def process():
     """Long-running process with real-time output."""
     for i in range(10):
@@ -185,59 +185,29 @@ def process():
 
 - **`is_button`** (bool): Display command as a highlighted button instead of a text link
   ```python
-  @ui.command(is_button=True)
+  @ui.options(is_button=True)
   ```
 
 - **`is_long`** (bool): Enable real-time output streaming for long-running commands
   ```python
-  @ui.command(is_long=True)
-  ```
-
-- **`is_markdown`** (bool): Render the command's return value as Markdown
-  ```python
-  @app.command()
-  @ui.command(is_markdown=True)
-  def info() -> str:
-      return "# Hello\n\nThis is **bold** text!"
+  @ui.options(is_long=True)
   ```
 
 - **`is_auto_exec`** (bool): Execute automatically when selected (hides "Run Command" button)
   ```python
   @app.command()
-  @ui.command(is_auto_exec=True)
+  @ui.options(is_auto_exec=True)
   def status():
       print(f"Current time: {datetime.now()}")
   ```
-
-### Using `@gui_command()` (Alternative)
-
-If you're using the separate runner approach, use `@gui_command()` instead:
-
-```python
-from typer_gui import gui_command
-import typer
-
-app = typer.Typer()
-
-@app.command()
-@gui_command(is_button=True, is_long=True)
-def process():
-    """Long-running process."""
-    for i in range(10):
-        print(f"Step {i}")
-        time.sleep(1)
-```
-
-The options are identical to `@ui.command()`.
 
 ### Markdown Output Example
 
 ```python
 @app.command()
-@ui.command(is_markdown=True)
-def report() -> str:
+def report():
     """Generate a formatted report."""
-    return """
+    ui.out.md("""
 # System Report
 
 ## Status
@@ -257,7 +227,7 @@ def report() -> str:
 # Example code block
 print("Hello World")
 ```
-"""
+""")
 ```
 
 ## Supported Parameter Types
@@ -311,14 +281,13 @@ Ui(app, *, title=None, description=None)
 
 **Methods:**
 
-#### `ui.command(*, is_button=False, is_long=False, is_markdown=False, is_auto_exec=False)`
+#### `ui.options(*, is_button=False, is_long=False, is_auto_exec=False)`
 
 Decorator to add GUI-specific options to a Typer command.
 
 **Parameters:**
 - `is_button` (bool): Display as a button in the left panel
 - `is_long` (bool): Enable real-time output streaming for long-running commands
-- `is_markdown` (bool): Render return value as Markdown
 - `is_auto_exec` (bool): Execute automatically when selected, hide 'Run Command' button
 
 **Example:**
@@ -330,7 +299,7 @@ app = typer.Typer()
 ui = typer_gui.Ui(app, title="My App")
 
 @app.command()
-@ui.command(is_button=True, is_long=True)
+@ui.options(is_button=True, is_long=True)
 def process():
     for i in range(10):
         print(f"Step {i}")
@@ -367,31 +336,6 @@ This allows you to have a single entry point that supports both GUI and CLI mode
 
 ---
 
-### `gui_command(*, is_button=False, is_long=False, is_markdown=False, is_auto_exec=False)`
-
-Decorator to add GUI-specific options to a Typer command (standalone decorator).
-
-**Parameters:**
-- `is_button` (bool): Display as a button in the left panel
-- `is_long` (bool): Enable real-time output streaming
-- `is_markdown` (bool): Render return value as Markdown
-- `is_auto_exec` (bool): Execute automatically when selected
-
-**Example:**
-```python
-from typer_gui import gui_command
-import typer
-
-app = typer.Typer()
-
-@app.command()
-@gui_command(is_button=True, is_markdown=True)
-def info() -> str:
-    return "# Hello **World**!"
-```
-
----
-
 ### `build_gui_model(app, *, title=None, description=None)`
 
 Build a structured representation of a Typer app (useful for testing or custom implementations).
@@ -419,7 +363,7 @@ for command in gui_model.commands:
 
 ### `Markdown` Class
 
-A return type for commands that produce Markdown output (alternative to `is_markdown=True`).
+A return type for commands that produce Markdown output.
 
 **Example:**
 ```python
@@ -430,7 +374,7 @@ def info() -> Markdown:
     return Markdown("# Hello\n\nThis is **bold** text!")
 ```
 
-**Note:** Using `is_markdown=True` and returning a string is the preferred approach.
+**Note:** Using `ui.out.md()` is the preferred approach for markdown output.
 
 ## Examples
 
@@ -441,7 +385,7 @@ Check out the `examples/` directory for comprehensive working examples:
   - Enum parameters with dropdown selection
   - Button-styled commands (`is_button=True`)
   - Long-running commands with real-time output (`is_long=True`)
-  - Markdown-formatted output (`is_markdown=True`)
+  - Markdown-formatted output (`ui.out.md()`)
   - Auto-executing commands (`is_auto_exec=True`)
   - Combination features (e.g., button + long-running)
 
@@ -486,7 +430,7 @@ pytest
 - ✅ Help text and descriptions
 - ✅ Live output capture (stdout/stderr)
 - ✅ **Real-time output streaming** for long-running commands (`is_long=True`)
-- ✅ **Markdown rendering** for rich formatted output (`is_markdown=True`)
+- ✅ **Markdown rendering** for rich formatted output (`ui.out.md()`)
 - ✅ **Auto-execution** - commands that run on selection (`is_auto_exec=True`)
 - ✅ **Button styling** for important commands (`is_button=True`)
 - ✅ **Integrated API** with `Ui` class for cleaner code
@@ -515,7 +459,7 @@ pytest
 
 1. **Reflection**: Typer-GUI uses Python's introspection (`inspect` module) to analyze your Typer app, extracting command names, parameter types, defaults, and help text from function signatures.
 
-2. **Decorator Metadata**: The `@ui.command()` or `@gui_command()` decorators attach GUI-specific metadata (button styling, streaming, markdown, auto-exec) to your functions without affecting Typer's CLI behavior.
+2. **Decorator Metadata**: The `@ui.options()` decorator attaches GUI-specific metadata (button styling, streaming, auto-exec) to your functions without affecting Typer's CLI behavior.
 
 3. **GUI Generation**: Based on the reflection data and decorator metadata, it generates a Flet-based GUI with appropriate controls for each parameter type (text fields, dropdowns, checkboxes).
 
@@ -524,7 +468,7 @@ pytest
 5. **Output Capture**:
    - **Regular commands**: stdout and stderr are buffered and displayed when the command completes
    - **Long-running commands** (`is_long=True`): Output is streamed in real-time as it's produced using custom IO writers
-   - **Markdown commands** (`is_markdown=True`): Return values are rendered with GitHub-flavored markdown formatting
+   - **Markdown output** (`ui.out.md()`): Content is rendered with GitHub-flavored markdown formatting
 
 ## Publishing Releases
 

@@ -10,6 +10,7 @@ import flet as ft
 
 from .types import GuiApp, GuiCommand, GuiParam, ParamType, Markdown
 from .ui_blocks import UiBlock, UiContext, set_context
+from .ui_app import UIApp, UICommand
 
 
 class _RealTimeWriter(io.StringIO):
@@ -41,17 +42,29 @@ class _RealTimeWriter(io.StringIO):
 class TyperGUI:
     """Main GUI application class for Typer-GUI."""
 
-    def __init__(self, gui_app: GuiApp):
-        """Initialize the GUI with a GuiApp model."""
+    def __init__(self, gui_app: GuiApp, ui_instance=None):
+        """Initialize the GUI with a GuiApp model.
+
+        Args:
+            gui_app: The GuiApp model
+            ui_instance: Optional Ui instance to register the UIApp with
+        """
         self.gui_app = gui_app
         self.current_command: Optional[GuiCommand] = None
         self.form_controls: dict[str, ft.Control] = {}
+        self._ui_instance = ui_instance
 
         # UI components
         self.command_list: Optional[ft.ListView] = None
         self.form_container: Optional[ft.Column] = None
         self.output_view: Optional[ft.ListView] = None
         self.page: Optional[ft.Page] = None
+
+        # UIApp instance - provides command operations and block access
+        self.ui_app: Optional[UIApp] = None
+
+        # UI block references for command sections
+        self.command_blocks: dict[str, dict[str, ft.Container]] = {}
 
     def build(self, page: ft.Page) -> None:
         """Build and display the GUI."""
@@ -61,9 +74,22 @@ class TyperGUI:
         page.window_height = 700
         page.padding = 0
 
+        # Initialize UIApp
+        self.ui_app = UIApp(self, self.gui_app)
+
+        # Register UIApp with Ui instance if provided
+        if self._ui_instance:
+            self._ui_instance._ui_app_instance = self.ui_app
+
         # Create the main layout
         header = self._create_header()
         content = self._create_content()
+
+        # Store references to header and body in UIApp.blocks
+        if self.ui_app:
+            self.ui_app.blocks.header = header
+            # body is the right panel's form_container
+            self.ui_app.blocks.body = self.form_container
 
         page.add(
             ft.Column(
@@ -209,8 +235,9 @@ class TyperGUI:
         # Build form for the selected command
         form_controls = []
 
-        # Command title and help
-        form_controls.append(
+        # Command title and help - wrapped in container for block reference
+        title_controls = []
+        title_controls.append(
             ft.Text(
                 command.name.upper(),
                 size=20,
@@ -219,7 +246,7 @@ class TyperGUI:
         )
 
         if command.help_text:
-            form_controls.append(
+            title_controls.append(
                 ft.Text(
                     command.help_text,
                     size=14,
@@ -227,15 +254,26 @@ class TyperGUI:
                 )
             )
 
+        title_container = ft.Container(
+            content=ft.Column(controls=title_controls, spacing=5)
+        )
+        form_controls.append(title_container)
         form_controls.append(ft.Divider())
 
-        # Create controls for each parameter
+        # Create controls for each parameter - wrapped in container for block reference
+        param_controls = []
         for param in command.params:
             control = self._create_param_control(param)
             if control:
-                form_controls.append(control)
+                param_controls.append(control)
 
-        # Add Run button only if not auto-exec
+        arguments_container = ft.Container(
+            content=ft.Column(controls=param_controls, spacing=10)
+        )
+        form_controls.append(arguments_container)
+
+        # Add Run button only if not auto-exec - wrapped in container for block reference
+        actions_container = ft.Container()
         if not command.gui_options.is_auto_exec:
             run_button = ft.ElevatedButton(
                 text="Run Command",
@@ -244,14 +282,28 @@ class TyperGUI:
                 bgcolor=ft.Colors.BLUE_700,
                 color=ft.Colors.WHITE,
             )
-            form_controls.append(
-                ft.Container(content=run_button, margin=ft.margin.only(top=20))
-            )
+            actions_container.content = run_button
+            actions_container.margin = ft.margin.only(top=20)
+
+        form_controls.append(actions_container)
+
+        # Result container (output view is used for results)
+        # We'll use output_view as the result container
+        result_container = self.output_view
 
         # Update the form container
         self.form_container.controls = form_controls
         if self.page:
             self.page.update()
+
+        # Update UICommand blocks references
+        if self.ui_app:
+            ui_command = self.ui_app.get_command(command.name)
+            if ui_command:
+                ui_command.blocks.title = title_container
+                ui_command.blocks.arguments = arguments_container
+                ui_command.blocks.actions = actions_container
+                ui_command.blocks.result = result_container
 
         # Auto-execute if configured
         if command.gui_options.is_auto_exec:
@@ -372,7 +424,8 @@ class TyperGUI:
                         mode="gui",
                         page=self.page,
                         output_view=self.output_view,
-                        gui_app=self
+                        gui_app=self,
+                        ui_app=self.ui_app
                     )
                     set_context(context)
 
@@ -398,10 +451,7 @@ class TyperGUI:
 
                 # Handle result for long-running commands
                 if result is not None:
-                    if self.current_command.gui_options.is_markdown:
-                        self._append_markdown(str(result))
-                    elif isinstance(result, Markdown):
-                        # Backward compatibility with Markdown class
+                    if isinstance(result, Markdown):
                         self._append_markdown(result.content)
                     else:
                         self._append_output(f"Result: {result}")
@@ -417,7 +467,8 @@ class TyperGUI:
                         mode="gui",
                         page=self.page,
                         output_view=self.output_view,
-                        gui_app=self
+                        gui_app=self,
+                        ui_app=self.ui_app
                     )
                     set_context(context)
 
@@ -437,10 +488,7 @@ class TyperGUI:
                         self._append_output(stderr_text)
 
                     if result is not None:
-                        if self.current_command.gui_options.is_markdown:
-                            self._append_markdown(str(result))
-                        elif isinstance(result, Markdown):
-                            # Backward compatibility with Markdown class
+                        if isinstance(result, Markdown):
                             self._append_markdown(result.content)
                         else:
                             self._append_output(f"Result: {result}")
@@ -553,11 +601,16 @@ class TyperGUI:
                 self.page.update()
 
 
-def create_flet_app(gui_app: GuiApp):
-    """Create a Flet app function from a GuiApp model."""
+def create_flet_app(gui_app: GuiApp, ui_instance=None):
+    """Create a Flet app function from a GuiApp model.
+
+    Args:
+        gui_app: The GuiApp model
+        ui_instance: Optional Ui instance to register the UIApp with
+    """
 
     def main(page: ft.Page):
-        app = TyperGUI(gui_app)
+        app = TyperGUI(gui_app, ui_instance=ui_instance)
         app.build(page)
 
     return main
