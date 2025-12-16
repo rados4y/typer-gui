@@ -177,10 +177,10 @@ def process_data():
 ```python
 @app.command()
 def show_data():
-    ui.table(
+    ui.out.table(
         headers=["Col1", "Col2"],
         rows=[["A", "B"], ["C", "D"]]
-    )
+    ).present()
 ```
 
 ### Command with UIApp Access

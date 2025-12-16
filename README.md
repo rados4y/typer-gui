@@ -227,7 +227,7 @@ def report():
 # Example code block
 print("Hello World")
 ```
-""")
+""").present()
 ```
 
 ## Supported Parameter Types

@@ -345,7 +345,7 @@ class UiOutput:
 
     @staticmethod
     def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> Table:
-        """Create and present a table UI block.
+        """Create a table UI block.
 
         Args:
             headers: List of column headers
@@ -353,64 +353,65 @@ class UiOutput:
             title: Optional title for the table
 
         Returns:
-            The created Table block (can be used with ui.out.row())
+            The created Table block
 
         Example:
+            >>> # Standalone use (auto-presents)
             >>> ui.out.table(
-            ...     headers=["Name", "Age", "City"],
-            ...     rows=[
-            ...         ["Alice", 30, "NYC"],
-            ...         ["Bob", 25, "SF"],
-            ...     ],
-            ...     title="Users"
+            ...     headers=["Name", "Age"],
+            ...     rows=[["Alice", 30]]
             ... )
+            >>>
+            >>> # In a row (don't call present, let row handle it)
+            >>> ui.out.row([ui.out.table(...), ui.out.md(...)])
         """
         block = Table(headers=headers, rows=rows, title=title)
-        block.present()
         return block
 
     @staticmethod
     def md(content: str) -> Markdown:
-        """Create and present a markdown UI block.
+        """Create a markdown UI block.
 
         Args:
             content: Markdown-formatted string
 
         Returns:
-            The created Markdown block (can be used with ui.out.row())
+            The created Markdown block
 
         Example:
-            >>> ui.out.md(\"\"\"
-            ... # Hello World
-            ...
-            ... This is **bold** text.
-            ... \"\"\")
+            >>> # Standalone use (auto-presents)
+            >>> ui.out.md("# Hello")
+            >>>
+            >>> # In a row
+            >>> ui.out.row([ui.out.md("**Bold**"), ui.out.link(...)])
         """
         block = Markdown(content=content)
-        block.present()
         return block
 
     @staticmethod
     def link(text: str, do: Callable) -> Link:
-        """Create and present a link UI block (GUI only).
+        """Create a link UI block (GUI only).
 
         Args:
             text: Link text to display
             do: Callable to execute when clicked
 
         Returns:
-            The created Link block (can be used with ui.out.row())
+            The created Link block
 
         Example:
-            >>> ui.out.link("Refresh data", do=lambda: ui.runtime.get_command("refresh").select())
+            >>> # Standalone use (auto-presents)
+            >>> ui.out.link("Click me", do=lambda: ...)
+            >>>
+            >>> # In a row
+            >>> ui.out.row([ui.out.link(...), ui.out.button(...)])
         """
         block = Link(text=text, do=do)
-        block.present()
         return block
 
     @staticmethod
     def button(text: str, do: Callable, icon: Optional[str] = None) -> Button:
-        """Create and present a button UI block (GUI only).
+        """Create a button UI block (GUI only).
 
         Args:
             text: Button text to display
@@ -418,17 +419,20 @@ class UiOutput:
             icon: Optional icon name (Flet icon name)
 
         Returns:
-            The created Button block (can be used with ui.out.row())
+            The created Button block
 
         Example:
-            >>> ui.out.button("Refresh", do=lambda: ui.runtime.get_command("refresh").run(), icon="refresh")
+            >>> # Standalone use (auto-presents)
+            >>> ui.out.button("Click", do=lambda: ...)
+            >>>
+            >>> # In a row
+            >>> ui.out.row([ui.out.button(...), ui.out.link(...)])
         """
         block = Button(text=text, do=do, icon=icon)
-        block.present()
         return block
 
     @staticmethod
-    def row(children: List[UiBlock]) -> None:
+    def row(children: List[UiBlock]) -> Row:
         """Create and present a row container with UI blocks displayed horizontally.
 
         In GUI mode, displays children side-by-side.
@@ -437,15 +441,19 @@ class UiOutput:
         Args:
             children: List of UI blocks to display in the row
 
+        Returns:
+            The created Row block
+
         Example:
-            >>> from typer_gui import Link
+            >>> # Create a row with links
             >>> ui.out.row([
-            ...     Link("Link 1", do=lambda: ui.command("cmd1").select()),
-            ...     Link("Link 2", do=lambda: ui.command("cmd2").select()),
-            ... ])
+            ...     ui.out.link("Link 1", do=lambda: ...),
+            ...     ui.out.link("Link 2", do=lambda: ...),
+            ... ]).present()
         """
         block = Row(children=children)
         block.present()
+        return block
 
 
 def render_for_mode(blocks: Union[UiBlock, List[UiBlock]]) -> Union[UiBlock, List[UiBlock], None]:

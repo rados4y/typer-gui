@@ -37,7 +37,7 @@ def show_table():
         headers=["Name", "Email", "Role"],
         rows=selected,
         title="Random Users Sample",
-    )
+    ).present()
 
 
 @app.command()
@@ -63,7 +63,7 @@ Current system metrics (randomly generated):
 ## Status
 All systems operational.
 """
-    )
+    ).present()
 
 
 @app.command()
@@ -98,10 +98,10 @@ This demonstrates all four UICommand methods with both:
 - **Auto-executed commands** (run automatically when selected)
 - **Manual commands** (require explicit execution)
 """
-    )
+    ).present()
 
     print()
-    ui.out.md("### SELECT Method - Navigate to Commands:")
+    ui.out.md("### SELECT Method - Navigate to Commands:").present()
     print()
 
     ui.out.row(
@@ -112,7 +112,7 @@ This demonstrates all four UICommand methods with both:
     )
 
     print()
-    ui.out.md("### RUN Method - Execute and Capture Output:")
+    ui.out.md("### RUN Method - Execute and Capture Output:").present()
     print()
 
     ui.out.row(
@@ -127,7 +127,7 @@ This demonstrates all four UICommand methods with both:
     )
 
     print()
-    ui.out.md("### INCLUDE Method - Execute Inline:")
+    ui.out.md("### INCLUDE Method - Execute Inline:").present()
     print()
 
     ui.out.row(
@@ -142,7 +142,7 @@ This demonstrates all four UICommand methods with both:
     )
 
     print()
-    ui.out.md("### CLEAR Method - Clear and Re-execute:")
+    ui.out.md("### CLEAR Method - Clear and Re-execute:").present()
     print()
 
     ui.out.row(
@@ -152,7 +152,7 @@ This demonstrates all four UICommand methods with both:
     )
 
     print()
-    ui.out.md("---")
+    ui.out.md("---").present()
 
 
 if __name__ == "__main__":

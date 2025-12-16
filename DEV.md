@@ -19,44 +19,9 @@ UICommand:
 - blocks.result - flet section with result of command
 
 =====
-task 1.
-NO BACKWARD compatibilty, clean up old code
-UIApp should have attribute out that will have list of available ui blocks, it can be used e.g.:
-ui.out.table()
-ui.out.md() # markdown
+clean up code organization and introduce correct code design enforcing separation of concerns, e.g.:
 
-move all ui block components from UIApp to UIApp.out
-fix examples
-
-task 2. ✅ DONE
-NO BACKWARD compatibilty, clean up old code
-remove is_markdown @ui.command(is_markdown=True), markdown will be supported only by ui.out.md()
-
-task 3 ✅ DONE
-NO BACKWARD compatibilty, clean up old code
-ui.link and ui.button should have do methods like so
-ui.out.link("Refresh data",do=lambda:ui.runtime.get_command("refresh").select())
-
-task 4
-NO BACKWARD compatibilty, clean up old code
-current code
---
-@app.command()
-@ui.command(is_button=True) # Display as prominent button
-def greet():
-...
---
-should be refactored, i can provide attribute block that will return ui.block component which will be used to present command
-so it should be right now supported as:
---
-@app.command()
-@ui.command(block=lambda:ui.out.button("Greet",do:lambda:ui.call("greet")))
-def greet():
-...
---
-or simpler, ui component will be called with UICommand as command attribute
-@app.command()
-@ui.command(block=ui.out.button)
-def greet():
-...
---
+- single instance of Typer UI that represent root application context, it holds definition of all commands, it is central commander, knows how to handle all operations triggered by dedicated UIs (yet there is no dependency on specific UI)
+- seperate class that holds complete build of flet UI, this class can be potentially replaced with other without impact on other classes
+- seperate executors for UI and CLI with context
+- seperate base class for Block UIs with

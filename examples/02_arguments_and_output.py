@@ -66,7 +66,7 @@ Format text with **bold**, *italic*, and `code`.
 | Tables  | ✓      |
 | Code    | ✓      |
 | Links   | ✓      |
-""")
+""").present()
 
 
 @app.command()
@@ -96,7 +96,7 @@ This command runs **automatically** when selected.
 - Info screens and dashboards
 - Commands with no required parameters
 - Display-only commands
-""")
+""").present()
 
 
 if __name__ == "__main__":
