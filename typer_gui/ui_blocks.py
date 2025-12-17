@@ -1,13 +1,15 @@
-"""UI Blocks - Rich components that can be returned from commands."""
+"""UI Blocks - Rich components with async event-driven rendering."""
 
 from abc import ABC, abstractmethod
 from typing import Any, Optional, List, Callable, Union, TYPE_CHECKING
 from dataclasses import dataclass
 import threading
+import asyncio
+import uuid
 
 if TYPE_CHECKING:
     import flet as ft
-
+    from .ui_app import UIApp
 
 # Global context storage using thread-local storage
 _context_storage = threading.local()
@@ -19,22 +21,27 @@ class UiContext:
     Tracks whether we're in CLI or GUI mode and provides rendering targets.
     """
 
-    def __init__(self, mode: str, page: Optional[Any] = None, output_view: Optional[Any] = None, gui_app: Optional[Any] = None, ui_app: Optional[Any] = None):
+    def __init__(
+        self,
+        mode: str,
+        ui_app: Optional['UIApp'] = None,
+        page: Optional[Any] = None,
+        output_view: Optional[Any] = None,
+    ):
         """Initialize UI context.
 
         Args:
             mode: "cli" or "gui"
+            ui_app: Reference to UIApp instance for event emission
             page: Flet page object (GUI mode only)
             output_view: Flet ListView for output (GUI mode only)
-            gui_app: Reference to GUI app for command execution (GUI mode only)
-            ui_app: Reference to UIApp instance (GUI mode only)
         """
         self.mode = mode
+        self.ui_app = ui_app
         self.page = page
         self.output_view = output_view
-        self.gui_app = gui_app
-        self.ui_app = ui_app
         self._row_stack: List[List['UiBlock']] = []  # Stack of row contexts
+        self._container_stack: List[str] = []  # Stack of container IDs
 
     def is_cli(self) -> bool:
         """Check if in CLI mode."""
@@ -48,14 +55,47 @@ class UiContext:
         """Check if currently inside a row context."""
         return len(self._row_stack) > 0
 
-    def enter_row(self) -> None:
-        """Enter a row context - blocks will be collected instead of rendered."""
-        self._row_stack.append([])
+    async def enter_row(self) -> str:
+        """Enter a row context - blocks will be collected instead of rendered.
 
-    def exit_row(self) -> List['UiBlock']:
-        """Exit a row context and return collected blocks."""
+        Returns:
+            Container ID
+        """
+        self._row_stack.append([])
+        container_id = str(uuid.uuid4())
+        self._container_stack.append(container_id)
+
+        # Emit ContainerStarted event
+        if self.ui_app:
+            from .events import ContainerStarted
+            await self.ui_app.emit_event(
+                ContainerStarted(
+                    container_type="row",
+                    container_id=container_id,
+                    params={},
+                )
+            )
+
+        return container_id
+
+    async def exit_row(self) -> List['UiBlock']:
+        """Exit a row context and return collected blocks.
+
+        Returns:
+            List of collected blocks
+        """
         if self._row_stack:
-            return self._row_stack.pop()
+            blocks = self._row_stack.pop()
+            container_id = self._container_stack.pop() if self._container_stack else ""
+
+            # Emit ContainerEnded event
+            if self.ui_app:
+                from .events import ContainerEnded
+                await self.ui_app.emit_event(
+                    ContainerEnded(container_id=container_id)
+                )
+
+            return blocks
         return []
 
     def add_to_row(self, block: 'UiBlock') -> None:
@@ -63,26 +103,34 @@ class UiContext:
         if self._row_stack:
             self._row_stack[-1].append(block)
 
-    def render(self, block: 'UiBlock') -> None:
-        """Render a UI block to the current context."""
+    async def render(self, block: 'UiBlock') -> None:
+        """Render a UI block to the current context.
+
+        Args:
+            block: Block to render
+        """
         # If inside a row context, collect the block instead of rendering
         if self.is_in_row():
             self.add_to_row(block)
             return
 
-        # Normal rendering
-        if self.is_cli():
-            # CLI mode - print if not GUI-only
-            if not block.is_gui_only():
-                print(block.render_cli())
+        # Emit BlockEmitted event for runner to handle
+        if self.ui_app:
+            from .events import BlockEmitted
+            await self.ui_app.emit_event(BlockEmitted(block=block))
         else:
-            # GUI mode - append to output view
-            if self.output_view:
-                flet_component = block.render_flet(self)
-                if flet_component:
-                    self.output_view.controls.append(flet_component)
-                    if self.page:
-                        self.page.update()
+            # Fallback: direct rendering (for legacy compatibility)
+            if self.is_cli():
+                if not block.is_gui_only():
+                    print(block.render_cli())
+            else:
+                # GUI mode fallback
+                if self.output_view:
+                    flet_component = block.render_flet(self)
+                    if flet_component:
+                        self.output_view.controls.append(flet_component)
+                        if self.page:
+                            self.page.update()
 
 
 def get_context() -> Optional[UiContext]:
@@ -127,11 +175,25 @@ class UiBlock(ABC):
         """
         return False
 
-    def present(self) -> None:
-        """Present this block in the current context."""
+    async def present(self) -> None:
+        """Present this block in the current context (async)."""
         context = get_context()
         if context:
-            context.render(self)
+            await context.render(self)
+
+    def present_sync(self) -> None:
+        """Present this block synchronously (for backward compatibility)."""
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Already in async context - schedule as task
+                asyncio.create_task(self.present())
+            else:
+                # No event loop - run sync
+                loop.run_until_complete(self.present())
+        except RuntimeError:
+            # No event loop at all - create one
+            asyncio.run(self.present())
 
 
 @dataclass
@@ -214,32 +276,22 @@ class Markdown(UiBlock):
 
     def render_cli(self) -> str:
         """Render markdown as plain text for CLI."""
-        # Simple markdown-to-text conversion
-        # Remove markdown formatting for CLI
         import re
 
         text = self.content
-        # Remove bold/italic markers
-        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # **bold**
-        text = re.sub(r'\*([^*]+)\*', r'\1', text)      # *italic*
-        text = re.sub(r'__([^_]+)__', r'\1', text)      # __bold__
-        text = re.sub(r'_([^_]+)_', r'\1', text)        # _italic_
-        # Remove inline code markers
-        text = re.sub(r'`([^`]+)`', r'\1', text)        # `code`
-        # Convert headers to uppercase
+        # Remove markdown formatting
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+        text = re.sub(r'\*([^*]+)\*', r'\1', text)
+        text = re.sub(r'__([^_]+)__', r'\1', text)
+        text = re.sub(r'_([^_]+)_', r'\1', text)
+        text = re.sub(r'`([^`]+)`', r'\1', text)
         text = re.sub(r'^#+\s+(.+)$', lambda m: m.group(1).upper(), text, flags=re.MULTILINE)
 
-        # Replace Unicode characters with ASCII equivalents for better CLI compatibility
+        # Unicode to ASCII
         replacements = {
-            '\u2713': '[x]',  # ✓ -> [x]
-            '\u2717': '[ ]',  # ✗ -> [ ]
-            '\u2022': '*',    # • -> *
-            '\u2014': '--',   # — -> --
-            '\u2013': '-',    # – -> -
-            '\u201c': '"',    # " -> "
-            '\u201d': '"',    # " -> "
-            '\u2018': "'",    # ' -> '
-            '\u2019': "'",    # ' -> '
+            '\u2713': '[x]', '\u2717': '[ ]', '\u2022': '*',
+            '\u2014': '--', '\u2013': '-', '\u201c': '"',
+            '\u201d': '"', '\u2018': "'", '\u2019': "'",
         }
         for unicode_char, ascii_char in replacements.items():
             text = text.replace(unicode_char, ascii_char)
@@ -274,7 +326,6 @@ class Link(UiBlock):
         import flet as ft
 
         def on_click(e):
-            """Handle link click to execute the action."""
             self.do()
 
         return ft.TextButton(
@@ -304,13 +355,11 @@ class Button(UiBlock):
         """Render as button in Flet."""
         import flet as ft
 
-        # Map icon name to Flet icon
         icon_obj = None
         if self.icon:
             icon_obj = getattr(ft.Icons, self.icon.upper(), None)
 
         def on_click(e):
-            """Handle button click to execute the action."""
             self.do()
 
         return ft.ElevatedButton(
@@ -326,11 +375,7 @@ class Button(UiBlock):
 
 @dataclass
 class Row(UiBlock):
-    """Container for displaying UI blocks in a horizontal row.
-
-    In GUI mode, displays children side-by-side.
-    In CLI mode, displays children vertically (one per line).
-    """
+    """Container for displaying UI blocks in a horizontal row."""
 
     children: List[UiBlock]
 
@@ -348,7 +393,6 @@ class Row(UiBlock):
         """Render children horizontally in Flet."""
         import flet as ft
 
-        # Render each child and collect the controls
         controls = []
         for child in self.children:
             control = child.render_flet(context)
@@ -357,41 +401,72 @@ class Row(UiBlock):
 
         return ft.Row(controls=controls, spacing=10, wrap=True)
 
-    def is_gui_only(self) -> bool:
-        """Row is not GUI-only, but renders differently in CLI."""
-        return False
-
 
 class RowContext:
-    """Context manager for creating rows of UI blocks.
+    """Async context manager for creating rows of UI blocks."""
 
-    Blocks created inside a row context are collected and displayed together.
-    """
+    def __init__(self):
+        self.container_id: Optional[str] = None
 
-    def __enter__(self):
+    async def __aenter__(self):
         """Enter row context - blocks will be collected."""
         context = get_context()
         if context:
-            context.enter_row()
+            self.container_id = await context.enter_row()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Exit row context - render collected blocks as a row."""
         context = get_context()
         if context:
-            blocks = context.exit_row()
+            blocks = await context.exit_row()
             if blocks:
                 row = Row(children=blocks)
-                row.present()
+                await row.present()
         return False
+
+    # Synchronous context manager support for backward compatibility
+    def __enter__(self):
+        """Synchronous enter (for backward compatibility)."""
+        context = get_context()
+        if context:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Create task but don't await
+                    task = asyncio.create_task(context.enter_row())
+                    # Store for exit
+                    self._enter_task = task
+                else:
+                    self.container_id = loop.run_until_complete(context.enter_row())
+            except RuntimeError:
+                self.container_id = asyncio.run(context.enter_row())
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Synchronous exit (for backward compatibility)."""
+        context = get_context()
+        if context:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(self._async_exit(context))
+                else:
+                    loop.run_until_complete(self._async_exit(context))
+            except RuntimeError:
+                asyncio.run(self._async_exit(context))
+        return False
+
+    async def _async_exit(self, context):
+        """Helper for async exit."""
+        blocks = await context.exit_row()
+        if blocks:
+            row = Row(children=blocks)
+            await row.present()
 
 
 class UiOutput:
-    """Container for UI output methods.
-
-    Provides methods to create and present UI blocks like tables, markdown, links, and buttons.
-    Available as ui.out in command contexts.
-    """
+    """Container for UI output methods."""
 
     @staticmethod
     def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> Table:
@@ -399,26 +474,21 @@ class UiOutput:
 
         Args:
             headers: List of column headers
-            rows: List of rows, where each row is a list of cell values
-            title: Optional title for the table
+            rows: List of rows
+            title: Optional title
 
         Returns:
             The created Table block
-
-        Example:
-            >>> # Standalone use (auto-presents)
-            >>> ui.out.table(
-            ...     headers=["Name", "Age"],
-            ...     rows=[["Alice", 30]]
-            ... )
-            >>>
-            >>> # In a row context (collected, not auto-presented)
-            >>> with ui.out.row():
-            ...     ui.out.table(...)
-            ...     ui.out.md(...)
         """
         block = Table(headers=headers, rows=rows, title=title)
-        block.present()
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(block.present())
+            else:
+                loop.run_until_complete(block.present())
+        except RuntimeError:
+            asyncio.run(block.present())
         return block
 
     @staticmethod
@@ -430,18 +500,16 @@ class UiOutput:
 
         Returns:
             The created Markdown block
-
-        Example:
-            >>> # Standalone use (auto-presents)
-            >>> ui.out.md("# Hello")
-            >>>
-            >>> # In a row context (collected, not auto-presented)
-            >>> with ui.out.row():
-            ...     ui.out.md("**Bold**")
-            ...     ui.out.link(...)
         """
         block = Markdown(content=content)
-        block.present()
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(block.present())
+            else:
+                loop.run_until_complete(block.present())
+        except RuntimeError:
+            asyncio.run(block.present())
         return block
 
     @staticmethod
@@ -449,23 +517,21 @@ class UiOutput:
         """Create and present a link UI block (GUI only).
 
         Args:
-            text: Link text to display
+            text: Link text
             do: Callable to execute when clicked
 
         Returns:
             The created Link block
-
-        Example:
-            >>> # Standalone use (auto-presents)
-            >>> ui.out.link("Click me", do=lambda: ...)
-            >>>
-            >>> # In a row context (collected, not auto-presented)
-            >>> with ui.out.row():
-            ...     ui.out.link(...)
-            ...     ui.out.button(...)
         """
         block = Link(text=text, do=do)
-        block.present()
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(block.present())
+            else:
+                loop.run_until_complete(block.present())
+        except RuntimeError:
+            asyncio.run(block.present())
         return block
 
     @staticmethod
@@ -473,77 +539,34 @@ class UiOutput:
         """Create and present a button UI block (GUI only).
 
         Args:
-            text: Button text to display
+            text: Button text
             do: Callable to execute when clicked
-            icon: Optional icon name (Flet icon name)
+            icon: Optional icon name
 
         Returns:
             The created Button block
-
-        Example:
-            >>> # Standalone use (auto-presents)
-            >>> ui.out.button("Click", do=lambda: ...)
-            >>>
-            >>> # In a row context (collected, not auto-presented)
-            >>> with ui.out.row():
-            ...     ui.out.button(...)
-            ...     ui.out.link(...)
         """
         block = Button(text=text, do=do, icon=icon)
-        block.present()
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(block.present())
+            else:
+                loop.run_until_complete(block.present())
+        except RuntimeError:
+            asyncio.run(block.present())
         return block
 
     @staticmethod
     def row() -> RowContext:
         """Create a row context for displaying UI blocks horizontally.
 
-        In GUI mode, displays children side-by-side.
-        In CLI mode, displays children vertically.
-
         Returns:
             A context manager for collecting blocks into a row
 
         Example:
-            >>> # Use as context manager
             >>> with ui.out.row():
             ...     ui.out.link("Link 1", do=lambda: ...)
-            ...     ui.out.link("Link 2", do=lambda: ...)
             ...     ui.out.button("Action", do=lambda: ...)
         """
         return RowContext()
-
-
-def render_for_mode(blocks: Union[UiBlock, List[UiBlock]]) -> Union[UiBlock, List[UiBlock], None]:
-    """Helper function to render UI blocks appropriately for CLI or GUI mode.
-
-    In CLI mode, prints the blocks and returns None.
-    In GUI mode, returns the blocks unchanged for GUI rendering.
-
-    Args:
-        blocks: A single UiBlock or list of UiBlocks
-
-    Returns:
-        The blocks if in GUI mode, None if in CLI mode
-
-    Example:
-        >>> @app.command()
-        >>> def my_command():
-        >>>     return render_for_mode(ui.table(...))
-    """
-    # Import here to avoid circular dependency
-    from .ui import Ui
-
-    if Ui.is_cli_mode():
-        # CLI mode - print the blocks
-        if isinstance(blocks, UiBlock):
-            if not blocks.is_gui_only():
-                print(blocks.render_cli())
-        elif isinstance(blocks, list):
-            for block in blocks:
-                if isinstance(block, UiBlock) and not block.is_gui_only():
-                    print(block.render_cli())
-                    print()  # Add spacing
-        return None
-    else:
-        # GUI mode - return blocks for GUI rendering
-        return blocks

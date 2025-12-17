@@ -3,21 +3,19 @@
 import inspect
 from enum import Enum as PyEnum
 from typing import Any, Callable, Optional, get_args, get_origin
-from functools import wraps
 
 import typer
 from typer.models import CommandInfo, ParameterInfo
 
-from .types import GuiApp, GuiCommand, GuiParam, ParamType, GuiCommandOptions
+from .specs import AppSpec, CommandSpec, ParamSpec, CommandUiSpec, ParamType
 
 
 # Attribute name for storing GUI options on functions
 _GUI_OPTIONS_ATTR = "__typer_gui_options__"
 
 
-def _get_param_type(annotation: Any) -> tuple[ParamType, Optional[type], Optional[list[str]]]:
-    """
-    Determine the ParamType from a Python type annotation.
+def _get_param_type(annotation: Any) -> tuple[ParamType, Optional[type], Optional[tuple[str, ...]]]:
+    """Determine the ParamType from a Python type annotation.
 
     Returns:
         Tuple of (ParamType, original_type, enum_choices)
@@ -46,15 +44,15 @@ def _get_param_type(annotation: Any) -> tuple[ParamType, Optional[type], Optiona
 
     # Handle Enum types
     if inspect.isclass(annotation) and issubclass(annotation, PyEnum):
-        choices = [e.value for e in annotation]
+        choices = tuple([e.value for e in annotation])
         return ParamType.ENUM, annotation, choices
 
     # Unsupported type
     return ParamType.UNSUPPORTED, annotation, None
 
 
-def _extract_param_info(param_name: str, param: inspect.Parameter) -> GuiParam:
-    """Extract GUI parameter information from an inspect.Parameter."""
+def _extract_param_info(param_name: str, param: inspect.Parameter) -> ParamSpec:
+    """Extract parameter information from an inspect.Parameter."""
     from typer.models import ArgumentInfo, OptionInfo
 
     # Get the annotation
@@ -69,8 +67,6 @@ def _extract_param_info(param_name: str, param: inspect.Parameter) -> GuiParam:
         typer_info = param.default
 
     # Determine if required
-    # ArgumentInfo with no default means required
-    # OptionInfo always has a default (False for flags, or explicit value)
     required = False
     default_value = None
 
@@ -90,16 +86,16 @@ def _extract_param_info(param_name: str, param: inspect.Parameter) -> GuiParam:
         default_value = param.default
 
     # Build CLI flags
-    cli_flags = []
+    cli_flags = ()
     if typer_info and hasattr(typer_info, "param_decls") and typer_info.param_decls:
-        cli_flags = list(typer_info.param_decls)
+        cli_flags = tuple(typer_info.param_decls)
 
     # Get help text
     help_text = None
     if typer_info and hasattr(typer_info, "help") and typer_info.help:
         help_text = typer_info.help
 
-    return GuiParam(
+    return ParamSpec(
         name=param_name,
         param_type=param_type,
         required=required,
@@ -111,8 +107,8 @@ def _extract_param_info(param_name: str, param: inspect.Parameter) -> GuiParam:
     )
 
 
-def _extract_command_info(command_name: str, command_info: CommandInfo) -> GuiCommand:
-    """Extract GUI command information from Typer's CommandInfo."""
+def _extract_command_info(command_name: str, command_info: CommandInfo) -> CommandSpec:
+    """Extract command information from Typer's CommandInfo."""
     callback = command_info.callback
 
     # Get help text from docstring or callback help
@@ -123,43 +119,52 @@ def _extract_command_info(command_name: str, command_info: CommandInfo) -> GuiCo
         help_text = callback.__doc__.strip()
 
     # Extract parameters from callback signature
-    params: list[GuiParam] = []
+    params: list[ParamSpec] = []
     if callback:
         sig = inspect.signature(callback)
         for param_name, param in sig.parameters.items():
-            gui_param = _extract_param_info(param_name, param)
-            params.append(gui_param)
+            param_spec = _extract_param_info(param_name, param)
+            params.append(param_spec)
 
     # Extract GUI options if present
-    gui_options = GuiCommandOptions()
+    ui_spec = CommandUiSpec()
     if callback and hasattr(callback, _GUI_OPTIONS_ATTR):
-        gui_options = getattr(callback, _GUI_OPTIONS_ATTR)
+        # Legacy GuiCommandOptions -> CommandUiSpec conversion
+        legacy_options = getattr(callback, _GUI_OPTIONS_ATTR)
+        ui_spec = CommandUiSpec(
+            is_button=getattr(legacy_options, 'is_button', False),
+            is_long=getattr(legacy_options, 'is_long', False),
+            is_auto_exec=getattr(legacy_options, 'is_auto_exec', False),
+        )
 
-    return GuiCommand(
+    return CommandSpec(
         name=command_name,
         callback=callback,
         help_text=help_text,
-        params=params,
-        gui_options=gui_options,
+        params=tuple(params),
+        ui_spec=ui_spec,
     )
 
 
-def build_gui_model(app: typer.Typer, *, title: Optional[str] = None, description: Optional[str] = None) -> GuiApp:
-    """
-    Build a GUI model from a Typer application.
+def build_app_spec(
+    app: typer.Typer,
+    *,
+    title: Optional[str] = None,
+    description: Optional[str] = None
+) -> AppSpec:
+    """Build an application specification from a Typer app.
 
     Args:
         app: A Typer application instance
-        title: Optional title for the GUI
-        description: Optional description for the GUI
+        title: Optional title for the application
+        description: Optional description for the application
 
     Returns:
-        GuiApp: A structured representation of the Typer app
+        AppSpec: Immutable application specification
     """
-    commands: list[GuiCommand] = []
+    commands: list[CommandSpec] = []
 
     # Access the registered commands from Typer
-    # Typer stores commands in app.registered_commands
     if hasattr(app, "registered_commands"):
         for command_info in app.registered_commands:
             # Get command name
@@ -170,13 +175,37 @@ def build_gui_model(app: typer.Typer, *, title: Optional[str] = None, descriptio
             # Convert underscores to dashes to match Typer's CLI convention
             command_name = command_name.replace("_", "-")
 
-            gui_command = _extract_command_info(command_name, command_info)
-            commands.append(gui_command)
+            command_spec = _extract_command_info(command_name, command_info)
+            commands.append(command_spec)
 
     # Handle the case where there's a single callback (no explicit commands)
     if not commands and hasattr(app, "registered_callback") and app.registered_callback:
         callback_info = app.registered_callback
-        gui_command = _extract_command_info("main", callback_info)
-        commands.append(gui_command)
+        command_spec = _extract_command_info("main", callback_info)
+        commands.append(command_spec)
 
-    return GuiApp(commands=commands, title=title, description=description)
+    return AppSpec(
+        commands=tuple(commands),
+        title=title,
+        description=description,
+    )
+
+
+# Backward compatibility alias
+def build_gui_model(
+    app: typer.Typer,
+    *,
+    title: Optional[str] = None,
+    description: Optional[str] = None
+) -> AppSpec:
+    """Deprecated: Use build_app_spec instead.
+
+    Args:
+        app: A Typer application instance
+        title: Optional title for the application
+        description: Optional description for the application
+
+    Returns:
+        AppSpec: Immutable application specification
+    """
+    return build_app_spec(app, title=title, description=description)
