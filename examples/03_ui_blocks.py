@@ -37,7 +37,7 @@ def show_table():
         headers=["Name", "Email", "Role"],
         rows=selected,
         title="Random Users Sample",
-    ).present()
+    )
 
 
 @app.command()
@@ -63,7 +63,7 @@ Current system metrics (randomly generated):
 ## Status
 All systems operational.
 """
-    ).present()
+    )
 
 
 @app.command()
@@ -98,61 +98,49 @@ This demonstrates all four UICommand methods with both:
 - **Auto-executed commands** (run automatically when selected)
 - **Manual commands** (require explicit execution)
 """
-    ).present()
-
-    print()
-    ui.out.md("### SELECT Method - Navigate to Commands:").present()
-    print()
-
-    ui.out.row(
-        [
-            ui.out.button("show-table", do=lambda: ui.command("show-table").select()),
-            ui.out.link("calc", do=lambda: ui.command("calc").select()),
-        ]
     )
 
     print()
-    ui.out.md("### RUN Method - Execute and Capture Output:").present()
+    ui.out.md("### SELECT Method - Navigate to Commands:")
     print()
 
-    ui.out.row(
-        [
-            ui.out.button(
-                "show-markdown", do=lambda: ui.command("show-markdown").run()
-            ),
-            ui.out.link(
-                "calc(x=15, y=3)", do=lambda: ui.command("calc").run(x=15, y=3)
-            ),
-        ]
-    )
+    with ui.out.row():
+        ui.out.button("show-table", do=lambda: ui.command("show-table").select())
+        ui.out.link("calc", do=lambda: ui.command("calc").select())
 
     print()
-    ui.out.md("### INCLUDE Method - Execute Inline:").present()
+    ui.out.md("### RUN Method - Execute and Capture Output:")
     print()
 
-    ui.out.row(
-        [
-            ui.out.button(
-                "show-markdown", do=lambda: ui.command("show-markdown").include()
-            ),
-            ui.out.link(
-                "calc(x=20, y=4)", do=lambda: ui.command("calc").include(x=20, y=4)
-            ),
-        ]
-    )
+    with ui.out.row():
+        ui.out.button(
+            "show-markdown", do=lambda: ui.command("show-markdown").run()
+        )
+        ui.out.link(
+            "calc(x=15, y=3)", do=lambda: ui.command("calc").run(x=15, y=3)
+        )
 
     print()
-    ui.out.md("### CLEAR Method - Clear and Re-execute:").present()
+    ui.out.md("### INCLUDE Method - Execute Inline:")
     print()
 
-    ui.out.row(
-        [
-            ui.out.button("clear", do=lambda: ui.command("command-methods").clear()),
-        ]
-    )
+    with ui.out.row():
+        ui.out.button(
+            "show-markdown", do=lambda: ui.command("show-markdown").include()
+        )
+        ui.out.link(
+            "calc(x=20, y=4)", do=lambda: ui.command("calc").include(x=20, y=4)
+        )
 
     print()
-    ui.out.md("---").present()
+    ui.out.md("### CLEAR Method - Clear and Re-execute:")
+    print()
+
+    with ui.out.row():
+        ui.out.button("clear", do=lambda: ui.command("command-methods").clear())
+
+    print()
+    ui.out.md("---")
 
 
 if __name__ == "__main__":

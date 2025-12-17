@@ -34,6 +34,7 @@ class UiContext:
         self.output_view = output_view
         self.gui_app = gui_app
         self.ui_app = ui_app
+        self._row_stack: List[List['UiBlock']] = []  # Stack of row contexts
 
     def is_cli(self) -> bool:
         """Check if in CLI mode."""
@@ -43,8 +44,33 @@ class UiContext:
         """Check if in GUI mode."""
         return self.mode == "gui"
 
+    def is_in_row(self) -> bool:
+        """Check if currently inside a row context."""
+        return len(self._row_stack) > 0
+
+    def enter_row(self) -> None:
+        """Enter a row context - blocks will be collected instead of rendered."""
+        self._row_stack.append([])
+
+    def exit_row(self) -> List['UiBlock']:
+        """Exit a row context and return collected blocks."""
+        if self._row_stack:
+            return self._row_stack.pop()
+        return []
+
+    def add_to_row(self, block: 'UiBlock') -> None:
+        """Add a block to the current row context."""
+        if self._row_stack:
+            self._row_stack[-1].append(block)
+
     def render(self, block: 'UiBlock') -> None:
         """Render a UI block to the current context."""
+        # If inside a row context, collect the block instead of rendering
+        if self.is_in_row():
+            self.add_to_row(block)
+            return
+
+        # Normal rendering
         if self.is_cli():
             # CLI mode - print if not GUI-only
             if not block.is_gui_only():
@@ -336,6 +362,30 @@ class Row(UiBlock):
         return False
 
 
+class RowContext:
+    """Context manager for creating rows of UI blocks.
+
+    Blocks created inside a row context are collected and displayed together.
+    """
+
+    def __enter__(self):
+        """Enter row context - blocks will be collected."""
+        context = get_context()
+        if context:
+            context.enter_row()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit row context - render collected blocks as a row."""
+        context = get_context()
+        if context:
+            blocks = context.exit_row()
+            if blocks:
+                row = Row(children=blocks)
+                row.present()
+        return False
+
+
 class UiOutput:
     """Container for UI output methods.
 
@@ -345,7 +395,7 @@ class UiOutput:
 
     @staticmethod
     def table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> Table:
-        """Create a table UI block.
+        """Create and present a table UI block.
 
         Args:
             headers: List of column headers
@@ -362,15 +412,18 @@ class UiOutput:
             ...     rows=[["Alice", 30]]
             ... )
             >>>
-            >>> # In a row (don't call present, let row handle it)
-            >>> ui.out.row([ui.out.table(...), ui.out.md(...)])
+            >>> # In a row context (collected, not auto-presented)
+            >>> with ui.out.row():
+            ...     ui.out.table(...)
+            ...     ui.out.md(...)
         """
         block = Table(headers=headers, rows=rows, title=title)
+        block.present()
         return block
 
     @staticmethod
     def md(content: str) -> Markdown:
-        """Create a markdown UI block.
+        """Create and present a markdown UI block.
 
         Args:
             content: Markdown-formatted string
@@ -382,15 +435,18 @@ class UiOutput:
             >>> # Standalone use (auto-presents)
             >>> ui.out.md("# Hello")
             >>>
-            >>> # In a row
-            >>> ui.out.row([ui.out.md("**Bold**"), ui.out.link(...)])
+            >>> # In a row context (collected, not auto-presented)
+            >>> with ui.out.row():
+            ...     ui.out.md("**Bold**")
+            ...     ui.out.link(...)
         """
         block = Markdown(content=content)
+        block.present()
         return block
 
     @staticmethod
     def link(text: str, do: Callable) -> Link:
-        """Create a link UI block (GUI only).
+        """Create and present a link UI block (GUI only).
 
         Args:
             text: Link text to display
@@ -403,15 +459,18 @@ class UiOutput:
             >>> # Standalone use (auto-presents)
             >>> ui.out.link("Click me", do=lambda: ...)
             >>>
-            >>> # In a row
-            >>> ui.out.row([ui.out.link(...), ui.out.button(...)])
+            >>> # In a row context (collected, not auto-presented)
+            >>> with ui.out.row():
+            ...     ui.out.link(...)
+            ...     ui.out.button(...)
         """
         block = Link(text=text, do=do)
+        block.present()
         return block
 
     @staticmethod
     def button(text: str, do: Callable, icon: Optional[str] = None) -> Button:
-        """Create a button UI block (GUI only).
+        """Create and present a button UI block (GUI only).
 
         Args:
             text: Button text to display
@@ -425,35 +484,33 @@ class UiOutput:
             >>> # Standalone use (auto-presents)
             >>> ui.out.button("Click", do=lambda: ...)
             >>>
-            >>> # In a row
-            >>> ui.out.row([ui.out.button(...), ui.out.link(...)])
+            >>> # In a row context (collected, not auto-presented)
+            >>> with ui.out.row():
+            ...     ui.out.button(...)
+            ...     ui.out.link(...)
         """
         block = Button(text=text, do=do, icon=icon)
+        block.present()
         return block
 
     @staticmethod
-    def row(children: List[UiBlock]) -> Row:
-        """Create and present a row container with UI blocks displayed horizontally.
+    def row() -> RowContext:
+        """Create a row context for displaying UI blocks horizontally.
 
         In GUI mode, displays children side-by-side.
         In CLI mode, displays children vertically.
 
-        Args:
-            children: List of UI blocks to display in the row
-
         Returns:
-            The created Row block
+            A context manager for collecting blocks into a row
 
         Example:
-            >>> # Create a row with links
-            >>> ui.out.row([
-            ...     ui.out.link("Link 1", do=lambda: ...),
-            ...     ui.out.link("Link 2", do=lambda: ...),
-            ... ]).present()
+            >>> # Use as context manager
+            >>> with ui.out.row():
+            ...     ui.out.link("Link 1", do=lambda: ...)
+            ...     ui.out.link("Link 2", do=lambda: ...)
+            ...     ui.out.button("Action", do=lambda: ...)
         """
-        block = Row(children=children)
-        block.present()
-        return block
+        return RowContext()
 
 
 def render_for_mode(blocks: Union[UiBlock, List[UiBlock]]) -> Union[UiBlock, List[UiBlock], None]:

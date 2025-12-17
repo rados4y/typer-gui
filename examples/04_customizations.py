@@ -31,7 +31,7 @@ def quick_action():
     Commands with is_button=True appear as prominent buttons in the GUI,
     making them stand out for frequently used actions.
     """
-    ui.out.md("## Quick Action Executed!").present()
+    ui.out.md("## Quick Action Executed!")
     print("\nThis command uses `is_button=True` to appear as a button.")
     print("Perfect for frequently used actions that need prominence.")
 
@@ -72,7 +72,7 @@ This command runs **automatically** when selected because it uses `is_auto_exec=
 - Information displays
 - Commands with no required parameters
 - Welcome/help screens
-""").present()
+""")
 
 
 # ============================================================================
@@ -87,7 +87,7 @@ def app_info():
         print("UIApp only available in GUI mode")
         return
 
-    ui.out.md("## Application Information\n").present()
+    ui.out.md("## Application Information\n")
 
     print(f"**Current command:** {ui.runtime.cmd.name}")
     print(f"**Total commands:** {len(ui.runtime.commands)}\n")
@@ -121,7 +121,7 @@ def composed_calculation(x: int = 7, y: int = 3):
         print("This command requires GUI mode")
         return
 
-    ui.out.md("## Composed Calculation\n").present()
+    ui.out.md("## Composed Calculation\n")
 
     # Get commands by name
     add_cmd = ui.command("add")
@@ -139,8 +139,8 @@ def composed_calculation(x: int = 7, y: int = 3):
 @ui.options(is_auto_exec=True)
 def button_menu():
     """Interactive menu - demonstrates ui.out.button() with actions."""
-    ui.out.md("# Interactive Button Menu\n").present()
-    ui.out.md("Click buttons to navigate or execute commands:").present()
+    ui.out.md("# Interactive Button Menu\n")
+    ui.out.md("Click buttons to navigate or execute commands:")
 
     print()
 
@@ -149,25 +149,25 @@ def button_menu():
         "Quick Action",
         do=lambda: ui.command("quick-action").select(),
         icon="flash_on"
-    ).present()
+    )
 
     ui.out.button(
         "Long Process",
         do=lambda: ui.command("long-process").select(),
         icon="hourglass_empty"
-    ).present()
+    )
 
     ui.out.button(
         "App Info",
         do=lambda: ui.command("app-info").select(),
         icon="info"
-    ).present()
+    )
 
     ui.out.button(
         "Run Calculation",
         do=lambda: ui.command("composed-calculation").select(),
         icon="calculate"
-    ).present()
+    )
 
 
 if __name__ == "__main__":

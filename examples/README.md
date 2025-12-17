@@ -180,7 +180,7 @@ def show_data():
     ui.out.table(
         headers=["Col1", "Col2"],
         rows=[["A", "B"], ["C", "D"]]
-    ).present()
+    )
 ```
 
 ### Command with UIApp Access
