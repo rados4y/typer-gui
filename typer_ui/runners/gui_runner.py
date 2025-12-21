@@ -127,7 +127,7 @@ class GUIRunner(Runner):
         # Temporarily capture the control instead of adding to output
         captured_control = None
 
-        def capture_add(control, comp=None):
+        def capture_add(control, component=None):
             nonlocal captured_control
             captured_control = control
 
