@@ -1,6 +1,6 @@
-# Typer-GUI Examples
+# Typer-UI Examples
 
-This directory contains progressive examples demonstrating how to use Typer-GUI.
+This directory contains progressive examples demonstrating how to use Typer-UI.
 
 ## Getting Started
 
@@ -196,7 +196,7 @@ def orchestrator():
 
 - **Main Documentation**: See `/docs` directory
 - **API Reference**: Check `UIApp_UICommand_Guide.md` in `/docs`
-- **Source Code**: Browse `/typer_gui` for implementation details
+- **Source Code**: Browse `/typer_ui` for implementation details
 
 ## Need Help?
 

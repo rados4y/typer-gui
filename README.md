@@ -1,20 +1,21 @@
-# Typer-GUI
+# Typer-UI
 
 Automatically generate desktop GUIs for existing [Typer](https://typer.tiangolo.com/) CLI applications using [Flet](https://flet.dev/).
 
 ## Overview
 
-**Typer-GUI** is a Python library that bridges the gap between command-line interfaces and graphical user interfaces. If you have a Typer-based CLI application, you can instantly create a desktop GUI for it with just a few lines of code.
+**Typer-UI** is a Python library that bridges the gap between command-line interfaces and graphical user interfaces. If you have a Typer-based CLI application, you can instantly create a desktop GUI for it with just a few lines of code.
 
-Key features:
+### Key Features
 
 - **Zero or minimal code changes** to your existing Typer app
 - **Automatic GUI generation** from Typer commands and parameters
+- **Simple, elegant API** - `ui(component)` for all output
+- **Auto-update components** - modify components and see changes instantly
+- **Progressive rendering** - update UI in real-time with context managers
+- **Rich UI components** - Tables, Markdown, Buttons, Rows, Columns, and more
 - **Type-aware controls** - text fields, dropdowns, checkboxes based on parameter types
 - **Real-time output streaming** - see output as it's produced for long-running commands
-- **Markdown rendering** - rich formatted output with headings, lists, code blocks, and more
-- **Auto-execution** - commands that run immediately when selected
-- **Custom styling** - highlight important commands as buttons
 - **Clean, modern interface** powered by Flet
 
 ## Installation
@@ -22,28 +23,23 @@ Key features:
 ### Using pip
 
 ```bash
-pip install typer-gui
+pip install typer-ui
 ```
 
 This will automatically install `typer` and `flet` as dependencies if they're not already present.
 
 ### For development
 
-If you're contributing to typer-gui or want to try it locally, you can use `uv` (optional but recommended for faster dependency management):
-
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/typer-gui.git
-cd typer-gui
+git clone https://github.com/yourusername/typer-ui.git
+cd typer-ui
 
-# Create a virtual environment with uv (optional)
-uv venv
+# Create a virtual environment
+python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install in development mode
-uv pip install -e .
-
-# Or with standard pip
 pip install -e .
 ```
 
@@ -51,20 +47,18 @@ pip install -e .
 
 Here's a minimal example to get you started:
 
-### Option 1: Integrated API (Recommended)
-
 ```python
 # my_app.py
 import typer
-import typer_gui
+import typer_ui as tg
 
 # Create the Typer app
 app = typer.Typer()
 
 # Create the UI wrapper
-ui = typer_gui.Ui(
+ui = tg.Ui(
     app,
-    title="My App GUI",
+    title="My App",
     description="A graphical interface for my CLI app"
 )
 
@@ -72,12 +66,17 @@ ui = typer_gui.Ui(
 def greet(name: str, excited: bool = False):
     """Greet someone with a friendly message."""
     punctuation = "!" if excited else "."
-    print(f"Hello {name}{punctuation}")
+
+    # Use ui() to output components
+    ui(tg.Md(f"# Hello {name}{punctuation}"))
+    ui(tg.Text("Thanks for using Typer-UI!"))
 
 @app.command()
 def add(a: int, b: int):
     """Add two numbers together."""
     result = a + b
+
+    # You can also use print()
     print(f"{a} + {b} = {result}")
 
 if __name__ == "__main__":
@@ -85,7 +84,7 @@ if __name__ == "__main__":
     ui.app()
 ```
 
-Run it:
+**Run it:**
 ```bash
 # Launch GUI
 python my_app.py
@@ -95,144 +94,222 @@ python my_app.py --cli greet "World" --excited
 python my_app.py --cli add 5 10
 ```
 
-### Option 2: Separate GUI Runner
-
-If you prefer to keep your CLI and GUI code separate:
-
-```python
-# my_app.py
-import typer
-
-app = typer.Typer()
-
-@app.command()
-def greet(name: str, excited: bool = False):
-    """Greet someone with a friendly message."""
-    punctuation = "!" if excited else "."
-    print(f"Hello {name}{punctuation}")
-
-if __name__ == "__main__":
-    app()
-```
-
-```python
-# my_app_gui.py
-import typer_gui
-from my_app import app
-
-if __name__ == "__main__":
-    ui = typer_gui.Ui(
-        app,
-        title="My App GUI",
-        description="A graphical interface for my CLI app"
-    )
-    ui.app()
-```
-
-Run it:
-```bash
-python my_app_gui.py
-```
-
 That's it! Your CLI app now has a fully functional GUI.
 
-## GUI Layout
+## The Simple API
 
-The generated GUI has three main areas:
+### Universal Output: `ui(component)`
 
+Instead of multiple output methods, Typer-UI has one simple pattern:
+
+```python
+# Output any component
+ui(tg.Text("Hello"))
+ui(tg.Md("# Header"))
+ui(tg.Table(cols=["Name"], data=[["Alice"]]))
+
+# Or return a component (auto-displayed)
+@app.command()
+def get_data():
+    return tg.Table(cols=["Name"], data=[["Bob"]])
 ```
-┌─────────────────────────────────────────┐
-│  Title and Description (if provided)    │
-├──────────┬──────────────────────────────┤
-│          │                              │
-│ Commands │  Parameter Form              │
-│  List    │  - Input fields              │
-│          │  - Dropdowns                 │
-│          │  - Checkboxes                │
-│          │  - [Run Command] button      │
-│          │                              │
-│          ├──────────────────────────────┤
-│          │  Output Console              │
-│          │  (stdout/stderr)             │
-└──────────┴──────────────────────────────┘
+
+### Available Components
+
+#### Text & Markdown
+```python
+ui(tg.Text("Plain text"))
+ui(tg.Md("**Bold** and *italic* with markdown"))
+ui(tg.Md("""
+# Report
+- Item 1
+- Item 2
+"""))
+```
+
+#### Tables
+```python
+ui(tg.Table(
+    cols=["Name", "Age", "City"],
+    data=[
+        ["Alice", 30, "NYC"],
+        ["Bob", 25, "LA"],
+    ],
+    title="Users"
+))
+```
+
+#### Layout Components
+```python
+# Horizontal layout
+ui(tg.Row([
+    tg.Button("Save", on_click=save_data),
+    tg.Button("Cancel", on_click=cancel),
+]))
+
+# Vertical layout
+ui(tg.Column([
+    tg.Md("# Dashboard"),
+    tg.Table(cols=["Metric", "Value"], data=get_metrics()),
+]))
+```
+
+#### Interactive Components
+```python
+# Buttons (GUI only)
+ui(tg.Button("Click me", on_click=lambda: print("Clicked!")))
+
+# Links (GUI only)
+ui(tg.Link("Learn more", on_click=open_docs))
+
+# Text input (GUI only)
+ui(tg.TextInput(
+    label="Name",
+    value="",
+    on_change=lambda text: print(f"Changed to: {text}")
+))
+```
+
+### Auto-Update Components
+
+One of Typer-UI's most powerful features: **components automatically update when modified**!
+
+```python
+@app.command()
+def process_items():
+    # Create and present a table
+    table = tg.Table(cols=["Item", "Status"], data=[])
+    ui(table)  # Present it
+
+    # Add rows - table auto-updates in real-time!
+    for i in range(10):
+        table.add_row([f"Item {i}", "Processing..."])
+        time.sleep(0.5)
+
+    ui(tg.Md("✓ Complete!"))
+```
+
+### Progressive Rendering with Context Managers
+
+For even cleaner code, use context managers:
+
+```python
+@app.command()
+@ui.command(is_long=True)
+def analyze_data():
+    # Present and update in one flow
+    with ui(tg.Table(cols=["Step", "Progress"], data=[])) as table:
+        table.add_row(["Loading", "0%"])
+        time.sleep(1)
+
+        table.add_row(["Processing", "50%"])
+        time.sleep(1)
+
+        table.add_row(["Complete", "100%"])
 ```
 
 ## GUI Customization
 
-Typer-GUI provides decorators to customize how commands appear and behave in the GUI. These work alongside your Typer decorators.
-
-### Using `@ui.options()`
-
-The `@ui.options()` decorator adds GUI-specific options to your commands:
+Use the `@ui.command()` decorator to customize command behavior:
 
 ```python
-import typer
-import typer_gui
-
-app = typer.Typer()
-ui = typer_gui.Ui(app, title="My App")
-
 @app.command()
-@ui.options(is_button=True, is_long=True)
+@ui.command(is_button=True, is_long=True)
 def process():
-    """Long-running process with real-time output."""
-    for i in range(10):
-        print(f"Processing step {i}...")
-        time.sleep(1)
+    """Long-running process with button styling."""
+    with ui(tg.Table(cols=["Step", "Status"], data=[])) as t:
+        for i in range(10):
+            t.add_row([f"Step {i+1}", "Running..."])
+            time.sleep(1)
 ```
 
 **Available options:**
 
-- **`is_button`** (bool): Display command as a highlighted button instead of a text link
-  ```python
-  @ui.options(is_button=True)
-  ```
+- **`is_button`** (bool): Display command as a highlighted button
+- **`is_long`** (bool): Enable real-time output streaming
+- **`is_auto_exec`** (bool): Execute automatically when selected
 
-- **`is_long`** (bool): Enable real-time output streaming for long-running commands
-  ```python
-  @ui.options(is_long=True)
-  ```
-
-- **`is_auto_exec`** (bool): Execute automatically when selected (hides "Run Command" button)
-  ```python
-  @app.command()
-  @ui.options(is_auto_exec=True)
-  def status():
-      print(f"Current time: {datetime.now()}")
-  ```
-
-### Markdown Output Example
+## Comprehensive Example
 
 ```python
+import typer
+import typer_ui as tg
+import time
+
+app = typer.Typer()
+ui = tg.Ui(app, title="Data Processor", description="Process and analyze data")
+
 @app.command()
-def report():
-    """Generate a formatted report."""
-    ui.out.md("""
+def show_report():
+    """Display a formatted report."""
+    ui(tg.Md("""
 # System Report
 
-## Status
-- **CPU**: OK
-- **Memory**: OK
-- **Disk**: OK
+## Summary
+All systems operational.
+    """))
 
-## Details
+    ui(tg.Table(
+        cols=["Component", "Status", "Usage"],
+        data=[
+            ["CPU", "✓", "45%"],
+            ["Memory", "✓", "60%"],
+            ["Disk", "✓", "70%"],
+        ],
+        title="System Metrics"
+    ))
 
-| Component | Status | Usage |
-|-----------|--------|-------|
-| CPU       | ✓      | 45%   |
-| Memory    | ✓      | 60%   |
-| Disk      | ✓      | 70%   |
+@app.command()
+@ui.command(is_button=True, is_long=True)
+def process_files(count: int = 5):
+    """Process multiple files with progress updates."""
+    ui(tg.Md(f"# Processing {count} files"))
 
-```python
-# Example code block
-print("Hello World")
-```
-""")
+    with ui(tg.Table(cols=["File", "Status"], data=[])) as table:
+        for i in range(count):
+            table.add_row([f"file_{i}.txt", "Processing..."])
+            time.sleep(0.5)
+
+    ui(tg.Md("✓ **All files processed!**"))
+
+@app.command()
+def dashboard():
+    """Show interactive dashboard."""
+    ui(tg.Column([
+        tg.Md("# Dashboard"),
+        tg.Row([
+            tg.Button("Refresh", on_click=lambda: print("Refreshing...")),
+            tg.Button("Export", on_click=lambda: print("Exporting...")),
+        ]),
+        tg.Table(
+            cols=["Metric", "Value"],
+            data=[
+                ["Users", "1,234"],
+                ["Revenue", "$56,789"],
+                ["Growth", "+12%"],
+            ]
+        ),
+    ]))
+
+@app.command()
+def analyze():
+    """Return data for automatic display."""
+    return tg.Table(
+        cols=["Analysis", "Result"],
+        data=[
+            ["Mean", "42.5"],
+            ["Median", "40.0"],
+            ["Std Dev", "5.2"],
+        ]
+    )
+
+if __name__ == "__main__":
+    ui.app()
 ```
 
 ## Supported Parameter Types
 
-Typer-GUI automatically maps Python types to appropriate GUI controls:
+Typer-UI automatically maps Python types to appropriate GUI controls:
 
 | Python Type | GUI Control | Notes |
 |-------------|-------------|-------|
@@ -246,28 +323,26 @@ Typer-GUI automatically maps Python types to appropriate GUI controls:
 
 ```python
 from enum import Enum
-import typer
 
-class Color(str, Enum):
-    RED = "red"
-    GREEN = "green"
-    BLUE = "blue"
-
-app = typer.Typer()
+class LogLevel(str, Enum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
 
 @app.command()
-def paint(color: Color):
-    """Paint with a color."""
-    print(f"Painting with {color.value}!")
+def configure(level: LogLevel = LogLevel.INFO):
+    """Configure logging level."""
+    print(f"Log level set to: {level.value}")
 ```
 
-In the GUI, the `color` parameter will appear as a dropdown with "red", "green", and "blue" as options.
+In the GUI, the `level` parameter will appear as a dropdown with all enum values.
 
 ## API Reference
 
 ### `Ui` Class
 
-The main entry point for typer-gui's integrated API.
+The main entry point for Typer-UI.
 
 **Constructor:**
 ```python
@@ -275,235 +350,128 @@ Ui(app, *, title=None, description=None)
 ```
 
 **Parameters:**
-- `app` (typer.Typer): The Typer application instance to extend
+- `app` (typer.Typer): The Typer application instance
 - `title` (str, optional): Window title for the GUI
-- `description` (str, optional): Description text shown at the top of the GUI
+- `description` (str, optional): Description text shown at the top
 
 **Methods:**
 
-#### `ui.options(*, is_button=False, is_long=False, is_auto_exec=False)`
+#### `ui(component)` - Universal Output
 
-Decorator to add GUI-specific options to a Typer command.
+Output any UI component. Returns the component for chaining/context managers.
 
-**Parameters:**
-- `is_button` (bool): Display as a button in the left panel
-- `is_long` (bool): Enable real-time output streaming for long-running commands
-- `is_auto_exec` (bool): Execute automatically when selected, hide 'Run Command' button
-
-**Example:**
 ```python
-import typer
-import typer_gui
+# Simple output
+ui(tg.Text("Hello"))
 
-app = typer.Typer()
-ui = typer_gui.Ui(app, title="My App")
+# Store reference for updates
+table = tg.Table(cols=["Name"], data=[])
+ui(table)
+table.add_row(["Alice"])  # Auto-updates!
 
+# Context manager
+with ui(tg.Table(cols=["Name"], data=[])) as t:
+    t.add_row(["Bob"])
+```
+
+#### `ui.command(*, is_button=False, is_long=False, is_auto_exec=False)`
+
+Decorator to customize command appearance and behavior.
+
+```python
 @app.command()
-@ui.options(is_button=True, is_long=True)
+@ui.command(is_button=True, is_long=True)
 def process():
-    for i in range(10):
-        print(f"Step {i}")
-        time.sleep(1)
-
-if __name__ == "__main__":
-    ui.app()
+    print("Processing...")
 ```
 
 #### `ui.app()`
 
-Launch the GUI application or run in CLI mode with `--cli` flag.
+Launch the GUI or run in CLI mode with `--cli` flag.
 
-By default, `ui.app()` launches the GUI. However, you can bypass the GUI and run the CLI directly by passing the `--cli` flag.
-
-**GUI Mode (default):**
-```python
-if __name__ == "__main__":
-    ui.app()
-```
-
-**CLI Mode:**
 ```bash
-# Run with GUI (default)
-python my_app.py
-
-# Run with CLI (bypasses GUI)
-python my_app.py --cli greet "Alice" --excited
-python my_app.py --cli add 5 3
-python my_app.py --cli --help  # Show all commands
+python my_app.py              # Launch GUI
+python my_app.py --cli hello  # Run CLI
 ```
 
-This allows you to have a single entry point that supports both GUI and CLI modes, giving your users flexibility in how they interact with your application.
+### UI Components
 
----
+All components are in the `typer_ui` module:
 
-### `build_gui_model(app, *, title=None, description=None)`
-
-Build a structured representation of a Typer app (useful for testing or custom implementations).
-
-**Parameters:**
-- `app` (typer.Typer): A Typer application instance
-- `title` (str, optional): App title
-- `description` (str, optional): App description
-
-**Returns:**
-- `GuiApp`: A structured model containing commands and parameters
-
-**Example:**
 ```python
-from typer_gui import build_gui_model
+import typer_ui as tg
 
-gui_model = build_gui_model(app)
-for command in gui_model.commands:
-    print(f"Command: {command.name}")
-    for param in command.params:
-        print(f"  - {param.name}: {param.param_type}")
+# Simple components
+tg.Text("content")           # Plain text
+tg.Md("# markdown")          # Markdown
+
+# Data display
+tg.Table(
+    cols=["A", "B"],         # Column headers
+    data=[["1", "2"]],       # Row data
+    title="Table Title"      # Optional title
+)
+
+# Layout
+tg.Row([comp1, comp2])       # Horizontal
+tg.Column([comp1, comp2])    # Vertical
+
+# Interactive (GUI only)
+tg.Button("text", on_click=callback)
+tg.Link("text", on_click=callback)
+tg.TextInput("label", value="", on_change=callback)
 ```
-
----
-
-### `Markdown` Class
-
-A return type for commands that produce Markdown output.
-
-**Example:**
-```python
-from typer_gui import Markdown
-
-@app.command()
-def info() -> Markdown:
-    return Markdown("# Hello\n\nThis is **bold** text!")
-```
-
-**Note:** Using `ui.out.md()` is the preferred approach for markdown output.
 
 ## Examples
 
-Check out the `examples/` directory for comprehensive working examples:
+Check out the `examples/` directory for working examples:
 
-- **`examples/basic_typer_app.py`** - A complete demonstration featuring:
-  - Multiple command types (greet, add, calculate, paint)
-  - Enum parameters with dropdown selection
-  - Button-styled commands (`is_button=True`)
-  - Long-running commands with real-time output (`is_long=True`)
-  - Markdown-formatted output (`ui.out.md()`)
-  - Auto-executing commands (`is_auto_exec=True`)
-  - Combination features (e.g., button + long-running)
+- **`01_basic_typer_to_gui.py`** - Minimal example showing basic usage
+- **`02_arguments_and_output.py`** - Parameters and UI components
+- **`03_ui_blocks.py`** - Tables, layout, and composition
+- **`04_customizations.py`** - Buttons, streaming, and advanced features
 
-- **`examples/basic_gui_runner.py`** - Alternative approach showing separate GUI runner
-
-**To run the main example:**
-
+**Run examples:**
 ```bash
-# Using the integrated approach
-python examples/basic_typer_app.py
+# GUI mode
+python examples/01_basic_typer_to_gui.py
 
-# Or using the separate runner
-python examples/basic_gui_runner.py
+# CLI mode
+python examples/01_basic_typer_to_gui.py --cli add 5 3
 ```
 
-**For development with auto-reload:**
-
-```bash
-uv run flet run examples/basic_typer_app.py --reload
-```
-
-## Running Tests
-
-The library includes unit tests for the core reflection logic:
-
-```bash
-# Install dev dependencies
-pip install -e ".[dev]"
-
-# Run tests
-pytest
-```
-
-## Features & Limitations
+## Features
 
 ### Current Features
 
-- ✅ Automatic reflection of Typer commands and parameters
-- ✅ Support for str, int, float, bool, and Enum types
-- ✅ Required and optional parameters with validation
-- ✅ Default values
-- ✅ Help text and descriptions
-- ✅ Live output capture (stdout/stderr)
-- ✅ **Real-time output streaming** for long-running commands (`is_long=True`)
-- ✅ **Markdown rendering** for rich formatted output (`ui.out.md()`)
-- ✅ **Auto-execution** - commands that run on selection (`is_auto_exec=True`)
-- ✅ **Button styling** for important commands (`is_button=True`)
-- ✅ **Integrated API** with `Ui` class for cleaner code
-- ✅ Output clearing when switching between commands
-- ✅ Clean, modern UI powered by Flet
+- ✅ Simple, unified API with `ui(component)`
+- ✅ Auto-update components when modified
+- ✅ Progressive rendering with context managers
+- ✅ Rich UI components (Text, Markdown, Table, Row, Column, Button, Link)
+- ✅ Automatic GUI generation from Typer commands
+- ✅ Type-aware form controls
+- ✅ Real-time output streaming (`is_long=True`)
+- ✅ Command customization (`is_button`, `is_auto_exec`)
+- ✅ Both GUI and CLI modes from single entry point
 - ✅ Cross-platform (Windows, macOS, Linux)
 
 ### Planned Features
 
 - Path/file selection widgets
-- Support for list/multiple value parameters
+- Progress bars and spinners
 - Date/time pickers
-- Custom themes and color schemes
+- Custom themes
 - Nested/grouped commands
 - Command history
-- Progress bars and status indicators
-- Command search/filtering
-
-### Known Limitations
-
-- Unsupported parameter types fall back to text input
-- Long-running commands without `is_long=True` will block the UI
-- No built-in progress bars (commands must print their own progress)
+- Tabs and panels
 
 ## How It Works
 
-1. **Reflection**: Typer-GUI uses Python's introspection (`inspect` module) to analyze your Typer app, extracting command names, parameter types, defaults, and help text from function signatures.
-
-2. **Decorator Metadata**: The `@ui.options()` decorator attaches GUI-specific metadata (button styling, streaming, auto-exec) to your functions without affecting Typer's CLI behavior.
-
-3. **GUI Generation**: Based on the reflection data and decorator metadata, it generates a Flet-based GUI with appropriate controls for each parameter type (text fields, dropdowns, checkboxes).
-
-4. **Direct Execution**: When you click "Run" (or when auto-exec triggers), the GUI calls your command function directly (not via subprocess), passing the parsed and validated parameters.
-
-5. **Output Capture**:
-   - **Regular commands**: stdout and stderr are buffered and displayed when the command completes
-   - **Long-running commands** (`is_long=True`): Output is streamed in real-time as it's produced using custom IO writers
-   - **Markdown output** (`ui.out.md()`): Content is rendered with GitHub-flavored markdown formatting
-
-## Publishing Releases
-
-For maintainers: To publish a new version to PyPI:
-
-1. **Update the version** in `pyproject.toml`:
-   ```toml
-   version = "0.2.0"  # Increment as appropriate
-   ```
-
-2. **Commit the version change**:
-   ```bash
-   git add pyproject.toml
-   git commit -m "Bump version to 0.2.0"
-   git push
-   ```
-
-3. **Run the release script**:
-   ```bash
-   # Cross-platform (recommended)
-   python release.py
-
-   # Or on Windows
-   release.bat
-
-   # Or on Linux/Mac
-   ./release.sh
-   ```
-
-The script will:
-- Clean previous builds
-- Build the package (source distribution + wheel)
-- Upload to PyPI (you'll be prompted for your API token)
-
-**Note**: You need a PyPI API token stored in `~/.pypirc` or will be prompted to enter it.
+1. **Reflection**: Analyzes your Typer app using Python's introspection
+2. **GUI Generation**: Creates Flet-based UI with appropriate controls
+3. **Direct Execution**: Calls your command functions directly (not via subprocess)
+4. **Component System**: Simple `show_cli()` and `show_gui()` methods for each component
+5. **Auto-Update**: Components track when they're presented and update automatically
 
 ## Contributing
 

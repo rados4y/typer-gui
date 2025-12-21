@@ -5,13 +5,13 @@ Typer CLI application. The application works in both GUI and CLI modes.
 """
 
 import typer
-import typer_gui
+import typer_ui
 
 # Step 1: Create your Typer app as usual
 app = typer.Typer()
 
 # Step 2: Create a Ui instance with optional title and description
-ui = typer_gui.Ui(
+ui = typer_ui.Ui(
     app,
     title="My First GUI App",
     description="A simple calculator with GUI"

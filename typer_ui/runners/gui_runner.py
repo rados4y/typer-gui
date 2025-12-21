@@ -1,6 +1,5 @@
 """GUI runner using Flet for desktop applications."""
 
-import asyncio
 import io
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
@@ -10,17 +9,7 @@ import flet as ft
 
 from .base import Runner
 from ..specs import AppSpec, CommandSpec, ParamType
-from ..events import (
-    Event,
-    CommandSelected,
-    CommandStarted,
-    CommandFinished,
-    TextEmitted,
-    BlockEmitted,
-    ContainerStarted,
-    ContainerEnded,
-    ErrorRaised,
-)
+from ..ui_blocks import Text, set_current_runner
 
 
 class _RealTimeWriter(io.StringIO):
@@ -54,20 +43,119 @@ class GUIRunner(Runner):
         self.page: Optional[ft.Page] = None
         self.current_command: Optional[CommandSpec] = None
         self.form_controls: dict[str, ft.Control] = {}
+        self.channel = "gui"
 
         # UI components
         self.command_list: Optional[ft.ListView] = None
         self.form_container: Optional[ft.Column] = None
         self.output_view: Optional[ft.ListView] = None
 
-        # Container stack for nested UI blocks
-        self.container_stack: list[ft.Control] = []
+        # Component tracking for updates
+        self._component_refs: dict[int, ft.Control] = {}
+        self._control_registry: dict[Any, ft.Control] = {}
 
-    async def start(self) -> None:
+    def start(self) -> None:
         """Start the Flet GUI application."""
         # Flet app will be started via ft.app() externally
-        # This method sets up the initial state
         pass
+
+    def show(self, component) -> None:
+        """Show component in GUI by calling its show_gui method.
+
+        Args:
+            component: UiBlock component to display
+        """
+        component.show_gui(self)
+
+    def update(self, component) -> None:
+        """Update existing component (for progressive rendering in context managers).
+
+        Args:
+            component: UiBlock component to update
+        """
+        from ..ui_blocks import Table  # Avoid circular import
+
+        # --- Smarter update for Table component ---
+        if isinstance(component, Table) and component.flet_control:
+            # Re-create data rows
+            component.flet_control.rows = [
+                ft.DataRow(
+                    cells=[ft.DataCell(ft.Text(str(cell))) for cell in row]
+                )
+                for row in component.data
+            ]
+            if self.page:
+                self.page.update()
+            return  # Smart update complete
+
+        # --- Fallback to old logic for other components ---
+        comp_id = id(component)
+        if comp_id in self._component_refs:
+            # Component already rendered, but we don't have a smart update for it.
+            # The old logic is destructive, so for now, we'll just re-show it,
+            # which may lead to duplicates for non-Table components.
+            # This is better than clearing the whole output.
+            # TODO: Implement smart updates for other container types.
+            component.show_gui(self)
+        else:
+            # First time seeing this component, just show it
+            component.show_gui(self)
+
+    def add_to_output(self, control: ft.Control, component: Any = None) -> None:
+        """Add Flet control to output view.
+
+        Args:
+            control: Flet control to add
+            component: Optional UiBlock component reference for tracking
+        """
+        if self.output_view:
+            self.output_view.controls.append(control)
+            if component:
+                self._component_refs[id(component)] = control
+            if self.page:
+                self.page.update()
+
+    def render_to_control(self, component) -> Optional[ft.Control]:
+        """Render component and return Flet control (for nesting).
+
+        Args:
+            component: UiBlock component to render
+
+        Returns:
+            Flet control
+        """
+        # Temporarily capture the control instead of adding to output
+        captured_control = None
+
+        def capture_add(control, comp=None):
+            nonlocal captured_control
+            captured_control = control
+
+        # Temporarily replace add_to_output
+        original_add = self.add_to_output
+        self.add_to_output = capture_add
+
+        try:
+            component.show_gui(self)
+        finally:
+            # Restore
+            self.add_to_output = original_add
+
+        return captured_control
+
+    def register_control(self, component: Any, control: ft.Control) -> None:
+        """Register a control for later access.
+
+        Args:
+            component: UiBlock component
+            control: Flet control
+        """
+        self._control_registry[component] = control
+
+    def refresh(self) -> None:
+        """Refresh the page."""
+        if self.page:
+            self.page.update()
 
     def build(self, page: ft.Page) -> None:
         """Build the Flet GUI.
@@ -266,7 +354,7 @@ class GUIRunner(Runner):
             run_button = ft.ElevatedButton(
                 text="Run Command",
                 icon=ft.Icons.PLAY_ARROW,
-                on_click=lambda e: asyncio.create_task(self._run_command()),
+                on_click=lambda e: self._run_command(),
                 bgcolor=ft.Colors.BLUE_700,
                 color=ft.Colors.WHITE,
             )
@@ -281,13 +369,7 @@ class GUIRunner(Runner):
 
         # Auto-execute
         if command.ui_spec.is_auto_exec:
-            asyncio.create_task(self._run_command())
-
-        # Emit selection event
-        if self.ui_app:
-            asyncio.create_task(
-                self.ui_app.emit_event(CommandSelected(command_name=command.name))
-            )
+            self._run_command()
 
     def _create_param_control(self, param) -> Optional[ft.Control]:
         """Create Flet control for parameter.
@@ -349,10 +431,10 @@ class GUIRunner(Runner):
 
         return control
 
-    async def _run_command(self) -> None:
+    def _run_command(self) -> None:
         """Execute current command."""
         if not self.current_command:
-            self._append_output("ERROR: No command selected.")
+            self._append_text("ERROR: No command selected.")
             return
 
         try:
@@ -366,7 +448,7 @@ class GUIRunner(Runner):
                 value = self._extract_value(control, param)
 
                 if param.required and value is None:
-                    self._append_output(
+                    self._append_text(
                         f"ERROR: Required parameter '{param.name}' is missing."
                     )
                     return
@@ -380,20 +462,14 @@ class GUIRunner(Runner):
                 if self.page:
                     self.page.update()
 
-            # Execute via UIApp if available
-            if self.ui_app:
-                await self.ui_app.run_command(**kwargs)
-            else:
-                # Fallback: execute directly
-                result, error = await self.execute_command(
-                    self.current_command.name, kwargs
-                )
-                if error:
-                    self._append_output(f"ERROR: {error}")
+            # Execute command
+            result, error = self.execute_command(self.current_command.name, kwargs)
+            if error:
+                self._append_text(f"ERROR: {error}")
 
         except Exception as e:
-            self._append_output(f"ERROR: {e}")
-            self._append_output(traceback.format_exc())
+            self._append_text(f"ERROR: {e}")
+            self._append_text(traceback.format_exc())
 
     def _extract_value(self, control: ft.Control, param) -> Any:
         """Extract value from Flet control."""
@@ -426,35 +502,7 @@ class GUIRunner(Runner):
 
         return None
 
-    async def handle_event(self, event: Event) -> None:
-        """Handle events from UIApp.
-
-        Args:
-            event: Event to handle
-        """
-        if isinstance(event, TextEmitted):
-            self._append_output(event.text)
-        elif isinstance(event, BlockEmitted):
-            self._append_ui_block(event.block)
-        elif isinstance(event, ContainerStarted):
-            # Create container and push to stack
-            if event.container_type == "row":
-                container = ft.Row(controls=[])
-            elif event.container_type == "column":
-                container = ft.Column(controls=[])
-            else:
-                container = ft.Container()
-            self.container_stack.append(container)
-        elif isinstance(event, ContainerEnded):
-            # Pop container and add to output
-            if self.container_stack:
-                container = self.container_stack.pop()
-                self._append_control(container)
-        elif isinstance(event, ErrorRaised):
-            self._append_output(f"ERROR: {event.exception}")
-            self._append_output(event.traceback)
-
-    async def execute_command(
+    def execute_command(
         self, command_name: str, params: dict[str, Any]
     ) -> tuple[Any, Optional[Exception]]:
         """Execute command with stdout/stderr capture.
@@ -476,6 +524,9 @@ class GUIRunner(Runner):
         if not command_spec:
             return None, ValueError(f"Command not found: {command_name}")
 
+        # Set this runner as current so ui.out() works
+        set_current_runner(self)
+
         result = None
         exception = None
 
@@ -484,16 +535,14 @@ class GUIRunner(Runner):
 
         if is_long:
             # Real-time streaming
-            stdout_writer = _RealTimeWriter(self._append_output)
+            stdout_writer = _RealTimeWriter(self._append_text)
             stderr_writer = _RealTimeWriter(
-                lambda t: self._append_output(f"[ERR] {t}")
+                lambda t: self._append_text(f"[ERR] {t}")
             )
 
             try:
                 with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
                     result = command_spec.callback(**params)
-                    if asyncio.iscoroutine(result):
-                        result = await result
 
                 stdout_writer.flush()
                 stderr_writer.flush()
@@ -502,8 +551,8 @@ class GUIRunner(Runner):
                 exception = e
                 stdout_writer.flush()
                 stderr_writer.flush()
-                self._append_output(f"ERROR: {e}")
-                self._append_output(traceback.format_exc())
+                self._append_text(f"ERROR: {e}")
+                self._append_text(traceback.format_exc())
 
         else:
             # Buffered output
@@ -513,26 +562,37 @@ class GUIRunner(Runner):
             try:
                 with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
                     result = command_spec.callback(**params)
-                    if asyncio.iscoroutine(result):
-                        result = await result
 
                 stdout_text = stdout_capture.getvalue()
                 stderr_text = stderr_capture.getvalue()
 
                 if stdout_text:
-                    self._append_output(stdout_text)
+                    # Convert print statements to Text components
+                    for line in stdout_text.rstrip('\n').split('\n'):
+                        if line:
+                            Text(line).show_gui(self)
+
                 if stderr_text:
-                    self._append_output(f"[STDERR]\n{stderr_text}")
+                    self._append_text(f"[STDERR]\n{stderr_text}")
 
             except Exception as e:
                 exception = e
-                self._append_output(f"ERROR: {e}")
-                self._append_output(traceback.format_exc())
+                self._append_text(f"ERROR: {e}")
+                self._append_text(traceback.format_exc())
+
+        # Handle return value - auto-display if it's a UiBlock
+        if result is not None:
+            from ..ui_blocks import UiBlock
+            if isinstance(result, UiBlock):
+                self.show(result)
+
+        # Clear runner reference
+        set_current_runner(None)
 
         return result, exception
 
-    def _append_output(self, text: str) -> None:
-        """Append text to output view."""
+    def _append_text(self, text: str) -> None:
+        """Append plain text to output view."""
         if self.output_view:
             lines = text.rstrip('\n').split('\n') if text else []
             for line in lines:
@@ -546,29 +606,6 @@ class GUIRunner(Runner):
                 )
             if self.page:
                 self.page.update()
-
-    def _append_control(self, control: ft.Control) -> None:
-        """Append Flet control to output."""
-        if self.output_view:
-            self.output_view.controls.append(control)
-            if self.page:
-                self.page.update()
-
-    def _append_ui_block(self, block: Any) -> None:
-        """Append UI block to output."""
-        # If we have an active container, add to it
-        if self.container_stack:
-            container = self.container_stack[-1]
-            if hasattr(container, 'controls'):
-                flet_component = block.render_flet()
-                container.controls.append(flet_component)
-        else:
-            # Add directly to output
-            if self.output_view:
-                flet_component = block.render_flet()
-                self.output_view.controls.append(flet_component)
-                if self.page:
-                    self.page.update()
 
 
 def create_flet_app(app_spec: AppSpec):

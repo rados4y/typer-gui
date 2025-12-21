@@ -23,10 +23,10 @@ The `UIApp` instance is accessible through the `Ui` class using the `runtime` pr
 
 ```python
 import typer
-import typer_gui
+import typer_ui as tg
 
 app = typer.Typer()
-ui = typer_gui.Ui(app, title="My App")
+ui = tg.Ui(app, title="My App")
 
 @app.command()
 def my_command():

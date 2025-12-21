@@ -10,8 +10,8 @@ from abc import ABC
 @dataclass
 class Event(ABC):
     """Base class for all events."""
-    timestamp: float = field(default_factory=time.time)
-    event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: float = field(default_factory=time.time, kw_only=True)
+    event_id: str = field(default_factory=lambda: str(uuid.uuid4()), kw_only=True)
 
 
 # === Lifecycle Events ===

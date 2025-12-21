@@ -1,292 +1,270 @@
-# Typer-GUI Technical Specification
+# Typer-GUI Simplified Architecture
 
-This document defines the full technical specification for implementing the `typer-gui` Python library. It is intended for direct consumption by an AI coding assistant such as Claude Code.
+This design prioritizes **simplicity** and **ease of adding new UI components** while maintaining clean separation between application definition, control logic, and presentation.
 
----
-
-## Goal
-
-Build a Python library called **`typer-gui`** that automatically generates a desktop GUI for existing **Typer** CLI applications, using **Flet** as the GUI framework.
-
-Developers should be able to:
-
-- Keep their existing Typer-based CLI code unchanged, or almost unchanged.
-- Add a very small integration layer (one or two functions) to expose a GUI.
-- Run something like `python my_app.py --gui` or a small bootstrap script, and get a Flet-based GUI that mirrors their Typer commands and options.
-
-The library should aim to be **simple to integrate**, **robust**, and **extensible**.
+The goal is to make the system simple to understand, easy to extend with new components, and straightforward to debug.
 
 ---
 
-## Core Requirements
+## 1. Definition Layer — _What the application is_
 
-### 1. Project structure
+**Artifacts**
 
-Create a proper Python package structure, for example:
+- `AppSpec` - Immutable application specification
+- `CommandSpec` - Command metadata and callback
+- `ParamSpec` - Parameter type and validation info
+- `CommandUiSpec` - UI presentation hints (is_button, is_long, etc.)
 
-- `typer_gui/`
+**Description**
+The definition layer is a **static, reflected model** of the application.
+It is produced by introspection of a Typer app and fully describes commands, parameters, defaults, help text, and UI-related metadata.
 
-  - `__init__.py`
-  - `core.py` # Reflection & mapping from Typer app to GUI model
-  - `flet_ui.py` # All Flet-specific GUI construction
-  - `runner.py` # Helper entrypoints (e.g., run_gui(app))
-  - `types.py` # Shared dataclasses / types for GUI models
+**Rules**
 
-- `examples/`
+- Immutable or treated as immutable
+- Serializable
+- No execution logic
+- No CLI / GUI / REST dependencies
 
-  - `basic_typer_app.py`
-  - `basic_gui_runner.py`
-
-- `pyproject.toml` or `setup.cfg` + `setup.py`
-- `README.md`
-- `LICENSE` (use MIT)
-
-Use type hints everywhere and make the library ready for publishing on PyPI.
-
-Runtime dependencies:
-
-- `typer` (for CLI integration)
-- `flet` (for the GUI)
-
-Development tooling (not imported in library code and not required at runtime):
-
-- `uv` for creating and managing the virtual environment / installing dependencies
-- a test runner such as `pytest` for unit tests
-
-`uv` MUST NOT be added as a runtime dependency of `typer-gui` and MUST NOT be imported anywhere in the library modules. It is only an optional tool for developers working on this project.
+**Purpose**
+Provide a stable, deterministic input for all runtimes and frontends.
 
 ---
 
-### 2. Typer integration API
+## 2. Controller / Session Layer — _What the application is doing_
 
-Expose a **minimal public API** for developers, for example in `typer_gui.__init__`:
+### `UIApp`
+
+**Description**
+`UIApp` is the **central controller** and manages session state.
+It coordinates command selection and execution, delegates presentation to the active runner.
+
+**Responsibilities**
+
+- Owns a reference to `AppSpec`
+- Maintains session state:
+  - current command
+  - execution history
+- Exposes command API:
+  - `select_command(name)`
+  - `run_command(**kwargs)`
+  - `include_command(**kwargs)`
+- Provides access to runner for component output
+
+**Rules**
+
+- Presentation-agnostic (doesn't render)
+- Framework-free (doesn't import Flet/Flask/etc.)
+- Lightweight - just state management
+
+---
+
+## 3. UI Components — _What can be displayed_
+
+### Component Design Principles
+
+**Single Class, All Presentation**
+
+Each UI component is a **single class** containing all presentation logic for every channel:
 
 ```python
-from .runner import run_gui
-from .core import build_gui_model
+class Table(UiBlock):
+    # Data
+    cols: List[str]
+    data: List[List[Any]]
 
-__all__ = ["run_gui", "build_gui_model"]
+    # Presentation per channel
+    def show_cli(self, runner: CLIRunner) -> None:
+        # ASCII table rendering
+
+    def show_gui(self, runner: GUIRunner) -> None:
+        # Flet DataTable rendering
+
+    def show_rest(self, runner: RESTRunner) -> None:
+        # JSON serialization
 ```
 
-#### `run_gui(app, *, title=None, description=None)`
+**Why Single Class?**
+- ✅ **Easy to add new components** - edit one file, one class
+- ✅ **All logic together** - no hunting across multiple files
+- ✅ **Simple to understand** - clear what component does
+- ✅ **Handles interactions** - click, input, etc. all in one place
 
-- `app`: a `typer.Typer` instance.
-- `title`: optional window title override.
-- `description`: optional text to show at the top of the GUI.
+**Component Types**
 
-Behavior:
+1. **Simple Components** - Just data and rendering
+   - `Text` - Plain text
+   - `Md` - Markdown content
 
-- Reflect the provided `Typer` app (commands, params, help text).
-- Start a Flet application that shows a window with:
+2. **Container Components** - Can hold children
+   - `Table` - Tabular data, can add rows progressively
+   - `Row` - Horizontal layout
+   - `Column` - Vertical layout
 
-  - Left pane: list of commands.
-  - Right pane: a dynamic form for the selected command.
-  - Bottom area: log / output console.
+3. **Interactive Components** - Handle user input
+   - `Button` - Clickable action
+   - `TextInput` - Text entry
+   - `Link` - Clickable link
 
-#### `build_gui_model(app)`
+**Container Context Manager Pattern**
 
-- Introspects a `typer.Typer` app and returns a structured representation of:
-
-  - Commands
-  - Arguments / options (names, types, defaults, help text, required flags)
-
-- This should be independent of Flet, so it can be reused or tested.
-- Use dataclasses in `types.py`, e.g. `GuiApp`, `GuiCommand`, `GuiParam`.
-
-The Typer app should **not** need to change; the library must rely on Typer’s own metadata (commands, params, annotations, defaults, etc.). Also support nested Typer apps (subcommands) if reasonably possible.
-
----
-
-### 3. Reflection of Typer apps
-
-Implement logic in `core.py` that:
-
-1. Accepts a `typer.Typer` instance.
-2. Iterates through its registered commands.
-3. For each command, gathers:
-
-   - Name (CLI name and function name)
-   - Help text / short help
-   - Parameters:
-
-     - Name(s) and CLI flags
-     - Annotation type (`str`, `int`, `float`, `bool`, `Enum`, etc.)
-     - Default value if any
-     - Required vs optional
-     - Help text
-
-4. Builds a `GuiApp` model with `GuiCommand` and `GuiParam` entries.
-
-Handle at least these param types:
-
-- `str`
-- `int`
-- `float`
-- `bool`
-- `Enum`
-
-You may start with these basic types, but design the code so it can be extended later to support:
-
-- `Path`
-- `datetime`
-- lists / multiple values
-
-If something is unsupported, the GUI can either:
-
-- Hide that parameter and show a warning in the console, or
-- Render a generic text field.
-
----
-
-### 4. Mapping CLI params to Flet controls
-
-In `flet_ui.py`, implement mapping from `GuiParam` types to Flet controls:
-
-- `str` → `TextField`
-- `int` → `TextField` with numeric input mode and validation
-- `float` → `TextField` with numeric/decimal validation
-- `bool` → `Checkbox` or `Switch`
-- `Enum` → `Dropdown` with options
-
-For each parameter:
-
-- Use the Typer help text (if present) as `hint_text` or helper text.
-- Show default values in the controls.
-- Mark required parameters clearly (e.g. with a `*` in label).
-
-We want a simple, clean layout. For example:
-
-- Top: optional description text and app title.
-- Left: `ListView` or `NavigationRail` with commands.
-- Right: for the chosen command:
-
-  - A vertical list of form fields for each parameter.
-  - A “Run” button.
-
-- Bottom: an output area that shows:
-
-  - Standard output of the command.
-  - Standard error, if possible, styled differently.
-
-You can assume a desktop usage first (typical window size like 900x600).
-
----
-
-### 5. Running commands from GUI
-
-When the user clicks **Run** on a command form:
-
-1. Validate and parse the form values into proper Python types.
-2. Call the underlying Typer command function **directly**, not via subprocess, to avoid re-parsing.
-3. Capture output:
-
-   - Simple option: temporarily redirect `stdout`/`stderr` using `io.StringIO` and context managers, then display it in the GUI.
-
-4. Errors (exceptions) should be:
-
-   - Shown in the output area with a clear error prefix.
-   - Logged to console as well.
-
-We are fine if the library is initially single-threaded as long as it doesn’t block Flet’s UI completely. If needed, offload the command execution to a background thread and update the UI via Flet’s recommended mechanisms.
-
----
-
-### 6. Example usage
-
-Create one or two small example apps under `examples/` to show intended usage.
-
-#### `examples/basic_typer_app.py`
-
-- A simple `typer.Typer()` app with a couple of commands, e.g.:
-
-  - `greet(name: str, excited: bool = False)`
-  - `add(a: int, b: int)`
-
-#### `examples/basic_gui_runner.py`
-
-An example of running the GUI for the Typer app:
+Containers support progressive rendering via context managers:
 
 ```python
-import typer
-from typer_gui import run_gui
-
-from basic_typer_app import app
-
-if __name__ == "__main__":
-    run_gui(app, title="Typer Demo GUI", description="Simple demo of typer-gui.")
+with tg.Table(cols=["Name", "Status"], data=[]) as table:
+    for item in items:
+        table.add_row([item.name, "Processing"])
+        process(item)
+        # Table updates in real-time!
 ```
 
-Make sure this actually works when run (assuming Flet is installed).
+---
+
+## 4. Runner Layer — _How the application is run_
+
+### Runners
+
+- `CLIRunner` - Terminal/console execution
+- `GUIRunner` - Flet desktop application
+- `RESTRunner` - REST API server (future)
+
+**Description**
+A Runner hosts the application in a specific environment.
+
+**Responsibilities**
+
+- Boot the environment (CLI process, Flet app, REST server)
+- Create and own `UIApp` instance
+- Execute command callbacks with stdout/stderr capture
+- Show components by calling their channel-specific method:
+  - `CLIRunner.show(component)` → calls `component.show_cli(self)`
+  - `GUIRunner.show(component)` → calls `component.show_gui(self)`
+- Support progressive updates for container components
+- Handle return values (auto-display returned components)
+- Intercept print() and convert to `Text` components
+
+**Rules**
+
+- May import UI frameworks (Flet, Rich, Flask, etc.)
+- Must not leak framework concerns into UIApp or components
+- Responsible for stdout/stderr capture during command execution
 
 ---
 
-### 7. Flet integration details
+## 5. User API — _How developers use it_
 
-- Use Flet’s `flet.app()` or `flet.app(target=main)` entry style.
-- Keep all Flet-specific details inside `flet_ui.py` and `runner.py`.
-- `run_gui(app, ...)` should:
+### Universal Output Method
 
-  - Build the GUI model using `build_gui_model(app)`.
-  - Start Flet with a `main(page: flet.Page)` function that:
+```python
+ui.out(component)  # Output any component
+```
 
-    - Builds the layout.
-    - Binds events (e.g. command selection, Run button).
-    - Updates the form when a different command is selected.
+**Examples:**
 
-Design the Flet code to be:
+```python
+# Explicit output
+ui.out(tg.Table(cols=["Name"], data=[["Alice"]]))
 
-- Clear and readable.
-- Organized into smaller functions/components for clarity (e.g. functions that create the command list, create the form, create the output panel).
+# Return value auto-displayed
+@app.command()
+def stats():
+    return tg.Table(cols=["Metric", "Value"], data=get_stats())
 
----
+# Progressive rendering
+with tg.Table(cols=["Task", "Status"], data=[]) as t:
+    for task in tasks:
+        t.add_row([task.name, "Running"])
+        task.execute()
 
-### 8. Error handling and edge cases
+# Nested components
+ui.out(
+    tg.Column([
+        tg.Md("# Dashboard"),
+        tg.Row([
+            tg.Button("Refresh", on_click=refresh),
+            tg.Button("Export", on_click=export),
+        ]),
+        tg.Table(cols=["Name"], data=get_data()),
+    ])
+)
 
-- If the Typer app has **no commands**, show a message in the GUI instead of failing.
-- If a parameter type is unsupported, mark it clearly in the form (e.g. disabled field with a message).
-- Validate numeric fields and show a message if parsing fails instead of crashing.
-- Gracefully handle exceptions thrown by command functions.
-
----
-
-### 9. Testing and quality
-
-- Use type hints everywhere and make the code compatible with `mypy` (at least in principle).
-- Add a few unit tests for the reflection logic in `core.py` (e.g., how commands and params are converted to GUI models).
-- Make the public API small and clear.
-
----
-
-### 10. Documentation (README)
-
-Produce a concise `README.md` that includes:
-
-- What `typer-gui` is.
-- Installation instructions, including:
-
-  - Standard `pip`-based installation, e.g. `pip install typer-gui` (and mentioning that `flet` and `typer` will be installed as dependencies if not already present).
-  - Optional example of using `uv` for local development setup, e.g. `uv venv` followed by `uv pip install -e .` or `uv pip install typer-gui flet typer`.
-
-`uv` should be presented as an optional development convenience, not as a required dependency for library users.
-
-- A minimal example of a Typer app and how to launch the GUI.
-- A screenshot placeholder section for the GUI (you can just describe it in text).
+# print() is intercepted
+print("Processing...")  # Same as ui.out(tg.Text("Processing..."))
+```
 
 ---
 
-### 11. Implementation style
+## 6. Architecture Flow
 
-- Use modern Python (3.10+).
-- Prefer dataclasses for the GUI model.
-- Keep each module focused and cohesive.
-- Code should be clean, readable, and structured as if it were going to be open-sourced.
+### Component Output Flow
+
+```
+User Code
+    ↓
+ui.out(component) or return component
+    ↓
+Runner.show(component)
+    ↓
+component.show_cli(runner) or component.show_gui(runner)
+    ↓
+Terminal output or Flet UI update
+```
+
+**Simple and Direct**
+- No events
+- No queues
+- No async complexity
+- Just method calls
+
+### Dependency Direction
+
+```
+AppSpec / CommandSpec
+    ↓
+UIApp (state management)
+    ↓
+Runner (execution + presentation)
+    ↓
+UiBlock components (presentation logic)
+```
+
+- Specs are immutable
+- UIApp manages state
+- Runner orchestrates execution
+- Components handle their own rendering
 
 ---
 
-## Deliverables
+## 7. Design Priorities
 
-1. The full source tree for the `typer-gui` library as described above.
-2. At least one working example that I can run locally to see the GUI.
-3. Basic tests for the reflection logic.
+### Optimized For
 
-Implement all of this now.
+1. **Adding new UI components** (frequent) ✅
+   - One class, one file
+   - All presentation together
+
+2. **Debugging** ✅
+   - Direct method calls
+   - Clear stack traces
+
+3. **Simplicity** ✅
+   - No events, no queues, no async overhead
+   - Straightforward control flow
+
+### Not Optimized For
+
+1. **Adding new channels** (rare)
+   - Requires adding method to all components
+   - Acceptable trade-off given priorities
+
+---
+
+## Final Principles
+
+1. **Specs describe** - Immutable application structure
+2. **UIApp coordinates** - Lightweight state management
+3. **Runner executes and captures** - Stdout/stderr, return values
+4. **Components render themselves** - Per-channel presentation in single class
+5. **Simplicity over abstraction** - Direct calls over event indirection
+
+This structure keeps the system simple, makes adding components easy, and maintains clear separation of concerns without over-engineering.

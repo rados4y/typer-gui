@@ -11,7 +11,7 @@ from .specs import AppSpec, CommandSpec, ParamSpec, CommandUiSpec, ParamType
 
 
 # Attribute name for storing GUI options on functions
-_GUI_OPTIONS_ATTR = "__typer_gui_options__"
+_GUI_OPTIONS_ATTR = "__typer_ui_options__"
 
 
 def _get_param_type(annotation: Any) -> tuple[ParamType, Optional[type], Optional[tuple[str, ...]]]:
@@ -189,23 +189,3 @@ def build_app_spec(
         title=title,
         description=description,
     )
-
-
-# Backward compatibility alias
-def build_gui_model(
-    app: typer.Typer,
-    *,
-    title: Optional[str] = None,
-    description: Optional[str] = None
-) -> AppSpec:
-    """Deprecated: Use build_app_spec instead.
-
-    Args:
-        app: A Typer application instance
-        title: Optional title for the application
-        description: Optional description for the application
-
-    Returns:
-        AppSpec: Immutable application specification
-    """
-    return build_app_spec(app, title=title, description=description)

@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 import flet as ft
 
-from .types import GuiApp, GuiCommand, GuiParam, ParamType, Markdown
+from .specs import AppSpec, CommandSpec, ParamSpec, ParamType
 from .ui_blocks import UiBlock, UiContext, set_context
 from .ui_app import UIApp, UICommand
 
@@ -42,11 +42,11 @@ class _RealTimeWriter(io.StringIO):
 class TyperGUI:
     """Main GUI application class for Typer-GUI."""
 
-    def __init__(self, gui_app: GuiApp, ui_instance=None):
-        """Initialize the GUI with a GuiApp model.
+    def __init__(self, gui_app: AppSpec, ui_instance=None):
+        """Initialize the GUI with an AppSpec model.
 
         Args:
-            gui_app: The GuiApp model
+            gui_app: The AppSpec model
             ui_instance: Optional Ui instance to register the UIApp with
         """
         self.gui_app = gui_app
@@ -223,7 +223,7 @@ class TyperGUI:
             expand=True,
         )
 
-    def select_command(self, command: GuiCommand) -> None:
+    def select_command(self, command: CommandSpec) -> None:
         """Update the form when a command is selected."""
         self.current_command = command
         self.form_controls.clear()
@@ -309,7 +309,7 @@ class TyperGUI:
         if command.gui_options.is_auto_exec:
             self.run_command()
 
-    def _create_param_control(self, param: GuiParam) -> Optional[ft.Control]:
+    def _create_param_control(self, param: ParamSpec) -> Optional[ft.Control]:
         """Create a Flet control for a parameter."""
         label = param.name
         if param.required:
@@ -451,10 +451,7 @@ class TyperGUI:
 
                 # Handle result for long-running commands
                 if result is not None:
-                    if isinstance(result, Markdown):
-                        self._append_markdown(result.content)
-                    else:
-                        self._append_output(f"Result: {result}")
+                    self._append_output(f"Result: {result}")
 
             else:
                 # Buffer output for regular commands
@@ -488,10 +485,7 @@ class TyperGUI:
                         self._append_output(stderr_text)
 
                     if result is not None:
-                        if isinstance(result, Markdown):
-                            self._append_markdown(result.content)
-                        else:
-                            self._append_output(f"Result: {result}")
+                        self._append_output(f"Result: {result}")
 
                 except Exception as e:
                     stderr_text = stderr_capture.getvalue()
@@ -514,7 +508,7 @@ class TyperGUI:
             self._append_output(f"ERROR parsing parameters: {type(e).__name__}: {e}")
             self._append_output(traceback.format_exc())
 
-    def _extract_value_from_control(self, control: ft.Control, param: GuiParam) -> Any:
+    def _extract_value_from_control(self, control: ft.Control, param: ParamSpec) -> Any:
         """Extract and parse the value from a Flet control."""
         if isinstance(control, ft.TextField):
             text_value = control.value or ""
@@ -601,11 +595,11 @@ class TyperGUI:
                 self.page.update()
 
 
-def create_flet_app(gui_app: GuiApp, ui_instance=None):
-    """Create a Flet app function from a GuiApp model.
+def create_flet_app(gui_app: AppSpec, ui_instance=None):
+    """Create a Flet app function from an AppSpec model.
 
     Args:
-        gui_app: The GuiApp model
+        gui_app: The AppSpec model
         ui_instance: Optional Ui instance to register the UIApp with
     """
 

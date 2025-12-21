@@ -5,7 +5,7 @@ from typing import Optional
 import flet as ft
 import typer
 
-from .core import build_gui_model
+from .spec_builder import build_app_spec
 from .flet_ui import create_flet_app
 
 
@@ -25,7 +25,7 @@ def run_gui(
 
     Example:
         >>> import typer
-        >>> from typer_gui import run_gui
+        >>> from typer_ui import run_gui
         >>>
         >>> app = typer.Typer()
         >>>
@@ -37,7 +37,7 @@ def run_gui(
         >>>     run_gui(app, title="My App")
     """
     # Build the GUI model from the Typer app
-    gui_app = build_gui_model(app, title=title, description=description)
+    gui_app = build_app_spec(app, title=title, description=description)
 
     # Create the Flet app function
     flet_main = create_flet_app(gui_app)

@@ -4,8 +4,8 @@ from enum import Enum
 
 import typer
 
-from typer_gui.core import build_gui_model
-from typer_gui.types import ParamType
+from typer_ui.spec_builder import build_app_spec
+from typer_ui.specs import ParamType
 
 
 class TestColor(str, Enum):
@@ -25,7 +25,7 @@ def test_build_gui_model_with_simple_command():
         """Greet someone."""
         print(f"Hello {name}")
 
-    gui_model = build_gui_model(app)
+    gui_model = build_app_spec(app)
 
     assert len(gui_model.commands) == 1
     cmd = gui_model.commands[0]
@@ -50,7 +50,7 @@ def test_build_gui_model_with_multiple_param_types():
         """Test command with multiple types."""
         pass
 
-    gui_model = build_gui_model(app)
+    gui_model = build_app_spec(app)
 
     assert len(gui_model.commands) == 1
     cmd = gui_model.commands[0]
@@ -75,7 +75,7 @@ def test_build_gui_model_with_enum():
         """Paint with a color."""
         pass
 
-    gui_model = build_gui_model(app)
+    gui_model = build_app_spec(app)
 
     assert len(gui_model.commands) == 1
     cmd = gui_model.commands[0]
@@ -84,7 +84,7 @@ def test_build_gui_model_with_enum():
     param = cmd.params[0]
     assert param.name == "color"
     assert param.param_type == ParamType.ENUM
-    assert param.enum_choices == ["red", "green", "blue"]
+    assert param.enum_choices == ("red", "green", "blue")
 
 
 def test_build_gui_model_with_defaults():
@@ -100,7 +100,7 @@ def test_build_gui_model_with_defaults():
         """Test command with defaults."""
         pass
 
-    gui_model = build_gui_model(app)
+    gui_model = build_app_spec(app)
 
     cmd = gui_model.commands[0]
     param_dict = {p.name: p for p in cmd.params}
@@ -124,7 +124,7 @@ def test_build_gui_model_with_multiple_commands():
         """Say goodbye."""
         pass
 
-    gui_model = build_gui_model(app)
+    gui_model = build_app_spec(app)
 
     assert len(gui_model.commands) == 2
     assert gui_model.commands[0].name == "greet"
@@ -140,7 +140,7 @@ def test_build_gui_model_with_title_and_description():
         """Test command."""
         pass
 
-    gui_model = build_gui_model(
+    gui_model = build_app_spec(
         app,
         title="My App",
         description="This is my app",
@@ -153,7 +153,7 @@ def test_build_gui_model_with_title_and_description():
 def test_build_gui_model_with_no_commands():
     """Test building GUI model from an app with no commands."""
     app = typer.Typer()
-    gui_model = build_gui_model(app)
+    gui_model = build_app_spec(app)
 
     assert len(gui_model.commands) == 0
 
@@ -170,7 +170,7 @@ def test_build_gui_model_required_vs_optional():
         """Test required vs optional."""
         pass
 
-    gui_model = build_gui_model(app)
+    gui_model = build_app_spec(app)
     cmd = gui_model.commands[0]
     param_dict = {p.name: p for p in cmd.params}
 

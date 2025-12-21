@@ -1,23 +1,23 @@
-"""Example 2: Parameters and Command Options
+"""Example 2: Parameters and UI Components
 
 This example demonstrates:
 - Different parameter types (str, int, bool, enum)
-- Markdown output with ui.out.md()
+- UI components (Text, Markdown, Table)
 - Long-running commands (is_long)
 - Auto-execute commands (is_auto_exec)
 - Button styling (is_button)
 """
 
 import typer
-import typer_gui
+import typer_ui as tg
 import time
 from enum import Enum
 
 app = typer.Typer()
-ui = typer_gui.Ui(
+ui = tg.Ui(
     app,
-    title="Parameters & Options",
-    description="Parameter types and command options"
+    title="Parameters & Components",
+    description="Parameter types and UI components"
 )
 
 
@@ -30,7 +30,7 @@ class Priority(str, Enum):
 
 
 @app.command()
-@ui.options(is_button=True)
+@ui.command(is_button=True)
 def greet(name: str = "World", times: int = 1, excited: bool = False):
     """Greet someone - demonstrates string, integer, and boolean parameters."""
     greeting = f"Hello, {name}!"
@@ -38,20 +38,26 @@ def greet(name: str = "World", times: int = 1, excited: bool = False):
         greeting += " How exciting!"
 
     for _ in range(times):
-        print(greeting)
+        ui(tg.Text(greeting))
 
 
 @app.command()
 def create_task(title: str, priority: Priority = Priority.MEDIUM):
     """Create a task - demonstrates enum parameter (renders as dropdown)."""
-    print(f"✓ Task created: {title}")
-    print(f"  Priority: {priority.value}")
+    ui(tg.Md("## Task Created"))
+    ui(tg.Table(
+        cols=["Field", "Value"],
+        data=[
+            ["Title", title],
+            ["Priority", priority.value],
+        ]
+    ))
 
 
 @app.command()
 def markdown_demo():
-    """Markdown output - demonstrates ui.out.md() for rich formatting."""
-    ui.out.md("""
+    """Markdown output - demonstrates Markdown component for rich formatting."""
+    ui(tg.Md("""
 # Markdown Example
 
 Format text with **bold**, *italic*, and `code`.
@@ -63,31 +69,32 @@ Format text with **bold**, *italic*, and `code`.
 
 | Feature | Status |
 |---------|--------|
-| Tables  | ✓      |
-| Code    | ✓      |
-| Links   | ✓      |
-""")
+| Tables  | [OK]   |
+| Code    | [OK]   |
+| Links   | [OK]   |
+"""))
 
 
 @app.command()
-@ui.options(is_long=True)
+@ui.command(is_long=True)
 def long_process(steps: int = 5):
     """Long process - demonstrates is_long for real-time output streaming."""
-    print("Starting process...\n")
+    ui(tg.Md(f"## Processing {steps} steps"))
 
-    for i in range(1, steps + 1):
-        print(f"[{i}/{steps}] Processing...")
-        time.sleep(0.8)
-        print(f"  ✓ Step {i} complete\n")
+    # Progressive table updates
+    with ui(tg.Table(cols=["Step", "Status"], data=[])) as table:
+        for i in range(1, steps + 1):
+            table.add_row([f"Step {i}/{steps}", "Processing..."])
+            time.sleep(0.8)
 
-    print("All done!")
+    ui(tg.Md("[OK] **All done!**"))
 
 
 @app.command()
-@ui.options(is_auto_exec=True)
+@ui.command(is_auto_exec=True)
 def welcome():
     """Welcome screen - demonstrates is_auto_exec (runs automatically when selected)."""
-    ui.out.md("""
+    ui(tg.Md("""
 # Welcome! 👋
 
 This command runs **automatically** when selected.
@@ -96,7 +103,7 @@ This command runs **automatically** when selected.
 - Info screens and dashboards
 - Commands with no required parameters
 - Display-only commands
-""")
+"""))
 
 
 if __name__ == "__main__":
@@ -106,7 +113,7 @@ if __name__ == "__main__":
 """
 CLI Examples:
 -------------
-python 02_arguments_and_output.py --cli greet --name Alice --times 3 --excited
-python 02_arguments_and_output.py --cli create-task "Fix bug" --priority urgent
-python 02_arguments_and_output.py --cli long-process --steps 3
+python examples/02_arguments_and_output.py --cli greet --name Alice --times 3 --excited
+python examples/02_arguments_and_output.py --cli create-task "Fix bug" --priority urgent
+python examples/02_arguments_and_output.py --cli long-process --steps 3
 """
