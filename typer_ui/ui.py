@@ -10,6 +10,7 @@ from .specs import CommandUiSpec
 from .runners.gui_runner import create_flet_app
 from .runners.cli_runner import CLIRunner
 from .ui_blocks import get_current_runner
+from .ui_app import UIApp
 
 
 class Ui:
@@ -57,6 +58,7 @@ class Ui:
         self.description = description
         self._typer_app = app
         self._cli_mode = False
+        self._ui_app: Optional[UIApp] = None
 
     def __call__(self, component):
         """Present a component and return it for further use.
@@ -113,7 +115,7 @@ class Ui:
         """
         self(component)
 
-    def command(
+    def def_command(
         self,
         *,
         is_button: bool = False,
@@ -132,7 +134,7 @@ class Ui:
 
         Example:
             >>> @app.command()
-            >>> @ui.command(is_button=True, is_long=True)
+            >>> @ui.def_command(is_button=True, is_long=True)
             >>> def process():
             >>>     for i in range(10):
             >>>         print(f"Step {i}")
@@ -154,8 +156,9 @@ class Ui:
 
         return decorator
 
-    # Alias for backward compatibility
-    options = command
+    # Aliases for backward compatibility
+    command = def_command
+    options = def_command
 
     def app(self):
         """Launch the GUI application or CLI based on --cli flag.
