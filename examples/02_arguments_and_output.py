@@ -56,22 +56,42 @@ def create_task(title: str, priority: Priority = Priority.MEDIUM):
 
 @app.command()
 def markdown_demo():
-    """Markdown output - demonstrates Markdown component for rich formatting."""
+    """Markdown output - demonstrates comprehensive Markdown formatting."""
     ui(tg.Md("""
-# Markdown Example
+# Markdown Features
 
-Format text with **bold**, *italic*, and `code`.
+You can use **bold**, *italic*, and `code` formatting.
 
-## Features
-- Rich formatting in GUI
-- Plain text fallback in CLI
-- Tables, lists, and more
+## Lists
 
-| Feature | Status |
-|---------|--------|
-| Tables  | [OK]   |
-| Code    | [OK]   |
-| Links   | [OK]   |
+### Unordered
+- Feature 1
+- Feature 2
+- Feature 3
+
+### Ordered
+1. First step
+2. Second step
+3. Third step
+
+## Tables
+
+| Feature | Status | Priority |
+|---------|--------|----------|
+| Tables  | [OK]   | High     |
+| Links   | [OK]   | Medium   |
+| Images  | Planned| Low      |
+
+## Code Blocks
+
+```python
+def hello():
+    print("Hello from Typer-UI!")
+```
+
+---
+
+Markdown works in both GUI and CLI modes!
 """))
 
 
@@ -88,6 +108,39 @@ def long_process(steps: int = 5):
             time.sleep(0.8)
 
     ui(tg.Md("[OK] **All done!**"))
+
+
+@app.command()
+def mixed_output():
+    """Mixed content - demonstrates combining different output types."""
+    ui(tg.Md("# Mixed Content Example"))
+
+    # Regular print still works
+    print("This is from print()")
+
+    # Mix components
+    ui(tg.Text("Plain text component"))
+
+    ui(tg.Table(
+        cols=["Output Type", "Method", "When to Use"],
+        data=[
+            ["Plain text", "print() or tg.Text()", "Simple messages"],
+            ["Formatted", "tg.Md()", "Rich content"],
+            ["Tabular", "tg.Table()", "Structured data"],
+            ["Interactive", "tg.Button/Link", "GUI actions"],
+        ]
+    ))
+
+    ui(tg.Md("""
+## Summary
+You can freely mix:
+- `print()` statements
+- UI components (`Text`, `Md`, `Table`)
+- Layout elements (`Row`, `Column`)
+- Interactive elements (`Button`, `Link`)
+
+Everything works together seamlessly!
+    """))
 
 
 @app.command()
@@ -115,5 +168,7 @@ CLI Examples:
 -------------
 python examples/02_arguments_and_output.py --cli greet --name Alice --times 3 --excited
 python examples/02_arguments_and_output.py --cli create-task "Fix bug" --priority urgent
+python examples/02_arguments_and_output.py --cli markdown-demo
+python examples/02_arguments_and_output.py --cli mixed-output
 python examples/02_arguments_and_output.py --cli long-process --steps 3
 """

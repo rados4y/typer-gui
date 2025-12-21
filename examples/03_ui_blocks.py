@@ -1,10 +1,10 @@
 """Example 3: UI Components and Layout
 
 This example demonstrates:
-- Table component with auto-update
+- Table component
+- Progressive rendering with context managers
 - Row and Column layout components
 - Nested component composition
-- Progressive rendering with context managers
 """
 
 import typer
@@ -15,14 +15,14 @@ import random
 app = typer.Typer()
 ui = tg.Ui(
     app,
-    title="UI Components",
-    description="Tables, layout, and composition"
+    title="UI Components & Layout",
+    description="Tables, progressive rendering, and layouts"
 )
 
 
 @app.command()
 def show_table():
-    """Simple table display."""
+    """Simple table - basic table display."""
     ui(tg.Table(
         cols=["Name", "Email", "Role"],
         data=[
@@ -36,37 +36,18 @@ def show_table():
 
 @app.command()
 @ui.command(is_long=True)
-def auto_update_table():
-    """Demonstrate table auto-update feature."""
-    ui(tg.Md("## Auto-Updating Table"))
+def progressive_table():
+    """Progressive rendering - watch table update in real-time with context manager."""
+    ui(tg.Md("## Progressive Table Rendering"))
     ui(tg.Text("Watch the table update as rows are added!"))
 
-    # Create and present table
-    table = tg.Table(cols=["Component", "Status"], data=[])
-    ui(table)
-
-    # Add rows - table automatically updates!
-    components = ["Database", "API Server", "Cache", "Workers", "Frontend"]
-    for comp in components:
-        table.add_row([comp, "[OK] Initialized"])
-        time.sleep(0.5)
-
-    ui(tg.Md("[OK] **All components ready!**"))
-
-
-@app.command()
-@ui.command(is_long=True)
-def progressive_table():
-    """Demonstrate progressive rendering with context manager."""
-    ui(tg.Md("## Progressive Rendering"))
-
-    # Use context manager for cleaner code
-    with ui(tg.Table(cols=["Step", "Progress", "Duration"], data=[])) as t:
+    # Use context manager for progressive rendering
+    with ui(tg.Table(cols=["Step", "Progress", "Duration"], data=[])) as table:
         steps = ["Initializing", "Loading Data", "Processing", "Validating", "Complete"]
         for i, step in enumerate(steps, 1):
             progress = f"{i}/{len(steps)}"
             duration = f"{i * 0.5:.1f}s"
-            t.add_row([step, progress, duration])
+            table.add_row([step, progress, duration])
             time.sleep(0.5)
 
     ui(tg.Md("[OK] **Processing complete!**"))
@@ -74,7 +55,7 @@ def progressive_table():
 
 @app.command()
 def layout_demo():
-    """Demonstrate Row and Column layout components."""
+    """Layout components - demonstrate Row and Column."""
     ui(tg.Md("# Layout Demo"))
 
     # Horizontal layout with Row
@@ -96,7 +77,7 @@ def layout_demo():
 
 @app.command()
 def dashboard():
-    """Demonstrate nested component composition."""
+    """Nested composition - complex nested structure with all component types."""
     # Generate random stats
     users = random.randint(1000, 2000)
     revenue = random.randint(50000, 100000)
@@ -133,80 +114,6 @@ def dashboard():
     ]))
 
 
-@app.command()
-def show_markdown():
-    """Display formatted markdown content."""
-    ui(tg.Md("""
-# Markdown Features
-
-You can use **bold**, *italic*, and `code` formatting.
-
-## Lists
-
-### Unordered
-- Feature 1
-- Feature 2
-- Feature 3
-
-### Ordered
-1. First step
-2. Second step
-3. Third step
-
-## Tables
-
-| Feature | Status | Priority |
-|---------|--------|----------|
-| Tables  | [OK]   | High     |
-| Links   | [OK]   | Medium   |
-| Images  | Planned| Low      |
-
-## Code Blocks
-
-```python
-def hello():
-    print("Hello from Typer-UI!")
-```
-
----
-
-Markdown works in both GUI and CLI modes!
-    """))
-
-
-@app.command()
-def mixed_output():
-    """Mix different component types and print statements."""
-    ui(tg.Md("# Mixed Content Example"))
-
-    # Regular print still works
-    print("This is from print()")
-
-    # Mix components
-    ui(tg.Text("Plain text component"))
-
-    ui(tg.Table(
-        cols=["Output Type", "Method", "When to Use"],
-        data=[
-            ["Plain text", "print() or tg.Text()", "Simple messages"],
-            ["Formatted", "tg.Md()", "Rich content"],
-            ["Tabular", "tg.Table()", "Structured data"],
-            ["Interactive", "tg.Button/Link", "GUI actions"],
-        ]
-    ))
-
-    ui(tg.Md("""
-## Summary
-You can freely mix:
-- `print()` statements
-- UI components (`Text`, `Md`, `Table`)
-- Layout elements (`Row`, `Column`)
-- Interactive elements (`Button`, `Link`)
-
-Everything works together seamlessly in both CLI and GUI!
-    """))
-
-
 if __name__ == "__main__":
     ui.app()
 
@@ -215,10 +122,7 @@ if __name__ == "__main__":
 CLI Examples:
 -------------
 python examples/03_ui_blocks.py --cli show-table
-python examples/03_ui_blocks.py --cli auto-update-table
 python examples/03_ui_blocks.py --cli progressive-table
 python examples/03_ui_blocks.py --cli layout-demo
 python examples/03_ui_blocks.py --cli dashboard
-python examples/03_ui_blocks.py --cli show-markdown
-python examples/03_ui_blocks.py --cli mixed-output
 """

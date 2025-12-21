@@ -72,7 +72,9 @@ class Container(UiBlock, ABC):
     """
 
     def __init__(self):
-        self.children: List[UiBlock] = []
+        # Only initialize children if not already set by dataclass
+        if not hasattr(self, 'children'):
+            self.children: List[UiBlock] = []
         self._context_active = False
         self._runner = None
         self._presentation_runner = None
