@@ -1,5 +1,6 @@
 """GUI runner using Flet for desktop applications."""
 
+import asyncio
 import io
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
@@ -10,6 +11,7 @@ import flet as ft
 from .base import Runner
 from ..specs import AppSpec, CommandSpec, ParamType
 from ..ui_blocks import Text, set_current_runner
+from ..ui_app import UIApp
 
 
 class _RealTimeWriter(io.StringIO):
@@ -38,12 +40,13 @@ class _RealTimeWriter(io.StringIO):
 class GUIRunner(Runner):
     """Runner for Flet-based GUI applications."""
 
-    def __init__(self, app_spec: AppSpec):
+    def __init__(self, app_spec: AppSpec, ui_app: Optional[UIApp] = None):
         super().__init__(app_spec)
         self.page: Optional[ft.Page] = None
         self.current_command: Optional[CommandSpec] = None
         self.form_controls: dict[str, ft.Control] = {}
         self.channel = "gui"
+        self.ui_app = ui_app or UIApp(app_spec, self)
 
         # UI components
         self.command_list: Optional[ft.ListView] = None
@@ -276,10 +279,14 @@ class GUIRunner(Runner):
 
         buttons = []
         for cmd in self.app_spec.commands:
+            # Use an async lambda for on_click handlers
+            async def handle_click(e, command=cmd):
+                await self._select_command(command)
+
             if cmd.ui_spec.is_button:
                 btn = ft.ElevatedButton(
                     text=cmd.name,
-                    on_click=lambda e, command=cmd: self._select_command(command),
+                    on_click=handle_click,
                     bgcolor=ft.Colors.BLUE_600,
                     color=ft.Colors.WHITE,
                     style=ft.ButtonStyle(
@@ -289,7 +296,7 @@ class GUIRunner(Runner):
             else:
                 btn = ft.TextButton(
                     text=cmd.name,
-                    on_click=lambda e, command=cmd: self._select_command(command),
+                    on_click=handle_click,
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=5),
                     ),
@@ -298,7 +305,7 @@ class GUIRunner(Runner):
 
         return ft.ListView(controls=buttons, spacing=5, expand=True)
 
-    def _select_command(self, command: CommandSpec) -> None:
+    async def _select_command(self, command: CommandSpec) -> None:
         """Select and display a command.
 
         Args:
@@ -369,7 +376,7 @@ class GUIRunner(Runner):
 
         # Auto-execute
         if command.ui_spec.is_auto_exec:
-            self._run_command()
+            await self._run_command()
 
     def _create_param_control(self, param) -> Optional[ft.Control]:
         """Create Flet control for parameter.
@@ -504,7 +511,7 @@ class GUIRunner(Runner):
 
     def execute_command(
         self, command_name: str, params: dict[str, Any]
-    ) -> tuple[Any, Optional[Exception]]:
+    ) -> tuple[Any, Optional[Exception], str]:
         """Execute command with stdout/stderr capture.
 
         Args:
@@ -512,7 +519,7 @@ class GUIRunner(Runner):
             params: Parameters
 
         Returns:
-            Tuple of (result, exception)
+            Tuple of (result, exception, output_text)
         """
         # Find command
         command_spec: Optional[CommandSpec] = None
@@ -522,74 +529,154 @@ class GUIRunner(Runner):
                 break
 
         if not command_spec:
-            return None, ValueError(f"Command not found: {command_name}")
+            return None, ValueError(f"Command not found: {command_name}"), ""
 
-        # Set this runner as current so ui.out() works
+        # Save current runner for nested execution support
+        from ..ui_blocks import get_current_runner
+        saved_runner = get_current_runner()
+
+        # Set this runner as current so ui() works
         set_current_runner(self)
+
+        # Set current command in UIApp
+        self.ui_app.current_command = command_spec
 
         result = None
         exception = None
+        output_lines = []  # Capture text output
+
+        # Temporarily replace show method to capture output
+        original_show = self.show
+
+        def capturing_show(component):
+            """Capture text representation while showing."""
+            # Get text representation from component
+            text_repr = self._component_to_text(component)
+            if text_repr:
+                output_lines.append(text_repr)
+            # Still show in GUI
+            original_show(component)
+
+        self.show = capturing_show
 
         # Check if long-running
         is_long = command_spec.ui_spec.is_long
 
-        if is_long:
-            # Real-time streaming
-            stdout_writer = _RealTimeWriter(self._append_text)
-            stderr_writer = _RealTimeWriter(
-                lambda t: self._append_text(f"[ERR] {t}")
-            )
+        try:
+            if is_long:
+                # Real-time streaming
+                stdout_writer = _RealTimeWriter(
+                    lambda t: (output_lines.append(t), self._append_text(t))
+                )
+                stderr_writer = _RealTimeWriter(
+                    lambda t: self._append_text(f"[ERR] {t}")
+                )
 
-            try:
-                with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
-                    result = command_spec.callback(**params)
+                try:
+                    with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
+                        result = command_spec.callback(**params)
 
-                stdout_writer.flush()
-                stderr_writer.flush()
+                    stdout_writer.flush()
+                    stderr_writer.flush()
 
-            except Exception as e:
-                exception = e
-                stdout_writer.flush()
-                stderr_writer.flush()
-                self._append_text(f"ERROR: {e}")
-                self._append_text(traceback.format_exc())
+                except Exception as e:
+                    exception = e
+                    stdout_writer.flush()
+                    stderr_writer.flush()
+                    error_text = f"ERROR: {e}"
+                    output_lines.append(error_text)
+                    self._append_text(error_text)
+                    self._append_text(traceback.format_exc())
 
+            else:
+                # Buffered output
+                stdout_capture = io.StringIO()
+                stderr_capture = io.StringIO()
+
+                try:
+                    with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                        result = command_spec.callback(**params)
+
+                    stdout_text = stdout_capture.getvalue()
+                    stderr_text = stderr_capture.getvalue()
+
+                    if stdout_text:
+                        # Convert print statements to Text components
+                        for line in stdout_text.rstrip('\n').split('\n'):
+                            if line:
+                                output_lines.append(line)
+                                Text(line).show_gui(self)
+
+                    if stderr_text:
+                        stderr_msg = f"[STDERR]\n{stderr_text}"
+                        output_lines.append(stderr_msg)
+                        self._append_text(stderr_msg)
+
+                except Exception as e:
+                    exception = e
+                    error_text = f"ERROR: {e}"
+                    output_lines.append(error_text)
+                    self._append_text(error_text)
+                    self._append_text(traceback.format_exc())
+
+            # Handle return value - auto-display if it's a UiBlock
+            if result is not None:
+                from ..ui_blocks import UiBlock
+                if isinstance(result, UiBlock):
+                    self.show(result)
+
+        finally:
+            # Restore original show method
+            self.show = original_show
+
+        # Restore previous runner (for nested execution support)
+        set_current_runner(saved_runner)
+
+        # Join all output lines
+        output_text = '\n'.join(output_lines)
+
+        return result, exception, output_text
+
+    def _component_to_text(self, component) -> str:
+        """Convert UI component to text representation.
+
+        Args:
+            component: UiBlock component
+
+        Returns:
+            Text representation of the component
+        """
+        from ..ui_blocks import Text, Md, Table
+
+        if isinstance(component, Text):
+            return component.content
+        elif isinstance(component, Md):
+            # Strip markdown formatting for text output
+            import re
+            text = component.content
+            text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+            text = re.sub(r'\*([^*]+)\*', r'\1', text)
+            text = re.sub(r'__([^_]+)__', r'\1', text)
+            text = re.sub(r'_([^_]+)_', r'\1', text)
+            text = re.sub(r'`([^`]+)`', r'\1', text)
+            text = re.sub(r'^#+\s+(.+)$', lambda m: m.group(1).upper(), text, flags=re.MULTILINE)
+            return text
+        elif isinstance(component, Table):
+            # Format table as text
+            lines = []
+            if component.title:
+                lines.append(component.title)
+                lines.append("")
+            # Column headers
+            lines.append(" | ".join(component.cols))
+            lines.append("-" * (sum(len(c) for c in component.cols) + 3 * (len(component.cols) - 1)))
+            # Data rows
+            for row in component.data:
+                lines.append(" | ".join(str(cell) for cell in row))
+            return "\n".join(lines)
         else:
-            # Buffered output
-            stdout_capture = io.StringIO()
-            stderr_capture = io.StringIO()
-
-            try:
-                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                    result = command_spec.callback(**params)
-
-                stdout_text = stdout_capture.getvalue()
-                stderr_text = stderr_capture.getvalue()
-
-                if stdout_text:
-                    # Convert print statements to Text components
-                    for line in stdout_text.rstrip('\n').split('\n'):
-                        if line:
-                            Text(line).show_gui(self)
-
-                if stderr_text:
-                    self._append_text(f"[STDERR]\n{stderr_text}")
-
-            except Exception as e:
-                exception = e
-                self._append_text(f"ERROR: {e}")
-                self._append_text(traceback.format_exc())
-
-        # Handle return value - auto-display if it's a UiBlock
-        if result is not None:
-            from ..ui_blocks import UiBlock
-            if isinstance(result, UiBlock):
-                self.show(result)
-
-        # Clear runner reference
-        set_current_runner(None)
-
-        return result, exception
+            # For other components, try to get a simple string representation
+            return str(component)
 
     def _append_text(self, text: str) -> None:
         """Append plain text to output view."""
@@ -608,16 +695,17 @@ class GUIRunner(Runner):
                 self.page.update()
 
 
-def create_flet_app(app_spec: AppSpec):
+def create_flet_app(app_spec: AppSpec, ui_app: Optional[UIApp] = None):
     """Create Flet app function from AppSpec.
 
     Args:
         app_spec: Application specification
+        ui_app: Optional UIApp instance
 
     Returns:
         Flet main function
     """
-    runner = GUIRunner(app_spec)
+    runner = GUIRunner(app_spec, ui_app)
 
     def main(page: ft.Page):
         runner.build(page)

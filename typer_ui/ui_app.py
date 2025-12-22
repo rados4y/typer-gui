@@ -5,7 +5,16 @@ from .specs import AppSpec, CommandSpec
 
 
 class UICommand:
-    """Wrapper for command operations."""
+    """Wrapper for command operations.
+
+    Supports method chaining for convenient access to output:
+        ui.runtime.command("fetch").run(x=10).out  # Execute and get output
+
+    Attributes:
+        name: Command name
+        result: Return value from last run() or include()
+        out: Property - captured text output (chainable)
+    """
 
     def __init__(self, app: 'UIApp', command_spec: CommandSpec):
         """Initialize UICommand.
@@ -17,44 +26,103 @@ class UICommand:
         self.app = app
         self.command_spec = command_spec
         self.name = command_spec.name
+        self._output: Optional[str] = None  # Internal captured output
+        self.result: Any = None  # Return value from last run()
 
-    def select(self) -> None:
-        """Select this command (sets it as current)."""
+    @property
+    def out(self) -> str:
+        """Get captured output from last run().
+
+        Returns empty string if no output captured yet.
+
+        Example:
+            >>> # Get current command output
+            >>> output = ui.runtime.command().out
+            >>>
+            >>> # Chain after run()
+            >>> output = ui.runtime.command("fetch").run(x=10).out
+        """
+        return self._output or ""
+
+    def select(self) -> 'UICommand':
+        """Select this command (sets it as current).
+
+        In GUI mode, this changes the displayed command form.
+        In CLI mode, this has no visible effect.
+
+        Returns:
+            Self for chaining
+        """
         self.app.current_command = self.command_spec
+        return self
 
-    def run(self, **kwargs) -> Any:
+    def clear(self) -> 'UICommand':
+        """Clear output for this command.
+
+        Returns:
+            Self for chaining
+        """
+        self._output = None
+        self.result = None
+        return self
+
+    def run(self, **kwargs) -> 'UICommand':
         """Execute this command with parameters.
 
         Captures output separately from current context.
+        Returns self for method chaining.
 
         Args:
             **kwargs: Parameter values
 
         Returns:
-            Command result
+            Self (for chaining .out, .result, etc.)
+
+        Example:
+            >>> # Chain to get output
+            >>> output = ui.runtime.command("fetch").run(source="api").out
+            >>>
+            >>> # Chain to get result
+            >>> result = ui.runtime.command("fetch").run(source="api").result
+            >>>
+            >>> # Use in button lambda
+            >>> ui(tg.Button("Copy",
+            ...     on_click=lambda: ui.clipboard(
+            ...         ui.runtime.command("fetch").run(source="api").out
+            ...     )))
         """
         # Execute via runner if available
         if self.app.runner:
-            result, error = self.app.runner.execute_command(
+            result, error, output = self.app.runner.execute_command(
                 self.command_spec.name, kwargs
             )
+            self.result = result
+            self._output = output
             if error:
                 raise error
-            return result
         else:
             # Direct execution fallback
-            return self.command_spec.callback(**kwargs)
+            result = self.command_spec.callback(**kwargs)
+            self.result = result
+            self._output = ""  # No output capture without runner
 
-    def include(self, **kwargs) -> Any:
+        return self  # Return self for chaining
+
+    def include(self, **kwargs) -> 'UICommand':
         """Execute this command inline within current context.
 
         Output appears in the current command's output area.
+        Returns self for method chaining.
 
         Args:
             **kwargs: Parameter values
 
         Returns:
-            Command result
+            Self (for chaining .result, etc.)
+
+        Example:
+            >>> # Execute inline and get result
+            >>> result = ui.runtime.command("process").include().result
         """
         # Save current command
         saved_command = self.app.current_command
@@ -65,10 +133,14 @@ class UICommand:
 
             # Execute directly (output goes to current context)
             if self.command_spec.callback:
-                return self.command_spec.callback(**kwargs)
+                result = self.command_spec.callback(**kwargs)
+                self.result = result
+                # Note: output is shown inline, not captured separately
         finally:
             # Restore previous command
             self.app.current_command = saved_command
+
+        return self  # Return self for chaining
 
 
 class UIApp:

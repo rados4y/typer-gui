@@ -8,6 +8,7 @@ from typing import Any, Optional
 from .base import Runner
 from ..specs import AppSpec, CommandSpec
 from ..ui_blocks import Text, set_current_runner
+from ..ui_app import UIApp
 
 
 class CLIRunner(Runner):
@@ -16,10 +17,11 @@ class CLIRunner(Runner):
     Executes commands directly from command line and prints output.
     """
 
-    def __init__(self, app_spec: AppSpec):
+    def __init__(self, app_spec: AppSpec, ui_app: Optional[UIApp] = None):
         super().__init__(app_spec)
         self._verbose = False
         self.channel = "cli"
+        self.ui_app = ui_app or UIApp(app_spec, self)
 
     def start(self) -> None:
         """Start CLI runner (no-op for CLI, execution is synchronous)."""
@@ -48,7 +50,7 @@ class CLIRunner(Runner):
         self,
         command_name: str,
         params: dict[str, Any]
-    ) -> tuple[Any, Optional[Exception]]:
+    ) -> tuple[Any, Optional[Exception], str]:
         """Execute command callback with stdout/stderr capture.
 
         Args:
@@ -56,7 +58,7 @@ class CLIRunner(Runner):
             params: Parameter values
 
         Returns:
-            Tuple of (result, exception)
+            Tuple of (result, exception, output_text)
         """
         # Find command spec
         command_spec: Optional[CommandSpec] = None
@@ -67,14 +69,38 @@ class CLIRunner(Runner):
 
         if not command_spec:
             error = ValueError(f"Command not found: {command_name}")
-            return None, error
+            return None, error, ""
 
-        # Set this runner as current so ui.out() works
+        # Save current runner for nested execution support
+        from ..ui_blocks import get_current_runner
+        saved_runner = get_current_runner()
+
+        # Set this runner as current so ui() works
         set_current_runner(self)
 
-        # Capture stdout/stderr
+        # Set current command in UIApp
+        self.ui_app.current_command = command_spec
+
+        # Capture stdout/stderr and UI components
         stdout_capture = StringIO()
         stderr_capture = StringIO()
+        output_lines = []  # Capture rendered text output
+
+        # Temporarily replace show method to capture output
+        original_show = self.show
+
+        def capturing_show(component):
+            """Capture text representation while showing."""
+            # Capture the text output by temporarily redirecting stdout
+            text_capture = StringIO()
+            with redirect_stdout(text_capture):
+                # Call the component's show_cli directly
+                component.show_cli(self)
+            captured = text_capture.getvalue()
+            if captured:
+                output_lines.append(captured.rstrip('\n'))
+
+        self.show = capturing_show
 
         result = None
         exception = None
@@ -86,11 +112,20 @@ class CLIRunner(Runner):
 
         except Exception as e:
             exception = e
+        finally:
+            # Restore original show method AFTER capturing output
+            self.show = original_show
 
-        # Print captured output
+        # Capture print statements as output lines
         stdout_text = stdout_capture.getvalue()
         if stdout_text:
-            # Convert print statements to Text components
+            # Add print statements to output
+            for line in stdout_text.rstrip('\n').split('\n'):
+                if line:
+                    output_lines.append(line)
+
+        # Print everything for display (using restored show method)
+        if stdout_text:
             for line in stdout_text.rstrip('\n').split('\n'):
                 if line:
                     Text(line).show_cli(self)
@@ -103,12 +138,21 @@ class CLIRunner(Runner):
         if result is not None:
             from ..ui_blocks import UiBlock
             if isinstance(result, UiBlock):
-                self.show(result)
+                # Capture output from returned UiBlock
+                text_capture = StringIO()
+                with redirect_stdout(text_capture):
+                    result.show_cli(self)
+                captured = text_capture.getvalue()
+                if captured:
+                    output_lines.append(captured.rstrip('\n'))
 
-        # Clear runner reference
-        set_current_runner(None)
+        # Restore previous runner (for nested execution support)
+        set_current_runner(saved_runner)
 
-        return result, exception
+        # Join all output lines
+        output_text = '\n'.join(output_lines)
+
+        return result, exception, output_text
 
     def set_verbose(self, verbose: bool) -> None:
         """Enable/disable verbose output.

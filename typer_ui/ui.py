@@ -115,6 +115,37 @@ class Ui:
         """
         self(component)
 
+    def clipboard(self, text: str) -> None:
+        """Copy text to clipboard.
+
+        Works in both GUI and CLI modes.
+        In GUI mode, copies to system clipboard.
+        In CLI mode, prints the text with a copy indicator.
+
+        Args:
+            text: Text to copy
+
+        Example:
+            >>> ui(tg.Button("Copy Result",
+            ...     on_click=lambda: ui.clipboard(str(result))))
+        """
+        runner = get_current_runner()
+        if not runner:
+            # Fallback if no runner available
+            print(f"[CLIPBOARD] {text}")
+            return
+
+        if runner.channel == "gui":
+            # GUI mode - copy to clipboard via Flet
+            if hasattr(runner, 'page') and runner.page:
+                runner.page.set_clipboard(text)
+                # Show feedback
+                from .ui_blocks import Text
+                Text(f"✓ Copied to clipboard").show_gui(runner)
+        else:
+            # CLI mode - print with indicator
+            print(f"[CLIPBOARD] {text}")
+
     def def_command(
         self,
         *,
@@ -156,10 +187,6 @@ class Ui:
 
         return decorator
 
-    # Aliases for backward compatibility
-    command = def_command
-    options = def_command
-
     def app(self):
         """Launch the GUI application or CLI based on --cli flag.
 
@@ -186,9 +213,16 @@ class Ui:
                 description=self.description
             )
 
+            # Create UIApp instance (without runner initially)
+            self._ui_app = UIApp(app_spec)
+
             # Create CLI runner and set as current
             from .ui_blocks import set_current_runner
-            cli_runner = CLIRunner(app_spec)
+            cli_runner = CLIRunner(app_spec, self._ui_app)
+
+            # Set the runner in UIApp now that it's created
+            self._ui_app.runner = cli_runner
+
             set_current_runner(cli_runner)
 
             try:
@@ -210,8 +244,11 @@ class Ui:
             description=self.description
         )
 
+        # Create UIApp instance
+        self._ui_app = UIApp(app_spec)
+
         # Create the Flet app function
-        flet_main = create_flet_app(app_spec)
+        flet_main = create_flet_app(app_spec, self._ui_app)
 
         # Run the Flet app
         ft.app(target=flet_main)
@@ -232,3 +269,23 @@ class Ui:
         This allows advanced usage if you need direct access to the Typer app.
         """
         return self._typer_app
+
+    @property
+    def runtime(self) -> Optional[UIApp]:
+        """Access the UIApp instance for programmatic command control.
+
+        Returns None if called before a command is executed.
+
+        Example:
+            >>> @app.command()
+            >>> def orchestrator():
+            >>>     # Get current command
+            >>>     current = ui.runtime.command()
+            >>>
+            >>>     # Execute another command
+            >>>     ui.runtime.command("fetch-data").run(source="api")
+            >>>
+            >>>     # Include command inline
+            >>>     ui.runtime.command("process-data").include()
+        """
+        return self._ui_app

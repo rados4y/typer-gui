@@ -38,11 +38,11 @@ class Runner(ABC):
         pass
 
     @abstractmethod
-    def execute_command(
+    async def execute_command(
         self,
         command_name: str,
         params: dict[str, Any]
-    ) -> tuple[Any, Optional[Exception]]:
+    ) -> tuple[Any, Optional[Exception], str]:
         """Execute a command callback with stdout/stderr capture.
 
         Args:
@@ -50,6 +50,7 @@ class Runner(ABC):
             params: Parameter values for the command
 
         Returns:
-            Tuple of (result, exception). Exception is None if successful.
+            Tuple of (result, exception, output_text). Exception is None if successful.
+            output_text contains the rendered text output from the command.
         """
         pass

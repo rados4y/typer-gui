@@ -1,187 +1,392 @@
-"""Example 4: Application Control
+"""Example 4: Application Control with app.command() API
 
 This example demonstrates:
-- Using buttons to execute commands
-- Command composition and orchestration
-- Programmatic command execution
-- Interactive workflows
+- ui.runtime.command("name") - Get a command by name
+- cmd.select() - Select a command (GUI mode)
+- cmd.run(**kwargs) - Execute with output capture
+- cmd.include(**kwargs) - Execute inline
+- cmd.clear() - Clear command output
+- ui.runtime.command() - Get current command
+- Retrieving output from executed commands
 """
 
 import typer
 import typer_ui as tg
-import time
-import random
 
 app = typer.Typer()
 ui = tg.Ui(
     app,
-    title="App Control",
-    description="Control commands with buttons and composition"
+    title="App Control API",
+    description="Interactive demos of app.command() operations"
 )
 
 
 # ============================================================================
-# Individual Commands
+# Base Commands (used by demos)
 # ============================================================================
 
 @app.command()
 def fetch_data(source: str = "database"):
     """Fetch data from a source."""
-    ui(tg.Md(f"## Fetching from {source}..."))
-    time.sleep(1)
-    ui(tg.Text(f"[OK] Data fetched from {source}"))
-    return {"records": random.randint(100, 500), "source": source}
+    ui(tg.Md(f"### Fetching from {source}"))
+    ui(tg.Text(f"✓ Fetched 150 records from {source}"))
+    return {"records": 150, "source": source}
 
 
 @app.command()
 def process_data():
     """Process the fetched data."""
-    ui(tg.Md("## Processing data..."))
-    time.sleep(1)
-    ui(tg.Text("[OK] Data processed successfully"))
-    return {"processed": True, "items": random.randint(50, 200)}
+    ui(tg.Md("### Processing data"))
+    ui(tg.Text("✓ Processed 120 records"))
+    return {"processed": 120}
 
 
 @app.command()
 def generate_report():
-    """Generate a report from processed data."""
-    ui(tg.Md("## Generating report..."))
-    time.sleep(1)
+    """Generate a final report."""
     ui(tg.Table(
         cols=["Metric", "Value"],
         data=[
-            ["Total Records", f"{random.randint(100, 500)}"],
-            ["Processed", f"{random.randint(50, 200)}"],
-            ["Success Rate", f"{random.randint(85, 99)}%"],
+            ["Total Records", "150"],
+            ["Processed", "120"],
+            ["Success Rate", "95%"],
         ],
-        title="Report Summary"
+        title="Final Report"
     ))
-    ui(tg.Text("[OK] Report generated"))
+    return {"status": "complete"}
 
 
 # ============================================================================
-# Button-Controlled Commands
+# Demo: cmd.include()
 # ============================================================================
 
 @app.command()
-def button_menu():
-    """Button menu - use buttons to execute other commands."""
-    ui(tg.Md("# Command Menu"))
-    ui(tg.Md("Click any button to execute a command:"))
+def demo_include():
+    """Demo: cmd.include() - Execute command inline using buttons."""
+    ui(tg.Md("# Demo: cmd.include()"))
+    ui(tg.Md("Click buttons to execute commands **inline** - output appears here:"))
+    ui(tg.Md("---"))
 
+    # Button handlers
+    def run_fetch():
+        ui(tg.Md("**Button clicked:** Executing fetch-data inline..."))
+        result = ui.runtime.command("fetch-data").include(source="button-api")
+        ui(tg.Md(f"**Returned:** `{result}`"))
+        ui(tg.Md(""))
+
+    def run_process():
+        ui(tg.Md("**Button clicked:** Executing process-data inline..."))
+        result = ui.runtime.command("process-data").include()
+        ui(tg.Md(f"**Returned:** `{result}`"))
+        ui(tg.Md(""))
+
+    def run_report():
+        ui(tg.Md("**Button clicked:** Executing generate-report inline..."))
+        result = ui.runtime.command("generate-report").include()
+        ui(tg.Md(f"**Returned:** `{result}`"))
+        ui(tg.Md(""))
+
+    # Interactive buttons
     ui(tg.Row([
-        tg.Button("Fetch Data", on_click=lambda: exec_fetch()),
-        tg.Button("Process Data", on_click=lambda: exec_process()),
-        tg.Button("Generate Report", on_click=lambda: exec_report()),
+        tg.Button("Fetch Data", on_click=lambda: run_fetch()),
+        tg.Button("Process Data", on_click=lambda: run_process()),
+        tg.Button("Generate Report", on_click=lambda: run_report()),
     ]))
 
     ui(tg.Md("---"))
-    ui(tg.Md("*Output will appear below when you click a button*"))
-
-
-def exec_fetch():
-    """Execute fetch_data command."""
-    ui(tg.Md("### Button clicked: Fetch Data"))
-    fetch_data("api")
-
-
-def exec_process():
-    """Execute process_data command."""
-    ui(tg.Md("### Button clicked: Process Data"))
-    process_data()
-
-
-def exec_report():
-    """Execute generate_report command."""
-    ui(tg.Md("### Button clicked: Generate Report"))
-    generate_report()
+    ui(tg.Md("*Note: include() executes the command inline - output appears in current context.*"))
 
 
 # ============================================================================
-# Workflow Examples
+# Demo: cmd.run()
 # ============================================================================
 
 @app.command()
-@ui.command(is_long=True)
-def run_workflow():
-    """Complete workflow - execute multiple commands in sequence."""
-    ui(tg.Md("# Running Complete Workflow"))
-    ui(tg.Md("This will execute all steps automatically:"))
-    ui(tg.Md(""))
+def demo_run():
+    """Demo: cmd.run() - Execute with chaining to access output/result."""
+    ui(tg.Md("# Demo: cmd.run() with Chaining"))
+    ui(tg.Md("Click buttons to execute and access output/result via chaining:"))
+    ui(tg.Md("---"))
 
-    # Step 1
-    ui(tg.Md("**Step 1/3:** Fetching data..."))
-    result1 = fetch_data("database")
-    ui(tg.Md(""))
+    # Button handlers
+    def run_and_show_result():
+        ui(tg.Md("**Executing with chaining...**"))
+        # Chain to get result directly
+        result = ui.runtime.command("fetch-data").run(source="run-api").result
+        ui(tg.Md(f"**Result:** `{result}`"))
+        ui(tg.Md(""))
 
-    # Step 2
-    ui(tg.Md("**Step 2/3:** Processing data..."))
-    result2 = process_data()
-    ui(tg.Md(""))
+    def run_and_show_output():
+        ui(tg.Md("**Executing and showing output...**"))
+        # Chain to get output
+        output = ui.runtime.command("fetch-data").run(source="run-api").out
+        ui(tg.Text(f"Captured output: {output}"))
+        ui(tg.Md(""))
 
-    # Step 3
-    ui(tg.Md("**Step 3/3:** Generating report..."))
-    generate_report()
-    ui(tg.Md(""))
+    # Interactive buttons
+    ui(tg.Row([
+        tg.Button("Show Result", on_click=lambda: run_and_show_result()),
+        tg.Button("Show Output", on_click=lambda: run_and_show_output()),
+    ]))
 
-    ui(tg.Md("[OK] **Workflow completed successfully!**"))
+    ui(tg.Md("---"))
+    ui(tg.Md("""
+**Chaining Pattern:**
+```python
+# Get result
+result = ui.runtime.command("cmd").run(x=10).result
 
+# Get output
+output = ui.runtime.command("cmd").run(x=10).out
+
+# Chain in lambda
+ui(tg.Button("Get Result",
+    on_click=lambda: process(
+        ui.runtime.command("cmd").run(x=10).result
+    )))
+```
+    """))
+
+
+# ============================================================================
+# Demo: Retrieve and Append Output
+# ============================================================================
 
 @app.command()
+def demo_output_retrieval():
+    """Demo: Retrieve output from executed command and append here."""
+    ui(tg.Md("# Demo: Output Retrieval"))
+    ui(tg.Md("Execute a command and retrieve its output/result:"))
+    ui(tg.Md("---"))
+
+    def fetch_and_show():
+        ui(tg.Md("**Executing fetch-data and retrieving output...**"))
+        ui(tg.Md(""))
+
+        # Execute command with run() to capture output
+        cmd = ui.runtime.command("fetch-data").run(source="retrieval-test")
+
+        # Show result
+        ui(tg.Md("### Retrieved Result:"))
+        ui(tg.Text(f"Return value: {cmd.result}"))
+        ui(tg.Md(""))
+
+        # Show captured output
+        ui(tg.Md("### Captured Output:"))
+        ui(tg.Text(cmd.out))
+        ui(tg.Md(""))
+
+        # Demonstrate with another command
+        ui(tg.Md("### Running generate-report and capturing output:"))
+        cmd2 = ui.runtime.command("generate-report").run()
+        ui(tg.Md("**Captured Output:**"))
+        ui(tg.Text(cmd2.out))
+        ui(tg.Md(""))
+
+    ui(tg.Button("Execute & Retrieve", on_click=lambda: fetch_and_show()))
+
+    ui(tg.Md("---"))
+    ui(tg.Md("""
+**Pattern:**
+```python
+# Execute and capture
+cmd = ui.runtime.command("fetch-data").run(source="api")
+
+# Access return value
+result = cmd.result
+
+# Access captured text output
+output = cmd.out
+
+# Or chain directly:
+output = ui.runtime.command("fetch-data").run(source="api").out
+```
+    """))
+
+
+# ============================================================================
+# Demo: cmd.select()
+# ============================================================================
+
+@app.command()
+def demo_select():
+    """Demo: cmd.select() - Change selected command (GUI mode)."""
+    ui(tg.Md("# Demo: cmd.select()"))
+    ui(tg.Md("Click buttons to select different commands (GUI mode only):"))
+    ui(tg.Md("---"))
+
+    # Get current command
+    current = ui.runtime.command()
+    ui(tg.Text(f"Currently executing: {current.name if current else 'None'}"))
+    ui(tg.Md(""))
+
+    # Button handlers
+    def select_fetch():
+        ui(tg.Md("**Selecting fetch-data command...**"))
+        ui.runtime.command("fetch-data").select()
+        ui(tg.Text("Command form should now show 'fetch-data' (GUI only)"))
+        ui(tg.Md(""))
+
+    def select_report():
+        ui(tg.Md("**Selecting generate-report command...**"))
+        ui.runtime.command("generate-report").select()
+        ui(tg.Text("Command form should now show 'generate-report' (GUI only)"))
+        ui(tg.Md(""))
+
+    # Interactive links (similar to buttons but styled as links)
+    ui(tg.Column([
+        tg.Link("→ Select fetch-data", on_click=lambda: select_fetch()),
+        tg.Link("→ Select generate-report", on_click=lambda: select_report()),
+    ]))
+
+    ui(tg.Md("---"))
+    ui(tg.Md("*Note: select() changes the GUI form. In CLI mode, it has no visible effect.*"))
+
+
+# ============================================================================
+# Demo: Current Command
+# ============================================================================
+
+@app.command()
+def demo_current():
+    """Demo: ui.runtime.command() - Get current command info."""
+    ui(tg.Md("# Demo: Current Command"))
+    ui(tg.Md("Click button to show information about the currently executing command:"))
+    ui(tg.Md("---"))
+
+    def show_current():
+        current = ui.runtime.command()
+        if current:
+            ui(tg.Table(
+                cols=["Property", "Value"],
+                data=[
+                    ["Command Name", current.name],
+                    ["Has Callback", str(current.command_spec.callback is not None)],
+                    ["Help Text", current.command_spec.help_text or "None"],
+                ],
+                title="Current Command Info"
+            ))
+        else:
+            ui(tg.Text("No command currently executing"))
+
+    ui(tg.Button("Show Current Command", on_click=lambda: show_current()))
+
+    ui(tg.Md("---"))
+    ui(tg.Md("*Call ui.runtime.command() with no arguments to get the currently executing command.*"))
+
+
+# ============================================================================
+# Demo: Clipboard Copy with Chaining
+# ============================================================================
+
+@app.command()
+def demo_clipboard():
+    """Demo: Copy command output to clipboard using chaining."""
+    ui(tg.Md("# Demo: Clipboard Copy with Chaining"))
+    ui(tg.Md("Click buttons to copy command output/results:"))
+    ui(tg.Md("---"))
+
+    # Method 1: Copy current command output
+    ui(tg.Md("## Method 1: Current Command Output"))
+    ui(tg.Button("Copy Current Output",
+        on_click=lambda: ui.clipboard(ui.runtime.command().out)))
+
+    ui(tg.Md(""))
+
+    # Method 2: Execute and copy output (chaining)
+    ui(tg.Md("## Method 2: Execute & Copy Output (Chaining)"))
+    ui(tg.Button("Execute & Copy Output",
+        on_click=lambda: ui.clipboard(
+            ui.runtime.command("fetch-data").run(source="button-api").out
+        )))
+
+    ui(tg.Md(""))
+
+    # Method 3: Execute and copy result
+    ui(tg.Md("## Method 3: Execute & Copy Result"))
+    ui(tg.Button("Execute & Copy Result",
+        on_click=lambda: ui.clipboard(
+            str(ui.runtime.command("fetch-data").run(source="api").result)
+        )))
+
+    ui(tg.Md(""))
+
+    # Method 4: Include and copy result
+    ui(tg.Md("## Method 4: Include & Show Result"))
+    def include_and_show():
+        cmd = ui.runtime.command("fetch-data").include(source="inline-test")
+        ui(tg.Md(f"**Result:** `{cmd.result}`"))
+        ui.clipboard(str(cmd.result))
+
+    ui(tg.Button("Include & Copy Result",
+        on_click=lambda: include_and_show()))
+
+    ui(tg.Md("---"))
+    ui(tg.Md("""
+**Chaining Patterns:**
+```python
+# Pattern 1: Current command output
+ui(tg.Button("Copy",
+    on_click=lambda: ui.clipboard(ui.runtime.command().out)))
+
+# Pattern 2: Execute and copy output (RECOMMENDED)
+ui(tg.Button("Copy",
+    on_click=lambda: ui.clipboard(
+        ui.runtime.command("cmd").run(x=10).out
+    )))
+
+# Pattern 3: Execute and copy result
+ui(tg.Button("Copy",
+    on_click=lambda: ui.clipboard(
+        str(ui.runtime.command("cmd").run(x=10).result)
+    )))
+```
+    """))
+
+
+# ============================================================================
+# Complete Workflow Demo
+# ============================================================================
+
+@app.command()
+@ui.def_command(is_long=True)
 def workflow_with_buttons():
-    """Interactive workflow - control execution with buttons."""
+    """Complete workflow controlled by buttons."""
     ui(tg.Md("# Interactive Workflow"))
-    ui(tg.Md("Execute the workflow one step at a time:"))
-
-    steps_completed = []
+    ui(tg.Md("Execute a multi-step workflow using buttons:"))
+    ui(tg.Md("---"))
 
     def step1():
-        ui(tg.Md("### Executing Step 1..."))
-        fetch_data("api")
-        steps_completed.append(1)
-        ui(tg.Text(f"Steps completed: {len(steps_completed)}/3"))
+        ui(tg.Md("## Step 1: Fetching Data"))
+        ui.runtime.command("fetch-data").include(source="workflow")
+        ui(tg.Md(""))
 
     def step2():
-        ui(tg.Md("### Executing Step 2..."))
-        process_data()
-        steps_completed.append(2)
-        ui(tg.Text(f"Steps completed: {len(steps_completed)}/3"))
+        ui(tg.Md("## Step 2: Processing Data"))
+        ui.runtime.command("process-data").include()
+        ui(tg.Md(""))
 
     def step3():
-        ui(tg.Md("### Executing Step 3..."))
-        generate_report()
-        steps_completed.append(3)
-        ui(tg.Md("[OK] **All steps completed!**"))
+        ui(tg.Md("## Step 3: Generating Report"))
+        ui.runtime.command("generate-report").include()
+        ui(tg.Md(""))
 
-    ui(tg.Column([
-        tg.Md("## Workflow Steps"),
-        tg.Button("Step 1: Fetch Data", on_click=lambda: step1()),
-        tg.Button("Step 2: Process Data", on_click=lambda: step2()),
-        tg.Button("Step 3: Generate Report", on_click=lambda: step3()),
-    ]))
-
-
-@app.command()
-def quick_actions():
-    """Quick actions - common operations accessible via buttons."""
-    ui(tg.Md("# Quick Actions Panel"))
+    def run_all():
+        ui(tg.Md("# Running Complete Workflow"))
+        step1()
+        step2()
+        step3()
+        ui(tg.Md("---"))
+        ui(tg.Md("✓ **Workflow completed!**"))
 
     ui(tg.Row([
-        tg.Button("Refresh", on_click=lambda: ui(tg.Text("[OK] Refreshed!"))),
-        tg.Button("Save", on_click=lambda: ui(tg.Text("[OK] Saved!"))),
-        tg.Button("Export", on_click=lambda: ui(tg.Text("[OK] Exported!"))),
+        tg.Button("Step 1", on_click=lambda: step1()),
+        tg.Button("Step 2", on_click=lambda: step2()),
+        tg.Button("Step 3", on_click=lambda: step3()),
     ]))
 
-    ui(tg.Md("---"))
-
-    ui(tg.Table(
-        cols=["Action", "Description"],
-        data=[
-            ["Refresh", "Reload current data"],
-            ["Save", "Save changes"],
-            ["Export", "Export to file"],
-        ]
-    ))
+    ui(tg.Md(""))
+    ui(tg.Button("Run All Steps", on_click=lambda: run_all()))
 
 
 if __name__ == "__main__":
@@ -191,14 +396,17 @@ if __name__ == "__main__":
 """
 CLI Examples:
 -------------
-# Individual commands
+# Interactive demos (best in GUI mode with buttons)
+python examples/04_app_control.py --cli demo-include
+python examples/04_app_control.py --cli demo-run
+python examples/04_app_control.py --cli demo-output-retrieval
+python examples/04_app_control.py --cli demo-select
+python examples/04_app_control.py --cli demo-current
+python examples/04_app_control.py --cli demo-clipboard
+python examples/04_app_control.py --cli workflow-with-buttons
+
+# Base commands
 python examples/04_app_control.py --cli fetch-data --source api
 python examples/04_app_control.py --cli process-data
 python examples/04_app_control.py --cli generate-report
-
-# Workflows
-python examples/04_app_control.py --cli run-workflow
-python examples/04_app_control.py --cli button-menu
-python examples/04_app_control.py --cli workflow-with-buttons
-python examples/04_app_control.py --cli quick-actions
 """
