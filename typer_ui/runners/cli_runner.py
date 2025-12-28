@@ -47,6 +47,19 @@ class CLIRunner(Runner):
         print()  # Add newline for separation
         component.show_cli(self)
 
+    def update_reactive_component(self, component_id: int, new_component) -> None:
+        """Update a reactive component (no-op in CLI mode).
+
+        In CLI mode, reactive updates aren't displayed since output is static.
+        This method exists for compatibility with the reactive state system.
+
+        Args:
+            component_id: Unique ID of the component
+            new_component: New component instance
+        """
+        # No-op for CLI - reactive updates only make sense in GUI
+        pass
+
     def execute_command(
         self,
         command_name: str,

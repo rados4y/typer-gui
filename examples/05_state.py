@@ -21,6 +21,7 @@ class Order:
 
 
 @app.command()
+@ui.def_command(is_auto_exec=True)
 def state_demo():
     """Demonstrates reactive UI components tied to state."""
     counter = ui.state(0)
@@ -68,7 +69,7 @@ def orders_demo():
             order.quantity,
             f"${order.total:.2f}",
             # This Link modifies the `selected_order_id` state on click
-            tg.Link("Select", on_click=lambda o=order: selected_order_id.set(o[0])),
+            tg.Link("Select", on_click=lambda o=order: selected_order_id.set(o.id)),
         ]
         for order in orders_data
     ]

@@ -1,6 +1,7 @@
 """Typer-UI: Automatically generate desktop GUIs for Typer CLI applications."""
 
 from .spec_builder import build_app_spec
+from .state import State
 from .ui import Ui
 from .ui_blocks import (
     UiBlock,
@@ -19,6 +20,7 @@ from .ui_app import UICommand
 __version__ = "0.2.0"
 __all__ = [
     "build_app_spec",
+    "State",
     "Ui",
     "UiBlock",
     "Container",

@@ -143,7 +143,7 @@ class Text(UiBlock):
 
     def show_gui(self, runner) -> None:
         import flet as ft
-        runner.add_to_output(ft.Text(self.content, selectable=True))
+        runner.add_to_output(ft.Text(self.content, selectable=True), component=self)
 
     def to_dict(self) -> dict:
         return {"type": "text", "content": self.content}
@@ -174,7 +174,8 @@ class Md(UiBlock):
                 selectable=True,
                 extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
                 on_tap_link=lambda e: runner.page.launch_url(e.data) if runner.page else None,
-            )
+            ),
+            component=self
         )
 
     def to_dict(self) -> dict:
@@ -235,12 +236,23 @@ class Table(Container):
             lines.append("=" * len(self.title))
             lines.append("")
 
+        # Helper function to get CLI-friendly cell representation
+        def cell_to_str(cell):
+            if isinstance(cell, UiBlock):
+                # For GUI-only components, show their text if available
+                if hasattr(cell, 'text'):
+                    return f"[{cell.text}]"
+                else:
+                    return "[UI Component]"
+            else:
+                return str(cell)
+
         # Calculate column widths
         col_widths = [len(h) for h in self.cols]
         for row in self.data:
             for i, cell in enumerate(row):
                 if i < len(col_widths):
-                    col_widths[i] = max(col_widths[i], len(str(cell)))
+                    col_widths[i] = max(col_widths[i], len(cell_to_str(cell)))
 
         # Header
         header_line = " | ".join(
@@ -252,7 +264,7 @@ class Table(Container):
         # Rows
         for row in self.data:
             row_line = " | ".join(
-                str(cell).ljust(col_widths[i]) if i < len(col_widths) else str(cell)
+                cell_to_str(cell).ljust(col_widths[i]) if i < len(col_widths) else cell_to_str(cell)
                 for i, cell in enumerate(row)
             )
             lines.append(row_line)
@@ -269,9 +281,19 @@ class Table(Container):
                 for header in self.cols
             ]
 
+            # Helper function to convert cell to Flet control
+            def cell_to_control(cell):
+                if isinstance(cell, UiBlock):
+                    # Render UI component to Flet control
+                    control = runner.render_to_control(cell)
+                    return control if control else ft.Text("")
+                else:
+                    # Convert to text
+                    return ft.Text(str(cell))
+
             data_rows = [
                 ft.DataRow(
-                    cells=[ft.DataCell(ft.Text(str(cell))) for cell in row]
+                    cells=[ft.DataCell(cell_to_control(cell)) for cell in row]
                 )
                 for row in self.data
             ]
@@ -346,7 +368,7 @@ class Row(Container):
             else:
                 controls.append(ft.Text(str(child)))
 
-        runner.add_to_output(ft.Row(controls=controls, spacing=10, wrap=True))
+        runner.add_to_output(ft.Row(controls=controls, spacing=10, wrap=True), component=self)
 
     def to_dict(self) -> dict:
         return {
@@ -383,7 +405,7 @@ class Column(Container):
         import flet as ft
 
         controls = [runner.render_to_control(child) for child in self.children]
-        runner.add_to_output(ft.Column(controls=controls, spacing=10))
+        runner.add_to_output(ft.Column(controls=controls, spacing=10), component=self)
 
     def to_dict(self) -> dict:
         return {
@@ -432,7 +454,8 @@ class Button(UiBlock):
                 text=self.text,
                 icon=icon_obj,
                 on_click=handle_click,
-            )
+            ),
+            component=self
         )
 
     def is_gui_only(self) -> bool:
@@ -475,7 +498,8 @@ class Link(UiBlock):
                 text=self.text,
                 icon=ft.Icons.LINK,
                 on_click=handle_click,
-            )
+            ),
+            component=self
         )
 
     def is_gui_only(self) -> bool:

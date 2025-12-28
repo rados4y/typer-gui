@@ -77,6 +77,10 @@ class GUIRunner(Runner):
         self._async_context: contextvars.ContextVar[Optional[CommandSpec]] = \
             contextvars.ContextVar('command_context', default=None)  # For async tasks
 
+        # Reactive state management
+        # Maps component ID to Flet control for re-rendering
+        self._reactive_components: dict[int, ft.Control] = {}
+
     def start(self) -> None:
         """Start the Flet GUI application."""
         # Flet app will be started via ft.app() externally
@@ -100,10 +104,21 @@ class GUIRunner(Runner):
 
         # --- Smarter update for Table component ---
         if isinstance(component, Table) and component.flet_control:
+            # Helper function to convert cell to Flet control
+            def cell_to_control(cell):
+                from ..ui_blocks import UiBlock
+                if isinstance(cell, UiBlock):
+                    # Render UI component to Flet control
+                    control = self.render_to_control(cell)
+                    return control if control else ft.Text("")
+                else:
+                    # Convert to text
+                    return ft.Text(str(cell))
+
             # Re-create data rows
             component.flet_control.rows = [
                 ft.DataRow(
-                    cells=[ft.DataCell(ft.Text(str(cell))) for cell in row]
+                    cells=[ft.DataCell(cell_to_control(cell)) for cell in row]
                 )
                 for row in component.data
             ]
@@ -161,6 +176,9 @@ class GUIRunner(Runner):
             view.output_view.controls.append(control)
             if component:
                 view.component_refs[id(component)] = control
+                # If component is reactive, track it globally
+                if hasattr(component, '_reactive_id'):
+                    self._reactive_components[component._reactive_id] = control
             if self.page:
                 self.page.update()
 
@@ -203,6 +221,49 @@ class GUIRunner(Runner):
 
     def refresh(self) -> None:
         """Refresh the page."""
+        if self.page:
+            self.page.update()
+
+    def update_reactive_component(self, component_id: int, new_component) -> None:
+        """Update a reactive component with its new render.
+
+        Called by State when a value changes to re-render dependent components.
+
+        Args:
+            component_id: Unique ID of the component to update
+            new_component: New component instance from re-executing renderer
+        """
+        view = self._get_current_view()
+        if not view or not view.output_view:
+            return
+
+        # Find the old control in the output view
+        old_control = self._reactive_components.get(component_id)
+        if not old_control:
+            # First time seeing this component, just show it
+            self.show(new_component)
+            return
+
+        # Find the index of the old control in the output view
+        try:
+            index = view.output_view.controls.index(old_control)
+        except ValueError:
+            # Control not found, just show the new one
+            self.show(new_component)
+            return
+
+        # Render new component to get the new Flet control
+        new_control = self.render_to_control(new_component)
+        if not new_control:
+            return
+
+        # Replace the old control with the new one
+        view.output_view.controls[index] = new_control
+
+        # Update the reactive components mapping
+        self._reactive_components[component_id] = new_control
+
+        # Refresh the page
         if self.page:
             self.page.update()
 

@@ -63,32 +63,32 @@ class Ui:
         self.runner: Optional[Any] = None
         self.current_command: Optional[CommandSpec] = None
 
-    def __call__(self, component):
+    def __call__(self, component_or_renderer, *dependencies):
         """Present a component and return it for further use.
 
-        This is the universal output method. It displays the component
-        and returns it, allowing for chaining or context manager usage.
+        Supports two patterns:
+        1. Normal: ui(component) - Display a component
+        2. Reactive: ui(renderer, state1, state2, ...) - Display and auto-update
 
         Args:
-            component: UiBlock component to display
+            component_or_renderer: Component to display OR callable returning component
+            *dependencies: State objects this component depends on (reactive mode)
 
         Returns:
             The component (for chaining or context manager usage)
 
-        Example:
-            >>> # Simple presentation
-            >>> ui(tg.Table(cols=["Name"], data=[["Alice"]]))
+        Examples:
+            >>> # Normal pattern
+            >>> ui(tg.Text("Hello"))
             >>>
-            >>> # Present and modify
-            >>> t = tg.Table(cols=["Name"], data=[])
-            >>> ui(t)  # Present it
-            >>> t.add_row(["Alice"])  # Auto-updates!
+            >>> # Reactive pattern with state
+            >>> counter = ui.state(0)
+            >>> ui(lambda: tg.Text(f"Count: {counter.value}"), counter)
+            >>> counter.set(1)  # Automatically re-renders
             >>>
             >>> # Context manager
             >>> with ui(tg.Table(cols=["Name"], data=[])) as t:
             >>>     t.add_row(["Alice"])
-            >>>     time.sleep(1)
-            >>>     t.add_row(["Bob"])
 
         Raises:
             RuntimeError: If called outside of command execution context
@@ -100,15 +100,48 @@ class Ui:
                 "Ensure you're calling it from within a command function."
             )
 
-        # Show the component
-        runner.show(component)
+        # Check if this is reactive pattern: ui(renderer, state1, state2, ...)
+        if callable(component_or_renderer) and dependencies:
+            # Reactive mode: renderer function with state dependencies
+            renderer = component_or_renderer
 
-        # Mark component as presented for auto-updates
-        if hasattr(component, '_mark_presented'):
-            component._mark_presented(runner)
+            # Execute renderer to get initial component
+            component = renderer()
 
-        # Return component for chaining/context manager
-        return component
+            # Generate unique ID for this reactive component
+            component_id = id(component)
+
+            # Mark component as reactive so runner can track it
+            setattr(component, '_reactive_id', component_id)
+
+            # Register this component with all state dependencies
+            from .state import State
+            for dep in dependencies:
+                if isinstance(dep, State):
+                    dep._add_observer(renderer, component_id)
+
+            # Show initial render
+            runner.show(component)
+
+            # Mark as presented for auto-updates
+            if hasattr(component, '_mark_presented'):
+                component._mark_presented(runner)
+
+            return component
+
+        else:
+            # Normal mode: just a component
+            component = component_or_renderer
+
+            # Show the component
+            runner.show(component)
+
+            # Mark component as presented for auto-updates
+            if hasattr(component, '_mark_presented'):
+                component._mark_presented(runner)
+
+            # Return component for chaining/context manager
+            return component
 
     def out(self, component) -> None:
         """Legacy output method. Use ui(component) instead.
@@ -148,6 +181,38 @@ class Ui:
         else:
             # CLI mode - print with indicator
             print(f"[CLIPBOARD] {text}")
+
+    def state(self, initial_value):
+        """Create a reactive state object.
+
+        State objects trigger automatic re-rendering of dependent UI components
+        when their value changes via set().
+
+        Args:
+            initial_value: Initial state value
+
+        Returns:
+            State object that can be read (.value) and updated (.set())
+
+        Example:
+            >>> counter = ui.state(0)
+            >>> ui(lambda: tg.Text(f"Count: {counter.value}"), counter)
+            >>> counter.set(counter.value + 1)  # Triggers re-render
+
+        Raises:
+            RuntimeError: If called outside command execution context
+        """
+        from .state import State
+        from .ui_blocks import get_current_runner
+
+        runner = get_current_runner()
+        if not runner:
+            raise RuntimeError(
+                "state() can only be called during command execution. "
+                "Ensure you're calling it from within a command function."
+            )
+
+        return State(initial_value, runner)
 
     def def_command(
         self,
