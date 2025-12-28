@@ -7,13 +7,26 @@ import io
 import threading
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any, Optional, List
 
 import flet as ft
 
 from .base import Runner
 from ..specs import AppSpec, CommandSpec, ParamType
 from ..ui_blocks import Text, set_current_runner
+
+
+@dataclass
+class ReactiveContext:
+    """Context for reactive rendering into a container.
+
+    When a reactive renderer executes, it operates within a ReactiveContext
+    that captures all ui() calls into a dedicated container.
+    """
+    container: Any  # UiBlock Column container
+    flet_control: ft.Column  # Flet control for the container
+    component_id: int  # Unique ID for this reactive region
 
 
 class _RealTimeWriter(io.StringIO):
@@ -80,6 +93,10 @@ class GUIRunner(Runner):
         # Reactive state management
         # Maps component ID to Flet control for re-rendering
         self._reactive_components: dict[int, ft.Control] = {}
+
+        # Reactive rendering context stack
+        # Supports nested reactive contexts (though rare)
+        self._reactive_contexts: List[ReactiveContext] = []
 
     def start(self) -> None:
         """Start the Flet GUI application."""
@@ -223,6 +240,143 @@ class GUIRunner(Runner):
         """Refresh the page."""
         if self.page:
             self.page.update()
+
+    @property
+    def current_reactive_context(self) -> Optional[ReactiveContext]:
+        """Get current reactive context, if any.
+
+        Returns:
+            Current ReactiveContext or None if not in reactive mode
+        """
+        return self._reactive_contexts[-1] if self._reactive_contexts else None
+
+    def is_reactive_mode(self) -> bool:
+        """Check if currently in reactive rendering mode.
+
+        Returns:
+            True if rendering into a reactive container
+        """
+        return len(self._reactive_contexts) > 0
+
+    def execute_in_reactive_mode(self, container, renderer):
+        """Execute renderer with all ui() calls going to container.
+
+        Creates a reactive context and executes the renderer function.
+        All ui() calls made during execution are captured into the container.
+
+        Supports two patterns:
+        1. Renderer calls ui() internally (ui pattern)
+        2. Renderer returns a UiBlock (return pattern)
+
+        Args:
+            container: UiBlock Column to capture components
+            renderer: Function to execute (reactive renderer)
+
+        Returns:
+            Tuple of (container, flet_control) - both the UiBlock and Flet control
+        """
+        # Create Flet control for container
+        flet_control = ft.Column(controls=[], spacing=10)
+
+        # Create reactive context
+        context = ReactiveContext(
+            container=container,
+            flet_control=flet_control,
+            component_id=id(container)
+        )
+
+        # Push context onto stack
+        self._reactive_contexts.append(context)
+
+        try:
+            # Execute renderer - all ui() calls go to container
+            result = renderer()
+
+            # If renderer returns a UiBlock, add it to container
+            if result is not None:
+                from ..ui_blocks import UiBlock
+                if isinstance(result, UiBlock):
+                    self.add_to_reactive_container(result)
+        finally:
+            # Pop context
+            self._reactive_contexts.pop()
+
+        return container, flet_control
+
+    def add_to_reactive_container(self, component):
+        """Add component to current reactive container.
+
+        Called by ui() when in reactive mode. Adds the component
+        to the container instead of the main output.
+
+        Args:
+            component: UiBlock component to add
+
+        Raises:
+            RuntimeError: If not in reactive mode
+        """
+        context = self.current_reactive_context
+        if not context:
+            raise RuntimeError("Not in reactive mode")
+
+        # Render component to Flet control
+        control = self.render_to_control(component)
+        if control:
+            # Add to Flet control
+            context.flet_control.controls.append(control)
+
+            # Add to UiBlock container (for tracking)
+            context.container.children.append(component)
+
+    def update_reactive_container(self, container, renderer):
+        """Update reactive container by re-executing renderer.
+
+        This clears the container and re-fills it with fresh components.
+        Only the container is refreshed, not the whole page.
+
+        Supports two patterns:
+        1. Renderer calls ui() internally (ui pattern)
+        2. Renderer returns a UiBlock (return pattern)
+
+        Args:
+            container: UiBlock Column container to update
+            renderer: Function to re-execute
+        """
+        # Find the Flet control for this container
+        flet_control = self._reactive_components.get(id(container))
+        if not flet_control:
+            return
+
+        # Clear the container
+        flet_control.controls.clear()
+        container.children.clear()
+
+        # Create new reactive context
+        context = ReactiveContext(
+            container=container,
+            flet_control=flet_control,
+            component_id=id(container)
+        )
+
+        # Push context
+        self._reactive_contexts.append(context)
+
+        try:
+            # Re-execute renderer - fills container with new components
+            result = renderer()
+
+            # If renderer returns a UiBlock, add it to container
+            if result is not None:
+                from ..ui_blocks import UiBlock
+                if isinstance(result, UiBlock):
+                    self.add_to_reactive_container(result)
+        finally:
+            # Pop context
+            self._reactive_contexts.pop()
+
+        # Refresh ONLY the container, not whole page
+        if self.page:
+            flet_control.update()
 
     def update_reactive_component(self, component_id: int, new_component) -> None:
         """Update a reactive component with its new render.

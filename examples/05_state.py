@@ -27,6 +27,7 @@ def state_demo():
     counter = ui.state(0)
     # --- Counter Example ---
     ui(tg.Md("## 🔢 Counter"))
+    # Pattern 1: Return a UiBlock (lambda returning component)
     ui(lambda: tg.Md(f"### **Current Count:** {counter.value}"), counter)
 
     ui(
@@ -45,6 +46,7 @@ def state_demo():
 
 
 @app.command()
+@ui.def_command(is_auto_exec=True)
 def orders_demo():
     """Demonstrates a master-detail view using state."""
 
@@ -74,33 +76,38 @@ def orders_demo():
         for order in orders_data
     ]
     ui(tg.Table(cols=["ID", "Item", "Quantity", "Total", "Action"], data=table_data))
-
+    ui(tg.Md("x"))
     ui(tg.Md("---"))
 
     # --- Display Details of Selected Order ---
     ui(tg.Md("## ℹ️ Order Details"))
 
-    # This is a reactive component that depends on `selected_order_id`.
-    # When `selected_order_id` changes, this lambda is re-run.
+    # Pattern 2: Call ui() internally (renderer calls ui() instead of returning)
+    # This is a reactive renderer that depends on `selected_order_id`.
+    # When `selected_order_id` changes, this function is re-executed.
     def render_order_details():
         order_id = selected_order_id.value
         if order_id is None:
-            return tg.Text("Select an order from the list above to see its details.")
+            ui(tg.Text("Select an order from the list above to see its details."))
+            return
 
         # Find the selected order from the plain data list
         order = next((o for o in orders_data if o.id == order_id), None)
 
         if order is None:
-            return tg.Text(f"Error: Order with ID {order_id} not found.")
+            ui(tg.Text(f"Error: Order with ID {order_id} not found."))
+            return
 
-        # Return a Markdown component with the order details
-        return tg.Md(
-            f"""
+        # Call ui() to display order details
+        ui(
+            tg.Md(
+                f"""
 - **Order ID:** `{order.id}`
 - **Item:** {order.item}
 - **Quantity:** {order.quantity}
 - **Total:** ${order.total:.2f}
         """
+            )
         )
 
     # The ui() call registers the dependency on the `selected_order_id` state

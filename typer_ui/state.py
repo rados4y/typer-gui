@@ -1,32 +1,40 @@
-"""Reactive state management for UI components."""
+"""Reactive state management - pure observable pattern."""
 
-from typing import Any, Callable, Generic, List, Optional, Tuple, TypeVar
+from typing import Callable, Generic, List, TypeVar
 
 T = TypeVar('T')
 
 
 class State(Generic[T]):
-    """Reactive state container that triggers UI updates on change.
+    """Observable state container that notifies observers on change.
 
-    When state value changes via set(), all registered observers (UI components)
-    are notified and re-rendered automatically.
+    State is a simple observable value. When the value changes via set(),
+    all registered observer callbacks are invoked. State doesn't know or
+    care what observers do - it just notifies them.
+
+    This follows the Observer pattern where State is the Subject and
+    callbacks are Observers.
 
     Example:
+        >>> counter = State(0)
+        >>> counter.add_observer(lambda: print(f"Value is {counter.value}"))
+        >>> counter.set(1)  # Prints: "Value is 1"
+        >>> counter.set(5)  # Prints: "Value is 5"
+
+    In UI context:
         >>> counter = ui.state(0)
         >>> ui(lambda: tg.Text(f"Count: {counter.value}"), counter)
         >>> counter.set(counter.value + 1)  # Triggers re-render
     """
 
-    def __init__(self, initial_value: T, runner: Any):
+    def __init__(self, initial_value: T):
         """Initialize state with a value.
 
         Args:
             initial_value: Initial state value
-            runner: Runner instance for triggering re-renders
         """
         self._value: T = initial_value
-        self._runner = runner
-        self._observers: List[Tuple[Callable, int]] = []  # (renderer, component_id)
+        self._observers: List[Callable[[], None]] = []
 
     @property
     def value(self) -> T:
@@ -40,7 +48,7 @@ class State(Generic[T]):
     def set(self, new_value: T) -> None:
         """Update state value and notify observers.
 
-        Only triggers re-render if value actually changed.
+        Only triggers notifications if value actually changed.
 
         Args:
             new_value: New state value
@@ -50,22 +58,34 @@ class State(Generic[T]):
             self._notify_observers()
 
     def _notify_observers(self) -> None:
-        """Re-render all components that depend on this state."""
-        for renderer, component_id in self._observers:
-            # Re-execute renderer to get new component
-            new_component = renderer()
+        """Notify all observers that value has changed.
 
-            # Tell runner to update the component
-            self._runner.update_reactive_component(component_id, new_component)
+        Simply calls each observer callback. Observers are responsible
+        for deciding what to do with the notification.
+        """
+        for observer_callback in self._observers:
+            observer_callback()
 
-    def _add_observer(self, renderer: Callable, component_id: int) -> None:
-        """Register a component as dependent on this state.
+    def add_observer(self, callback: Callable[[], None]) -> None:
+        """Register an observer callback.
+
+        The callback will be invoked whenever the state value changes.
+        The callback receives no arguments - it can access the new value
+        via the state's .value property if needed.
 
         Args:
-            renderer: Function that returns a component
-            component_id: Unique ID of the component to update
+            callback: Function to call when state changes
         """
-        self._observers.append((renderer, component_id))
+        self._observers.append(callback)
+
+    def remove_observer(self, callback: Callable[[], None]) -> None:
+        """Unregister an observer callback.
+
+        Args:
+            callback: The callback to remove
+        """
+        if callback in self._observers:
+            self._observers.remove(callback)
 
     def __repr__(self) -> str:
         """String representation for debugging."""

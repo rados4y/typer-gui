@@ -105,36 +105,49 @@ class Ui:
             # Reactive mode: renderer function with state dependencies
             renderer = component_or_renderer
 
-            # Execute renderer to get initial component
-            component = renderer()
+            # Create a reactive container to capture all ui() calls
+            from .ui_blocks import Column
+            container = Column(children=[])
 
-            # Generate unique ID for this reactive component
-            component_id = id(component)
+            # Execute renderer in reactive mode
+            # This captures all ui() calls into the container
+            container, flet_control = runner.execute_in_reactive_mode(container, renderer)
 
-            # Mark component as reactive so runner can track it
-            setattr(component, '_reactive_id', component_id)
+            # Store the container's flet control for updates (if we have one)
+            if flet_control is not None:
+                runner._reactive_components[id(container)] = flet_control
+                # Show the container (GUI mode)
+                runner.add_to_output(flet_control, component=container)
+            # In CLI mode, flet_control is None and renderer already printed output
 
-            # Register this component with all state dependencies
+            # Create observer callback that handles re-rendering
+            def on_state_change():
+                """Observer callback invoked when any dependency changes.
+
+                Re-executes the renderer and updates the container.
+                """
+                # Update the reactive container
+                runner.update_reactive_container(container, renderer)
+
+            # Register the observer callback with all state dependencies
             from .state import State
             for dep in dependencies:
                 if isinstance(dep, State):
-                    dep._add_observer(renderer, component_id)
+                    dep.add_observer(on_state_change)
 
-            # Show initial render
-            runner.show(component)
-
-            # Mark as presented for auto-updates
-            if hasattr(component, '_mark_presented'):
-                component._mark_presented(runner)
-
-            return component
+            return container
 
         else:
             # Normal mode: just a component
             component = component_or_renderer
 
-            # Show the component
-            runner.show(component)
+            # Check if in reactive mode
+            if runner.is_reactive_mode():
+                # Add to reactive container instead of main output
+                runner.add_to_reactive_container(component)
+            else:
+                # Normal show to main output
+                runner.show(component)
 
             # Mark component as presented for auto-updates
             if hasattr(component, '_mark_presented'):
@@ -199,20 +212,13 @@ class Ui:
             >>> ui(lambda: tg.Text(f"Count: {counter.value}"), counter)
             >>> counter.set(counter.value + 1)  # Triggers re-render
 
-        Raises:
-            RuntimeError: If called outside command execution context
+        Note:
+            State is independent of the execution context and can be created
+            outside of command functions if needed.
         """
         from .state import State
-        from .ui_blocks import get_current_runner
 
-        runner = get_current_runner()
-        if not runner:
-            raise RuntimeError(
-                "state() can only be called during command execution. "
-                "Ensure you're calling it from within a command function."
-            )
-
-        return State(initial_value, runner)
+        return State(initial_value)
 
     def def_command(
         self,

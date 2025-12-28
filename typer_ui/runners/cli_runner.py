@@ -23,6 +23,8 @@ class CLIRunner(Runner):
         self._verbose = False
         self.channel = "cli"
         self.ui = ui
+        # Reactive components (for compatibility with GUI runner)
+        self._reactive_components = {}
 
     def start(self) -> None:
         """Start CLI runner (no-op for CLI, execution is synchronous)."""
@@ -58,6 +60,66 @@ class CLIRunner(Runner):
             new_component: New component instance
         """
         # No-op for CLI - reactive updates only make sense in GUI
+        pass
+
+    def is_reactive_mode(self) -> bool:
+        """Check if in reactive mode (always False for CLI).
+
+        Returns:
+            False - CLI doesn't support reactive containers
+        """
+        return False
+
+    def add_to_reactive_container(self, component) -> None:
+        """Add to reactive container (no-op in CLI mode).
+
+        Args:
+            component: Component to add
+        """
+        # No-op for CLI
+        pass
+
+    def execute_in_reactive_mode(self, container, renderer):
+        """Execute renderer in reactive mode (simplified for CLI).
+
+        In CLI mode, we don't need containers. Just execute the renderer
+        and return the container unchanged.
+
+        Supports two patterns:
+        1. Renderer calls ui() internally (ui pattern)
+        2. Renderer returns a UiBlock (return pattern)
+
+        Args:
+            container: Container (ignored in CLI)
+            renderer: Function to execute
+
+        Returns:
+            Tuple of (container, None) for compatibility
+        """
+        # Execute the renderer - it will call ui() which will print
+        result = renderer()
+
+        # If renderer returns a UiBlock, show it
+        if result is not None:
+            from ..ui_blocks import UiBlock
+            if isinstance(result, UiBlock):
+                self.show(result)
+
+        # Return container and None (no flet_control in CLI)
+        return container, None
+
+    def update_reactive_container(self, container, renderer):
+        """Update reactive container (no-op in CLI mode).
+
+        In CLI mode, reactive updates aren't displayed since output is static.
+        This method exists for compatibility with the reactive state system.
+
+        Args:
+            container: Container to update
+            renderer: Function to re-execute
+        """
+        # No-op for CLI - reactive updates only make sense in GUI
+        # State changes don't trigger re-rendering in CLI mode
         pass
 
     def execute_command(
