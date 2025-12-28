@@ -1117,6 +1117,49 @@ class GUIRunner(Runner):
 
         return result, exception, '\n'.join(output_lines)
 
+    def _execute_tab_content(self, content_callable, target_container: ft.Column) -> None:
+        """Execute a callable for tab content and capture ui() calls into target container.
+
+        Args:
+            content_callable: Function that uses ui() to build content
+            target_container: Flet Column to receive the output
+        """
+        # Get current view
+        current_view = self._get_current_view()
+        if not current_view:
+            return
+
+        # Save current output view and reactive container
+        saved_output_view = current_view.output_view
+        saved_reactive = self._reactive_container
+
+        # Temporarily redirect output to the target container
+        current_view.output_view = target_container
+        self._reactive_container = None
+
+        try:
+            # Execute the callable - all ui() calls will go to target_container
+            content_callable()
+
+            # Update the UI
+            if self.page:
+                self.page.update()
+
+        except Exception as e:
+            # Show error in the tab
+            error_text = ft.Text(
+                f"Error rendering tab content: {str(e)}",
+                color=ft.Colors.RED,
+            )
+            target_container.controls.append(error_text)
+            if self.page:
+                self.page.update()
+
+        finally:
+            # Restore original output view and reactive container
+            current_view.output_view = saved_output_view
+            self._reactive_container = saved_reactive
+
     def _component_to_text(self, component) -> str:
         """Convert UI component to text representation.
 

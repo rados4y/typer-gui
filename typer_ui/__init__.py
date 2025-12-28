@@ -14,6 +14,8 @@ from .ui_blocks import (
     Button,
     Link,
     TextInput,
+    Tab,
+    Tabs,
 )
 from .ui_app import UICommand
 
@@ -32,5 +34,7 @@ __all__ = [
     "Button",
     "Link",
     "TextInput",
+    "Tab",
+    "Tabs",
     "UICommand",
 ]

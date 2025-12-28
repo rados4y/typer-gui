@@ -616,3 +616,127 @@ class TextInput(UiBlock):
             "label": self.label,
             "value": self.value,
         }
+
+
+# ============================================================================
+# Tabs Components
+# ============================================================================
+
+
+@dataclass
+class Tab:
+    """A single tab with label and content.
+
+    Args:
+        label: Tab label/title
+        content: Either a UiBlock component or a callable that builds content using ui()
+    """
+    label: str
+    content: Union[UiBlock, Callable]
+
+    def __post_init__(self):
+        """Validate the tab configuration."""
+        if not callable(self.content) and not isinstance(self.content, UiBlock):
+            raise ValueError(
+                f"Tab content must be a UiBlock or callable, got {type(self.content)}"
+            )
+
+
+@dataclass
+class Tabs(UiBlock):
+    """Tabbed interface container.
+
+    Args:
+        tabs: List of Tab objects
+    """
+    tabs: List[Tab]
+
+    def __post_init__(self):
+        """Validate tabs configuration."""
+        if not self.tabs:
+            raise ValueError("Tabs must contain at least one tab")
+        if not all(isinstance(tab, Tab) for tab in self.tabs):
+            raise ValueError("All items must be Tab objects")
+
+    def show_cli(self, runner) -> None:
+        """Render tabs sequentially with separators in CLI."""
+        for i, tab in enumerate(self.tabs):
+            # Add spacing between tabs
+            if i > 0:
+                print()
+
+            # Print tab header
+            separator = "=" * len(tab.label)
+            print(f"\n{separator}")
+            print(tab.label)
+            print(f"{separator}\n")
+
+            # Render tab content
+            if callable(tab.content):
+                # Execute callable - it will use ui() to render content
+                tab.content()
+            else:
+                # Render UiBlock directly
+                tab.content.show_cli(runner)
+
+    def show_gui(self, runner) -> None:
+        """Render tabs as Flet Tabs widget."""
+        import flet as ft
+
+        flet_tabs = []
+
+        for tab in self.tabs:
+            # Create content for this tab
+            if callable(tab.content):
+                # For callable content, we need to capture ui() calls
+                # Create a container to hold the content
+                content_column = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
+
+                # Execute the callable in a context that captures output
+                runner._execute_tab_content(tab.content, content_column)
+                tab_content = content_column
+            else:
+                # For UiBlock content, render it into a container
+                content_column = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
+
+                # Get current view and temporarily redirect output to this container
+                current_view = runner._get_current_view()
+                if current_view:
+                    saved_output_view = current_view.output_view
+                    current_view.output_view = content_column
+                    try:
+                        tab.content.show_gui(runner)
+                    finally:
+                        current_view.output_view = saved_output_view
+
+                tab_content = content_column
+
+            # Create Flet Tab
+            flet_tab = ft.Tab(
+                text=tab.label,
+                content=ft.Container(
+                    content=tab_content,
+                    padding=10,
+                ),
+            )
+            flet_tabs.append(flet_tab)
+
+        # Create Tabs widget
+        tabs_widget = ft.Tabs(
+            tabs=flet_tabs,
+            animation_duration=300,
+        )
+
+        runner.add_to_output(tabs_widget)
+
+    def to_dict(self) -> dict:
+        return {
+            "type": "tabs",
+            "tabs": [
+                {
+                    "label": tab.label,
+                    "content": tab.content.to_dict() if isinstance(tab.content, UiBlock) else "<callable>"
+                }
+                for tab in self.tabs
+            ],
+        }
