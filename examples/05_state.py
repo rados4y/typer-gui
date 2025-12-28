@@ -21,7 +21,7 @@ class Order:
 
 
 @app.command()
-@ui.def_command(auto=True)
+@ui.def_command(auto=True, header=False)
 def state_demo():
     """Demonstrates reactive UI components tied to state."""
     counter = ui.state(0)
@@ -46,7 +46,7 @@ def state_demo():
 
 
 @app.command()
-@ui.def_command(auto=True)
+@ui.def_command(auto=True, header=False)
 def orders_demo():
     """Demonstrates a master-detail view using state."""
 

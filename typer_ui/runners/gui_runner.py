@@ -560,6 +560,13 @@ class GUIRunner(Runner):
         """
         self.current_command = command
 
+        # Invoke on_select callback if provided
+        if command.ui_spec.on_select:
+            try:
+                command.ui_spec.on_select()
+            except Exception as e:
+                print(f"Warning: on_select callback failed: {e}")
+
         # Lazy initialize command view if it doesn't exist
         if command.name not in self.command_views:
             await self._create_command_view(command)
@@ -600,29 +607,30 @@ class GUIRunner(Runner):
         # Build form
         form_controls = []
 
-        # Title
-        title_controls = []
-        title_controls.append(
-            ft.Text(
-                command.name.upper(),
-                size=20,
-                weight=ft.FontWeight.BOLD,
-            )
-        )
-
-        if command.help_text:
+        # Title (only if header=True)
+        if command.ui_spec.header:
+            title_controls = []
             title_controls.append(
                 ft.Text(
-                    command.help_text,
-                    size=14,
-                    color=ft.Colors.GREY_700,
+                    command.name.upper(),
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
                 )
             )
 
-        form_controls.append(
-            ft.Container(content=ft.Column(controls=title_controls, spacing=5))
-        )
-        form_controls.append(ft.Divider())
+            if command.help_text:
+                title_controls.append(
+                    ft.Text(
+                        command.help_text,
+                        size=14,
+                        color=ft.Colors.GREY_700,
+                    )
+                )
+
+            form_controls.append(
+                ft.Container(content=ft.Column(controls=title_controls, spacing=5))
+            )
+            form_controls.append(ft.Divider())
 
         # Parameters
         param_controls = []
@@ -641,7 +649,7 @@ class GUIRunner(Runner):
                 await self._run_command()
 
             run_button = ft.ElevatedButton(
-                text="Run Command",
+                text=command.ui_spec.submit_name,
                 icon=ft.Icons.PLAY_ARROW,
                 on_click=handle_run,
                 bgcolor=ft.Colors.BLUE_700,
