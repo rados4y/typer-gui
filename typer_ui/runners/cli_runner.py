@@ -197,16 +197,15 @@ class CLIRunner(Runner):
         # Capture print statements as output lines
         stdout_text = stdout_capture.getvalue()
         if stdout_text:
-            # Add print statements to output
+            # Add print statements to output (including empty lines)
             for line in stdout_text.rstrip('\n').split('\n'):
-                if line:
-                    output_lines.append(line)
+                output_lines.append(line)
 
         # Print everything for display (using restored show method)
         if stdout_text:
             for line in stdout_text.rstrip('\n').split('\n'):
-                if line:
-                    Text(line).show_cli(self)
+                # Show all lines including empty ones for spacing
+                Text(line).show_cli(self)
 
         stderr_text = stderr_capture.getvalue()
         if stderr_text:

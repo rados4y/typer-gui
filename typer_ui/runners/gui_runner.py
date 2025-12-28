@@ -937,11 +937,10 @@ class GUIRunner(Runner):
             stderr_text = stderr_capture.getvalue()
 
             if stdout_text:
-                # Convert print statements to Text components
+                # Convert print statements to Text components (including empty lines for spacing)
                 for line in stdout_text.rstrip('\n').split('\n'):
-                    if line:
-                        output_lines.append(line)
-                        Text(line).show_gui(self)
+                    output_lines.append(line)
+                    Text(line).show_gui(self)
 
             if stderr_text:
                 stderr_msg = f"[STDERR]\n{stderr_text}"
