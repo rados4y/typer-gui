@@ -14,7 +14,7 @@ from .ui_blocks import (
     Link,
     TextInput,
 )
-from .ui_app import UIApp, UICommand
+from .ui_app import UICommand
 
 __version__ = "0.2.0"
 __all__ = [
@@ -30,6 +30,5 @@ __all__ = [
     "Button",
     "Link",
     "TextInput",
-    "UIApp",
     "UICommand",
 ]

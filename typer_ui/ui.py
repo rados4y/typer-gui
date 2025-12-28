@@ -6,11 +6,10 @@ import typer
 import flet as ft
 
 from .spec_builder import build_app_spec, _GUI_OPTIONS_ATTR
-from .specs import CommandUiSpec
+from .specs import CommandUiSpec, AppSpec, CommandSpec
 from .runners.gui_runner import create_flet_app
 from .runners.cli_runner import CLIRunner
 from .ui_blocks import get_current_runner
-from .ui_app import UIApp
 
 
 class Ui:
@@ -58,7 +57,11 @@ class Ui:
         self.description = description
         self._typer_app = app
         self._cli_mode = False
-        self._ui_app: Optional[UIApp] = None
+
+        # Runtime attributes (initialized when app starts)
+        self.app_spec: Optional[AppSpec] = None
+        self.runner: Optional[Any] = None
+        self.current_command: Optional[CommandSpec] = None
 
     def __call__(self, component):
         """Present a component and return it for further use.
@@ -173,6 +176,9 @@ class Ui:
         """
 
         def decorator(func: Callable) -> Callable:
+            import asyncio
+            import inspect
+
             # Store GUI options on the function
             setattr(
                 func,
@@ -183,9 +189,93 @@ class Ui:
                     is_auto_exec=is_auto_exec,
                 ),
             )
+
+            # If the function is async, wrap it for Typer compatibility
+            # Typer will call it synchronously, so we need to handle async execution
+            if inspect.iscoroutinefunction(func):
+                def sync_wrapper(*args, **kwargs):
+                    return asyncio.run(func(*args, **kwargs))
+
+                # Copy over the GUI options to the wrapper
+                setattr(sync_wrapper, _GUI_OPTIONS_ATTR, getattr(func, _GUI_OPTIONS_ATTR))
+
+                # Store reference to original async function
+                setattr(sync_wrapper, '_original_async_func', func)
+
+                # Copy function metadata
+                sync_wrapper.__name__ = func.__name__
+                sync_wrapper.__doc__ = func.__doc__
+                sync_wrapper.__annotations__ = func.__annotations__
+                sync_wrapper.__signature__ = inspect.signature(func)
+
+                return sync_wrapper
+
             return func
 
         return decorator
+
+    def command(self, name: Optional[str] = None):
+        """Get a command by name or return the current command.
+
+        Args:
+            name: Command name (optional). If None, returns current command.
+
+        Returns:
+            UICommand instance or None
+
+        Examples:
+            >>> # Get command by name
+            >>> ui.command("fetch-data").run(source="api")
+            >>>
+            >>> # Get current command
+            >>> current = ui.command()
+        """
+        # Import here to avoid circular dependency
+        from .ui_app import UICommand
+
+        if name is None:
+            # Return current command
+            if self.current_command:
+                return UICommand(self, self.current_command)
+            return None
+
+        # Find command by name
+        command_spec = self._find_command(name)
+        if command_spec:
+            return UICommand(self, command_spec)
+        return None
+
+    def _find_command(self, command_name: str) -> Optional[CommandSpec]:
+        """Find command spec by name.
+
+        Args:
+            command_name: Command name
+
+        Returns:
+            CommandSpec or None
+        """
+        if not self.app_spec:
+            return None
+
+        for cmd in self.app_spec.commands:
+            if cmd.name == command_name:
+                return cmd
+        return None
+
+    @property
+    def commands(self):
+        """Get all commands as UICommand wrappers.
+
+        Returns:
+            List of UICommand instances
+        """
+        # Import here to avoid circular dependency
+        from .ui_app import UICommand
+
+        if not self.app_spec:
+            return []
+
+        return [UICommand(self, cmd) for cmd in self.app_spec.commands]
 
     def app(self):
         """Launch the GUI application or CLI based on --cli flag.
@@ -207,21 +297,18 @@ class Ui:
             sys.argv.remove("--cli")
 
             # Build app spec
-            app_spec = build_app_spec(
+            self.app_spec = build_app_spec(
                 self._typer_app,
                 title=self.title,
                 description=self.description
             )
 
-            # Create UIApp instance (without runner initially)
-            self._ui_app = UIApp(app_spec)
-
             # Create CLI runner and set as current
             from .ui_blocks import set_current_runner
-            cli_runner = CLIRunner(app_spec, self._ui_app)
+            cli_runner = CLIRunner(self.app_spec, self)
 
-            # Set the runner in UIApp now that it's created
-            self._ui_app.runner = cli_runner
+            # Set the runner
+            self.runner = cli_runner
 
             set_current_runner(cli_runner)
 
@@ -238,17 +325,14 @@ class Ui:
     def _run_gui(self):
         """Internal method to launch the GUI."""
         # Build the GUI model from the Typer app
-        app_spec = build_app_spec(
+        self.app_spec = build_app_spec(
             self._typer_app,
             title=self.title,
             description=self.description
         )
 
-        # Create UIApp instance
-        self._ui_app = UIApp(app_spec)
-
         # Create the Flet app function
-        flet_main = create_flet_app(app_spec, self._ui_app)
+        flet_main = create_flet_app(self.app_spec, self)
 
         # Run the Flet app
         ft.app(target=flet_main)
@@ -269,23 +353,3 @@ class Ui:
         This allows advanced usage if you need direct access to the Typer app.
         """
         return self._typer_app
-
-    @property
-    def runtime(self) -> Optional[UIApp]:
-        """Access the UIApp instance for programmatic command control.
-
-        Returns None if called before a command is executed.
-
-        Example:
-            >>> @app.command()
-            >>> def orchestrator():
-            >>>     # Get current command
-            >>>     current = ui.runtime.command()
-            >>>
-            >>>     # Execute another command
-            >>>     ui.runtime.command("fetch-data").run(source="api")
-            >>>
-            >>>     # Include command inline
-            >>>     ui.runtime.command("process-data").include()
-        """
-        return self._ui_app

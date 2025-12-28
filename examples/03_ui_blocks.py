@@ -54,7 +54,7 @@ def ui_table():
 
 
 @app.command()
-@ui.command(is_long=True)
+@ui.def_command(is_long=True)
 def ui_table_progressive():
     """Table with progressive rendering - add rows dynamically with context manager."""
     ui(tg.Md("## Progressive Table"))

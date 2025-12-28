@@ -1,7 +1,10 @@
 """GUI runner using Flet for desktop applications."""
 
 import asyncio
+import contextvars
+import inspect
 import io
+import threading
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
 from typing import Any, Optional
@@ -11,7 +14,6 @@ import flet as ft
 from .base import Runner
 from ..specs import AppSpec, CommandSpec, ParamType
 from ..ui_blocks import Text, set_current_runner
-from ..ui_app import UIApp
 
 
 class _RealTimeWriter(io.StringIO):
@@ -37,25 +39,43 @@ class _RealTimeWriter(io.StringIO):
         super().flush()
 
 
+class _CommandView:
+    """Container for per-command UI components."""
+    def __init__(self):
+        self.form_controls: dict[str, ft.Control] = {}
+        self.form_container: Optional[ft.Column] = None
+        self.output_view: Optional[ft.ListView] = None
+        self.main_container: Optional[ft.Column] = None
+        self.component_refs: dict[int, ft.Control] = {}
+
+
 class GUIRunner(Runner):
     """Runner for Flet-based GUI applications."""
 
-    def __init__(self, app_spec: AppSpec, ui_app: Optional[UIApp] = None):
+    def __init__(self, app_spec: AppSpec, ui: Optional[Any] = None):
         super().__init__(app_spec)
         self.page: Optional[ft.Page] = None
         self.current_command: Optional[CommandSpec] = None
-        self.form_controls: dict[str, ft.Control] = {}
         self.channel = "gui"
-        self.ui_app = ui_app or UIApp(app_spec, self)
+        self.ui = ui
+
+        # Per-command views (lazy initialized)
+        self.command_views: dict[str, _CommandView] = {}
+
+        # Container for all command views
+        self.views_container: Optional[ft.Column] = None
 
         # UI components
         self.command_list: Optional[ft.ListView] = None
-        self.form_container: Optional[ft.Column] = None
-        self.output_view: Optional[ft.ListView] = None
 
-        # Component tracking for updates
-        self._component_refs: dict[int, ft.Control] = {}
+        # Component tracking for updates (global registry)
         self._control_registry: dict[Any, ft.Control] = {}
+
+        # Context-aware command tracking for threads and async tasks
+        # This ensures background threads/tasks output to their original command view
+        self._thread_local = threading.local()  # For background threads
+        self._async_context: contextvars.ContextVar[Optional[CommandSpec]] = \
+            contextvars.ContextVar('command_context', default=None)  # For async tasks
 
     def start(self) -> None:
         """Start the Flet GUI application."""
@@ -92,17 +112,42 @@ class GUIRunner(Runner):
             return  # Smart update complete
 
         # --- Fallback to old logic for other components ---
-        comp_id = id(component)
-        if comp_id in self._component_refs:
-            # Component already rendered, but we don't have a smart update for it.
-            # The old logic is destructive, so for now, we'll just re-show it,
-            # which may lead to duplicates for non-Table components.
-            # This is better than clearing the whole output.
-            # TODO: Implement smart updates for other container types.
-            component.show_gui(self)
+        # Check in current command's component refs
+        view = self._get_current_view()
+        if view:
+            comp_id = id(component)
+            if comp_id in view.component_refs:
+                component.show_gui(self)
+            else:
+                component.show_gui(self)
         else:
-            # First time seeing this component, just show it
             component.show_gui(self)
+
+    def _get_current_view(self) -> Optional[_CommandView]:
+        """Get the current command's view.
+
+        Checks context-specific command (thread-local or async context) first,
+        then falls back to global current_command. This ensures background
+        threads and async tasks output to their original command view.
+
+        Returns:
+            CommandView if current command exists and has a view, None otherwise
+        """
+        # Priority 1: Check async context (for Mode 2: async commands)
+        async_cmd = self._async_context.get()
+        if async_cmd and async_cmd.name in self.command_views:
+            return self.command_views[async_cmd.name]
+
+        # Priority 2: Check thread-local storage (for Mode 3: long-running threads)
+        thread_cmd = getattr(self._thread_local, 'current_command', None)
+        if thread_cmd and thread_cmd.name in self.command_views:
+            return self.command_views[thread_cmd.name]
+
+        # Priority 3: Fallback to global current_command (for Mode 1: default sync, UI interactions)
+        if self.current_command and self.current_command.name in self.command_views:
+            return self.command_views[self.current_command.name]
+
+        return None
 
     def add_to_output(self, control: ft.Control, component: Any = None) -> None:
         """Add Flet control to output view.
@@ -111,10 +156,11 @@ class GUIRunner(Runner):
             control: Flet control to add
             component: Optional UiBlock component reference for tracking
         """
-        if self.output_view:
-            self.output_view.controls.append(control)
+        view = self._get_current_view()
+        if view and view.output_view:
+            view.output_view.controls.append(control)
             if component:
-                self._component_refs[id(component)] = control
+                view.component_refs[id(component)] = control
             if self.page:
                 self.page.update()
 
@@ -187,7 +233,11 @@ class GUIRunner(Runner):
 
         # Select first command
         if self.app_spec.commands:
-            self._select_command(self.app_spec.commands[0])
+            # Schedule async task to select first command
+            async def select_first():
+                await self._select_command(self.app_spec.commands[0])
+
+            page.run_task(select_first)
 
     def _create_header(self) -> ft.Container:
         """Create header with title and description."""
@@ -225,18 +275,9 @@ class GUIRunner(Runner):
         # Command list
         self.command_list = self._create_command_list()
 
-        # Form container
-        self.form_container = ft.Column(
+        # Container that will hold all command views (lazy initialized)
+        self.views_container = ft.Column(
             controls=[],
-            scroll=ft.ScrollMode.AUTO,
-            expand=True,
-            spacing=12,
-        )
-
-        # Output view
-        self.output_view = ft.ListView(
-            controls=[],
-            auto_scroll=True,
             expand=True,
             spacing=0,
         )
@@ -249,19 +290,10 @@ class GUIRunner(Runner):
             padding=10,
         )
 
-        right_panel = ft.Column(
-            controls=[
-                ft.Container(
-                    content=self.form_container,
-                    padding=20,
-                ),
-                ft.Container(
-                    content=self.output_view,
-                    padding=ft.padding.only(left=20, right=20, bottom=20),
-                    expand=True,
-                ),
-            ],
+        right_panel = ft.Container(
+            content=self.views_container,
             expand=True,
+            padding=0,
         )
 
         return ft.Row(
@@ -312,11 +344,43 @@ class GUIRunner(Runner):
             command: Command to select
         """
         self.current_command = command
-        self.form_controls.clear()
 
-        # Clear output
-        if self.output_view:
-            self.output_view.controls.clear()
+        # Lazy initialize command view if it doesn't exist
+        if command.name not in self.command_views:
+            await self._create_command_view(command)
+
+        # Hide all command views
+        for view in self.command_views.values():
+            if view.main_container:
+                view.main_container.visible = False
+
+        # Show selected command view
+        selected_view = self.command_views[command.name]
+        if selected_view.main_container:
+            selected_view.main_container.visible = True
+
+        # Clear output for non-long-running tasks on selection
+        # Long-running tasks keep their output for review
+        if not command.ui_spec.is_long and selected_view.output_view:
+            if selected_view.output_view.controls:
+                selected_view.output_view.controls.clear()
+
+        if self.page:
+            self.page.update()
+
+        # Auto-execute only if this is the first time selecting this command
+        # (Check if output is empty to avoid re-running on switch back)
+        if command.ui_spec.is_auto_exec and selected_view.output_view:
+            if not selected_view.output_view.controls:
+                await self._run_command()
+
+    async def _create_command_view(self, command: CommandSpec) -> None:
+        """Create UI view for a command (lazy initialization).
+
+        Args:
+            command: Command to create view for
+        """
+        view = _CommandView()
 
         # Build form
         form_controls = []
@@ -348,7 +412,7 @@ class GUIRunner(Runner):
         # Parameters
         param_controls = []
         for param in command.params:
-            control = self._create_param_control(param)
+            control = self._create_param_control(param, view)
             if control:
                 param_controls.append(control)
 
@@ -356,33 +420,90 @@ class GUIRunner(Runner):
             ft.Container(content=ft.Column(controls=param_controls, spacing=10))
         )
 
-        # Run button (if not auto-exec)
+        # Buttons row
         if not command.ui_spec.is_auto_exec:
+            async def handle_run(e):
+                await self._run_command()
+
             run_button = ft.ElevatedButton(
                 text="Run Command",
                 icon=ft.Icons.PLAY_ARROW,
-                on_click=lambda e: self._run_command(),
+                on_click=handle_run,
                 bgcolor=ft.Colors.BLUE_700,
                 color=ft.Colors.WHITE,
             )
+
+            buttons = [run_button]
+
+            # Add Clear button for long-running tasks
+            if command.ui_spec.is_long:
+                async def handle_clear(e):
+                    # Clear output and re-run
+                    if view.output_view:
+                        view.output_view.controls.clear()
+                        if self.page:
+                            self.page.update()
+                    await self._run_command()
+
+                clear_button = ft.OutlinedButton(
+                    text="Clear & Re-run",
+                    icon=ft.Icons.REFRESH,
+                    on_click=handle_clear,
+                )
+                buttons.append(clear_button)
+
             form_controls.append(
-                ft.Container(content=run_button, margin=ft.margin.only(top=20))
+                ft.Container(
+                    content=ft.Row(buttons, spacing=10),
+                    margin=ft.margin.only(top=20)
+                )
             )
 
-        # Update form
-        self.form_container.controls = form_controls
-        if self.page:
-            self.page.update()
+        # Create form container
+        view.form_container = ft.Column(
+            controls=form_controls,
+            scroll=ft.ScrollMode.AUTO,
+            spacing=12,
+        )
 
-        # Auto-execute
-        if command.ui_spec.is_auto_exec:
-            await self._run_command()
+        # Create output view
+        view.output_view = ft.ListView(
+            controls=[],
+            auto_scroll=True,
+            expand=True,
+            spacing=0,
+        )
 
-    def _create_param_control(self, param) -> Optional[ft.Control]:
+        # Create main container for this command view
+        view.main_container = ft.Column(
+            controls=[
+                ft.Container(
+                    content=view.form_container,
+                    padding=20,
+                ),
+                ft.Container(
+                    content=view.output_view,
+                    padding=ft.padding.only(left=20, right=20, bottom=20),
+                    expand=True,
+                ),
+            ],
+            expand=True,
+            visible=False,  # Hidden by default
+        )
+
+        # Add to views container
+        if self.views_container:
+            self.views_container.controls.append(view.main_container)
+
+        # Store view
+        self.command_views[command.name] = view
+
+    def _create_param_control(self, param, view: _CommandView) -> Optional[ft.Control]:
         """Create Flet control for parameter.
 
         Args:
             param: ParamSpec instance
+            view: CommandView to store the control in
 
         Returns:
             Flet control or None
@@ -434,21 +555,26 @@ class GUIRunner(Runner):
                 )
 
         if control:
-            self.form_controls[param.name] = control
+            view.form_controls[param.name] = control
 
         return control
 
-    def _run_command(self) -> None:
+    async def _run_command(self) -> None:
         """Execute current command."""
         if not self.current_command:
             self._append_text("ERROR: No command selected.")
+            return
+
+        view = self._get_current_view()
+        if not view:
+            self._append_text("ERROR: Command view not initialized.")
             return
 
         try:
             # Parse parameters
             kwargs = {}
             for param in self.current_command.params:
-                control = self.form_controls.get(param.name)
+                control = view.form_controls.get(param.name)
                 if not control:
                     continue
 
@@ -463,14 +589,14 @@ class GUIRunner(Runner):
                 if value is not None:
                     kwargs[param.name] = value
 
-            # Clear output
-            if self.output_view:
-                self.output_view.controls.clear()
+            # Clear output for this command
+            if view.output_view:
+                view.output_view.controls.clear()
                 if self.page:
                     self.page.update()
 
             # Execute command
-            result, error = self.execute_command(self.current_command.name, kwargs)
+            result, error, output = await self.execute_command(self.current_command.name, kwargs)
             if error:
                 self._append_text(f"ERROR: {error}")
 
@@ -509,10 +635,15 @@ class GUIRunner(Runner):
 
         return None
 
-    def execute_command(
+    async def execute_command(
         self, command_name: str, params: dict[str, Any]
     ) -> tuple[Any, Optional[Exception], str]:
         """Execute command with stdout/stderr capture.
+
+        Three execution modes:
+        1. Default (sync, no is_long): Buffered output, executes in main thread
+        2. Async: Immediate updates, executes as async task
+        3. is_long flag: Immediate updates, executes in background thread
 
         Args:
             command_name: Command name
@@ -531,6 +662,26 @@ class GUIRunner(Runner):
         if not command_spec:
             return None, ValueError(f"Command not found: {command_name}"), ""
 
+        # Determine execution mode
+        # Check if the callback has an original async function stored
+        original_async = getattr(command_spec.callback, '_original_async_func', None)
+        is_async = inspect.iscoroutinefunction(command_spec.callback) or original_async is not None
+        is_long = command_spec.ui_spec.is_long
+
+        if is_long:
+            # Mode 3: Execute in background thread with immediate updates
+            return self._execute_in_thread(command_spec, params)
+        elif is_async:
+            # Mode 2: Execute as async with immediate updates
+            return await self._execute_async(command_spec, params)
+        else:
+            # Mode 1: Default sync execution with buffered output
+            return self._execute_sync(command_spec, params)
+
+    def _execute_sync(
+        self, command_spec: CommandSpec, params: dict[str, Any]
+    ) -> tuple[Any, Optional[Exception], str]:
+        """Mode 1: Execute synchronously with buffered output."""
         # Save current runner for nested execution support
         from ..ui_blocks import get_current_runner
         saved_runner = get_current_runner()
@@ -538,8 +689,9 @@ class GUIRunner(Runner):
         # Set this runner as current so ui() works
         set_current_runner(self)
 
-        # Set current command in UIApp
-        self.ui_app.current_command = command_spec
+        # Set current command in Ui
+        if self.ui:
+            self.ui.current_command = command_spec
 
         result = None
         exception = None
@@ -550,7 +702,6 @@ class GUIRunner(Runner):
 
         def capturing_show(component):
             """Capture text representation while showing."""
-            # Get text representation from component
             text_repr = self._component_to_text(component)
             if text_repr:
                 output_lines.append(text_repr)
@@ -559,65 +710,94 @@ class GUIRunner(Runner):
 
         self.show = capturing_show
 
-        # Check if long-running
-        is_long = command_spec.ui_spec.is_long
+        # Buffered output
+        stdout_capture = io.StringIO()
+        stderr_capture = io.StringIO()
 
         try:
-            if is_long:
-                # Real-time streaming
-                stdout_writer = _RealTimeWriter(
-                    lambda t: (output_lines.append(t), self._append_text(t))
-                )
-                stderr_writer = _RealTimeWriter(
-                    lambda t: self._append_text(f"[ERR] {t}")
-                )
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                result = command_spec.callback(**params)
 
-                try:
-                    with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
-                        result = command_spec.callback(**params)
+            stdout_text = stdout_capture.getvalue()
+            stderr_text = stderr_capture.getvalue()
 
-                    stdout_writer.flush()
-                    stderr_writer.flush()
+            if stdout_text:
+                # Convert print statements to Text components
+                for line in stdout_text.rstrip('\n').split('\n'):
+                    if line:
+                        output_lines.append(line)
+                        Text(line).show_gui(self)
 
-                except Exception as e:
-                    exception = e
-                    stdout_writer.flush()
-                    stderr_writer.flush()
-                    error_text = f"ERROR: {e}"
-                    output_lines.append(error_text)
-                    self._append_text(error_text)
-                    self._append_text(traceback.format_exc())
+            if stderr_text:
+                stderr_msg = f"[STDERR]\n{stderr_text}"
+                output_lines.append(stderr_msg)
+                self._append_text(stderr_msg)
 
-            else:
-                # Buffered output
-                stdout_capture = io.StringIO()
-                stderr_capture = io.StringIO()
+        except Exception as e:
+            exception = e
+            error_text = f"ERROR: {e}"
+            output_lines.append(error_text)
+            self._append_text(error_text)
+            self._append_text(traceback.format_exc())
 
-                try:
-                    with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                        result = command_spec.callback(**params)
+        # Handle return value - auto-display if it's a UiBlock
+        if result is not None:
+            from ..ui_blocks import UiBlock
+            if isinstance(result, UiBlock):
+                self.show(result)
 
-                    stdout_text = stdout_capture.getvalue()
-                    stderr_text = stderr_capture.getvalue()
+        # Restore original show method
+        self.show = original_show
 
-                    if stdout_text:
-                        # Convert print statements to Text components
-                        for line in stdout_text.rstrip('\n').split('\n'):
-                            if line:
-                                output_lines.append(line)
-                                Text(line).show_gui(self)
+        # Restore previous runner
+        set_current_runner(saved_runner)
 
-                    if stderr_text:
-                        stderr_msg = f"[STDERR]\n{stderr_text}"
-                        output_lines.append(stderr_msg)
-                        self._append_text(stderr_msg)
+        # Join all output lines
+        output_text = '\n'.join(output_lines)
 
-                except Exception as e:
-                    exception = e
-                    error_text = f"ERROR: {e}"
-                    output_lines.append(error_text)
-                    self._append_text(error_text)
-                    self._append_text(traceback.format_exc())
+        return result, exception, output_text
+
+    async def _execute_async(
+        self, command_spec: CommandSpec, params: dict[str, Any]
+    ) -> tuple[Any, Optional[Exception], str]:
+        """Mode 2: Execute async function with immediate updates."""
+        result = None
+        exception = None
+        output_lines = []
+
+        # Save current runner
+        from ..ui_blocks import get_current_runner
+        saved_runner = get_current_runner()
+        set_current_runner(self)
+
+        if self.ui:
+            self.ui.current_command = command_spec
+
+        # Set async context for this command
+        # This ensures output goes to THIS command's view even if user switches commands
+        token = self._async_context.set(command_spec)
+
+        # Temporarily replace show method to capture output
+        original_show = self.show
+
+        def capturing_show(component):
+            """Capture text representation while showing."""
+            text_repr = self._component_to_text(component)
+            if text_repr:
+                output_lines.append(text_repr)
+            # Still show in GUI
+            original_show(component)
+
+        self.show = capturing_show
+
+        try:
+            # Get the actual async function (may be wrapped)
+            async_func = getattr(command_spec.callback, '_original_async_func', None)
+            if async_func is None:
+                async_func = command_spec.callback
+
+            # Execute async command and await it
+            result = await async_func(**params)
 
             # Handle return value - auto-display if it's a UiBlock
             if result is not None:
@@ -625,17 +805,93 @@ class GUIRunner(Runner):
                 if isinstance(result, UiBlock):
                     self.show(result)
 
+        except Exception as e:
+            exception = e
+            error_text = f"ERROR: {e}"
+            output_lines.append(error_text)
+            self._append_text(error_text)
+            self._append_text(traceback.format_exc())
+
         finally:
             # Restore original show method
             self.show = original_show
 
-        # Restore previous runner (for nested execution support)
+            # Reset async context
+            self._async_context.reset(token)
+
+        # Restore runner
         set_current_runner(saved_runner)
 
-        # Join all output lines
-        output_text = '\n'.join(output_lines)
+        return result, exception, '\n'.join(output_lines)
 
-        return result, exception, output_text
+    def _execute_in_thread(
+        self, command_spec: CommandSpec, params: dict[str, Any]
+    ) -> tuple[Any, Optional[Exception], str]:
+        """Mode 3: Execute in background thread with immediate updates."""
+        result = None
+        exception = None
+        output_lines = []
+
+        # Save current runner
+        from ..ui_blocks import get_current_runner
+        saved_runner = get_current_runner()
+
+        def thread_target():
+            nonlocal result, exception
+
+            # Set runner in thread
+            set_current_runner(self)
+
+            # Set thread-local command context
+            # This ensures output goes to THIS command's view even if user switches commands
+            self._thread_local.current_command = command_spec
+
+            if self.ui:
+                self.ui.current_command = command_spec
+
+            # Real-time streaming with thread-safe page updates
+            def append_with_update(text):
+                output_lines.append(text)
+                self._append_text(text)
+
+            stdout_writer = _RealTimeWriter(append_with_update)
+            stderr_writer = _RealTimeWriter(
+                lambda t: self._append_text(f"[ERR] {t}")
+            )
+
+            try:
+                with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
+                    result = command_spec.callback(**params)
+
+                stdout_writer.flush()
+                stderr_writer.flush()
+
+            except Exception as e:
+                exception = e
+                stdout_writer.flush()
+                stderr_writer.flush()
+                error_text = f"ERROR: {e}"
+                output_lines.append(error_text)
+                self._append_text(error_text)
+                self._append_text(traceback.format_exc())
+
+            # Handle return value
+            if result is not None:
+                from ..ui_blocks import UiBlock
+                if isinstance(result, UiBlock):
+                    self.show(result)
+
+            # Restore runner
+            set_current_runner(saved_runner)
+
+        # Start thread
+        thread = threading.Thread(target=thread_target, daemon=True)
+        thread.start()
+
+        # Note: We return immediately, thread continues in background
+        # This allows UI to remain responsive
+
+        return result, exception, '\n'.join(output_lines)
 
     def _component_to_text(self, component) -> str:
         """Convert UI component to text representation.
@@ -680,10 +936,11 @@ class GUIRunner(Runner):
 
     def _append_text(self, text: str) -> None:
         """Append plain text to output view."""
-        if self.output_view:
+        view = self._get_current_view()
+        if view and view.output_view:
             lines = text.rstrip('\n').split('\n') if text else []
             for line in lines:
-                self.output_view.controls.append(
+                view.output_view.controls.append(
                     ft.Text(
                         line,
                         selectable=True,
@@ -695,17 +952,21 @@ class GUIRunner(Runner):
                 self.page.update()
 
 
-def create_flet_app(app_spec: AppSpec, ui_app: Optional[UIApp] = None):
+def create_flet_app(app_spec: AppSpec, ui: Optional[Any] = None):
     """Create Flet app function from AppSpec.
 
     Args:
         app_spec: Application specification
-        ui_app: Optional UIApp instance
+        ui: Optional Ui instance
 
     Returns:
         Flet main function
     """
-    runner = GUIRunner(app_spec, ui_app)
+    runner = GUIRunner(app_spec, ui)
+
+    # Set the runner in the UI instance
+    if ui:
+        ui.runner = runner
 
     def main(page: ft.Page):
         runner.build(page)

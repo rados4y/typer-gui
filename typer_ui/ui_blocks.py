@@ -215,6 +215,18 @@ class Table(Container):
         self.data.append(row_data)
         self._update()
 
+    def update_cell(self, row_index: int, col_index: int, value: Any) -> None:
+        """Update a cell value and trigger display update.
+
+        Args:
+            row_index: Row index (0-based)
+            col_index: Column index (0-based)
+            value: New cell value
+        """
+        if 0 <= row_index < len(self.data) and 0 <= col_index < len(self.data[row_index]):
+            self.data[row_index][col_index] = value
+            self._update()
+
     def show_cli(self, runner) -> None:
         lines = []
 
@@ -404,7 +416,13 @@ class Button(UiBlock):
             icon_obj = getattr(ft.Icons, self.icon.upper(), None)
 
         def handle_click(e):
-            self.on_click()
+            # Set runner context for callback execution
+            saved_runner = get_current_runner()
+            set_current_runner(runner)
+            try:
+                self.on_click()
+            finally:
+                set_current_runner(saved_runner)
             # Optionally refresh runner
             if hasattr(runner, 'refresh'):
                 runner.refresh()
@@ -444,7 +462,13 @@ class Link(UiBlock):
         import flet as ft
 
         def handle_click(e):
-            self.on_click()
+            # Set runner context for callback execution
+            saved_runner = get_current_runner()
+            set_current_runner(runner)
+            try:
+                self.on_click()
+            finally:
+                set_current_runner(saved_runner)
 
         runner.add_to_output(
             ft.TextButton(
@@ -486,7 +510,13 @@ class TextInput(UiBlock):
         def handle_change(e):
             self.value = e.control.value
             if self.on_change:
-                self.on_change(e.control.value)
+                # Set runner context for callback execution
+                saved_runner = get_current_runner()
+                set_current_runner(runner)
+                try:
+                    self.on_change(e.control.value)
+                finally:
+                    set_current_runner(saved_runner)
 
         textfield = ft.TextField(
             label=self.label,

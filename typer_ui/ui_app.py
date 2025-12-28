@@ -1,14 +1,17 @@
-"""UIApp - Simple synchronous application controller."""
+"""UICommand - Command wrapper for execution control."""
 
-from typing import Any, Optional
-from .specs import AppSpec, CommandSpec
+from typing import Any, Optional, TYPE_CHECKING
+from .specs import CommandSpec
+
+if TYPE_CHECKING:
+    from .ui import Ui
 
 
 class UICommand:
     """Wrapper for command operations.
 
     Supports method chaining for convenient access to output:
-        ui.runtime.command("fetch").run(x=10).out  # Execute and get output
+        ui.command("fetch").run(x=10).out  # Execute and get output
 
     Attributes:
         name: Command name
@@ -16,14 +19,14 @@ class UICommand:
         out: Property - captured text output (chainable)
     """
 
-    def __init__(self, app: 'UIApp', command_spec: CommandSpec):
+    def __init__(self, ui: 'Ui', command_spec: CommandSpec):
         """Initialize UICommand.
 
         Args:
-            app: Parent UIApp instance
+            ui: Parent Ui instance
             command_spec: Command specification
         """
-        self.app = app
+        self.ui = ui
         self.command_spec = command_spec
         self.name = command_spec.name
         self._output: Optional[str] = None  # Internal captured output
@@ -37,10 +40,10 @@ class UICommand:
 
         Example:
             >>> # Get current command output
-            >>> output = ui.runtime.command().out
+            >>> output = ui.command().out
             >>>
             >>> # Chain after run()
-            >>> output = ui.runtime.command("fetch").run(x=10).out
+            >>> output = ui.command("fetch").run(x=10).out
         """
         return self._output or ""
 
@@ -53,22 +56,59 @@ class UICommand:
         Returns:
             Self for chaining
         """
-        self.app.current_command = self.command_spec
+        self.ui.current_command = self.command_spec
+
+        # Trigger GUI update if in GUI mode
+        if self.ui.runner and hasattr(self.ui.runner, '_select_command'):
+            runner = self.ui.runner
+            # Use page.run_task if available (Flet GUI mode)
+            if hasattr(runner, 'page') and runner.page:
+                async def do_select():
+                    await runner._select_command(self.command_spec)
+                runner.page.run_task(do_select)
+
         return self
 
     def clear(self) -> 'UICommand':
         """Clear output for this command.
 
+        If command is auto-exec, re-executes it after clearing.
+
         Returns:
             Self for chaining
         """
+        # Clear internal state
         self._output = None
         self.result = None
+
+        # Clear GUI output if in GUI mode
+        if self.ui.runner and hasattr(self.ui.runner, 'output_view'):
+            runner = self.ui.runner
+            if runner.output_view:
+                runner.output_view.controls.clear()
+                if hasattr(runner, 'page') and runner.page:
+                    runner.page.update()
+
+        # Re-execute if auto-exec
+        if self.command_spec.ui_spec.is_auto_exec:
+            # Execute the command again
+            if self.ui.runner and hasattr(self.ui.runner, 'page') and self.ui.runner.page:
+                # In GUI mode, use async execution
+                async def re_execute():
+                    await self.ui.runner._run_command()
+
+                self.ui.runner.page.run_task(re_execute)
+            else:
+                # In CLI mode or no runner, direct execution
+                if self.command_spec.callback:
+                    self.result = self.command_spec.callback()
+
         return self
 
     def run(self, **kwargs) -> 'UICommand':
         """Execute this command with parameters.
 
+        In GUI mode, selects the command first (changes form), then executes.
         Captures output separately from current context.
         Returns self for method chaining.
 
@@ -80,20 +120,23 @@ class UICommand:
 
         Example:
             >>> # Chain to get output
-            >>> output = ui.runtime.command("fetch").run(source="api").out
+            >>> output = ui.command("fetch").run(source="api").out
             >>>
             >>> # Chain to get result
-            >>> result = ui.runtime.command("fetch").run(source="api").result
+            >>> result = ui.command("fetch").run(source="api").result
             >>>
             >>> # Use in button lambda
             >>> ui(tg.Button("Copy",
             ...     on_click=lambda: ui.clipboard(
-            ...         ui.runtime.command("fetch").run(source="api").out
+            ...         ui.command("fetch").run(source="api").out
             ...     )))
         """
+        # Select command first (in GUI mode, this updates the form)
+        self.select()
+
         # Execute via runner if available
-        if self.app.runner:
-            result, error, output = self.app.runner.execute_command(
+        if self.ui.runner:
+            result, error, output = self.ui.runner.execute_command(
                 self.command_spec.name, kwargs
             )
             self.result = result
@@ -122,14 +165,14 @@ class UICommand:
 
         Example:
             >>> # Execute inline and get result
-            >>> result = ui.runtime.command("process").include().result
+            >>> result = ui.command("process").include().result
         """
         # Save current command
-        saved_command = self.app.current_command
+        saved_command = self.ui.current_command
 
         try:
             # Temporarily set this as current
-            self.app.current_command = self.command_spec
+            self.ui.current_command = self.command_spec
 
             # Execute directly (output goes to current context)
             if self.command_spec.callback:
@@ -138,75 +181,6 @@ class UICommand:
                 # Note: output is shown inline, not captured separately
         finally:
             # Restore previous command
-            self.app.current_command = saved_command
+            self.ui.current_command = saved_command
 
         return self  # Return self for chaining
-
-
-class UIApp:
-    """Central controller for UI applications.
-
-    Provides simple API for command selection and execution.
-    """
-
-    def __init__(self, app_spec: AppSpec, runner: Optional[Any] = None):
-        """Initialize UIApp.
-
-        Args:
-            app_spec: Immutable application specification
-            runner: Optional runner instance (CLIRunner, GUIRunner, etc.)
-        """
-        self.app_spec = app_spec
-        self.runner = runner
-        self.current_command: Optional[CommandSpec] = None
-
-    def command(self, name: Optional[str] = None) -> Optional[UICommand]:
-        """Get a command by name or return the current command.
-
-        Args:
-            name: Command name (optional). If None, returns current command.
-
-        Returns:
-            UICommand instance or None
-
-        Examples:
-            >>> # Get command by name
-            >>> app.command("fetch-data").run(source="api")
-
-            >>> # Get current command
-            >>> current = app.command()
-        """
-        if name is None:
-            # Return current command
-            if self.current_command:
-                return UICommand(self, self.current_command)
-            return None
-
-        # Find command by name
-        command_spec = self._find_command(name)
-        if command_spec:
-            return UICommand(self, command_spec)
-        return None
-
-    def _find_command(self, command_name: str) -> Optional[CommandSpec]:
-        """Find command spec by name.
-
-        Args:
-            command_name: Command name
-
-        Returns:
-            CommandSpec or None
-        """
-        for cmd in self.app_spec.commands:
-            if cmd.name == command_name:
-                return cmd
-        return None
-
-    @property
-    def commands(self) -> list[UICommand]:
-        """Get all commands as UICommand wrappers.
-
-        Returns:
-            List of UICommand instances
-        """
-        return [UICommand(self, cmd) for cmd in self.app_spec.commands]

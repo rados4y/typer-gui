@@ -1,5 +1,7 @@
 """CLI runner for command-line execution."""
 
+import asyncio
+import inspect
 import sys
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
@@ -8,7 +10,6 @@ from typing import Any, Optional
 from .base import Runner
 from ..specs import AppSpec, CommandSpec
 from ..ui_blocks import Text, set_current_runner
-from ..ui_app import UIApp
 
 
 class CLIRunner(Runner):
@@ -17,11 +18,11 @@ class CLIRunner(Runner):
     Executes commands directly from command line and prints output.
     """
 
-    def __init__(self, app_spec: AppSpec, ui_app: Optional[UIApp] = None):
+    def __init__(self, app_spec: AppSpec, ui: Optional[Any] = None):
         super().__init__(app_spec)
         self._verbose = False
         self.channel = "cli"
-        self.ui_app = ui_app or UIApp(app_spec, self)
+        self.ui = ui
 
     def start(self) -> None:
         """Start CLI runner (no-op for CLI, execution is synchronous)."""
@@ -78,8 +79,9 @@ class CLIRunner(Runner):
         # Set this runner as current so ui() works
         set_current_runner(self)
 
-        # Set current command in UIApp
-        self.ui_app.current_command = command_spec
+        # Set current command in Ui
+        if self.ui:
+            self.ui.current_command = command_spec
 
         # Capture stdout/stderr and UI components
         stdout_capture = StringIO()
@@ -108,6 +110,7 @@ class CLIRunner(Runner):
         try:
             with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
                 # Call the command callback directly
+                # Async commands are already wrapped by def_command decorator
                 result = command_spec.callback(**params)
 
         except Exception as e:
