@@ -21,7 +21,7 @@ class Order:
 
 
 @app.command()
-@ui.def_command(is_auto_exec=True)
+@ui.def_command(auto=True)
 def state_demo():
     """Demonstrates reactive UI components tied to state."""
     counter = ui.state(0)
@@ -46,7 +46,7 @@ def state_demo():
 
 
 @app.command()
-@ui.def_command(is_auto_exec=True)
+@ui.def_command(auto=True)
 def orders_demo():
     """Demonstrates a master-detail view using state."""
 
@@ -71,7 +71,7 @@ def orders_demo():
             order.quantity,
             f"${order.total:.2f}",
             # This Link modifies the `selected_order_id` state on click
-            tg.Link("Select", on_click=lambda o=order: selected_order_id.set(o.id)),
+            tg.Link("Select", on_click=lambda o=order: selected_order_id.set(o)),
         ]
         for order in orders_data
     ]
@@ -85,26 +85,21 @@ def orders_demo():
     # Reactive renderer that calls ui() internally with shortcuts
     # When `selected_order_id` changes, this function is re-executed.
     def render_order_details():
-        order_id = selected_order_id.value
-        if order_id is None:
+        order = selected_order_id.value
+        if order is None:
             # Shortcut: ui(str) renders as Markdown
             ui("Select an order from the list above to see its details.")
             return
 
-        # Find the selected order from the plain data list
-        order = next((o for o in orders_data if o.id == order_id), None)
-
-        if order is None:
-            ui(f"Error: Order with ID {order_id} not found.")
-            return
-
         # Shortcut: ui(str) renders markdown
-        ui(f"""
+        ui(
+            f"""
 - **Order ID:** `{order.id}`
 - **Item:** {order.item}
 - **Quantity:** {order.quantity}
 - **Total:** ${order.total:.2f}
-        """)
+        """
+        )
 
     # The ui() call registers the dependency on the `selected_order_id` state
     ui(render_order_details, selected_order_id)

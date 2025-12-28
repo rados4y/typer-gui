@@ -248,9 +248,16 @@ class Ui:
     def def_command(
         self,
         *,
-        is_button: bool = False,
-        is_long: bool = False,
-        is_auto_exec: bool = False,
+        button: bool = False,
+        long: bool = False,
+        auto: bool = False,
+        header: bool = True,
+        submit_name: str = "Run Command",
+        on_select: Optional[Callable] = None,
+        # Deprecated parameters (for backward compatibility)
+        is_button: Optional[bool] = None,
+        is_long: Optional[bool] = None,
+        is_auto_exec: Optional[bool] = None,
     ):
         """Decorator to add GUI-specific options to a Typer command.
 
@@ -258,31 +265,50 @@ class Ui:
         It only stores GUI metadata and doesn't affect Typer's behavior.
 
         Args:
-            is_button: Display as a button in the left panel
-            is_long: Enable real-time output streaming for long-running commands
-            is_auto_exec: Execute automatically when selected, hide 'Run Command' button
+            button: Display as a button in the left panel
+            long: Enable real-time output streaming for long-running commands
+            auto: Execute automatically when selected, hide submit button
+            header: Show command name and description (default: True)
+            submit_name: Text for the submit button (default: "Run Command")
+            on_select: Callback function called when command is selected
+            is_button: Deprecated, use 'button' instead
+            is_long: Deprecated, use 'long' instead
+            is_auto_exec: Deprecated, use 'auto' instead
 
         Example:
             >>> @app.command()
-            >>> @ui.def_command(is_button=True, is_long=True)
+            >>> @ui.def_command(button=True, long=True)
             >>> def process():
             >>>     for i in range(10):
             >>>         print(f"Step {i}")
             >>>         time.sleep(1)
+            >>>
+            >>> @app.command()
+            >>> @ui.def_command(auto=True, header=False)
+            >>> def dashboard():
+            >>>     ui("# Dashboard")  # Only output shown, no command header
         """
 
         def decorator(func: Callable) -> Callable:
             import asyncio
             import inspect
 
+            # Handle backward compatibility
+            final_button = is_button if is_button is not None else button
+            final_long = is_long if is_long is not None else long
+            final_auto = is_auto_exec if is_auto_exec is not None else auto
+
             # Store GUI options on the function
             setattr(
                 func,
                 _GUI_OPTIONS_ATTR,
                 CommandUiSpec(
-                    is_button=is_button,
-                    is_long=is_long,
-                    is_auto_exec=is_auto_exec,
+                    button=final_button,
+                    long=final_long,
+                    auto=final_auto,
+                    header=header,
+                    submit_name=submit_name,
+                    on_select=on_select,
                 ),
             )
 

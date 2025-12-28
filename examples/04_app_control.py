@@ -54,7 +54,7 @@ def generate_report():
 
 
 @app.command()
-@ui.def_command(is_auto_exec=True)
+@ui.def_command(auto=True)
 def control_demo():
     """Interactive demo of run(), include(), and select()."""
     ui(tg.Md("# Command Control Demo"))

@@ -129,13 +129,8 @@ def _extract_command_info(command_name: str, command_info: CommandInfo) -> Comma
     # Extract GUI options if present
     ui_spec = CommandUiSpec()
     if callback and hasattr(callback, _GUI_OPTIONS_ATTR):
-        # Legacy GuiCommandOptions -> CommandUiSpec conversion
-        legacy_options = getattr(callback, _GUI_OPTIONS_ATTR)
-        ui_spec = CommandUiSpec(
-            is_button=getattr(legacy_options, 'is_button', False),
-            is_long=getattr(legacy_options, 'is_long', False),
-            is_auto_exec=getattr(legacy_options, 'is_auto_exec', False),
-        )
+        # Get the stored CommandUiSpec directly (it's already the right type)
+        ui_spec = getattr(callback, _GUI_OPTIONS_ATTR)
 
     return CommandSpec(
         name=command_name,

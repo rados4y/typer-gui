@@ -32,7 +32,7 @@ class Priority(str, Enum):
 
 
 @app.command()
-@ui.def_command(is_auto_exec=True)
+@ui.def_command(auto=True)
 def welcome_screen():
     """
     Demonstrates a command that runs automatically when selected in the GUI.
@@ -42,14 +42,14 @@ def welcome_screen():
     ui("""
 # Welcome!
 
-This command runs **automatically** when selected because `is_auto_exec=True`.
+This command runs **automatically** when selected because `auto=True`.
 
 It's a great way to present initial information or a dashboard without requiring user interaction to click a "Run" button.
 """)
 
 
 @app.command()
-@ui.def_command(is_button=True)
+@ui.def_command(button=True)
 def basic_parameters(
     name: str,
     times: int = 1,
@@ -111,7 +111,7 @@ You can use **bold**, *italic*, and `code` formatting.
 
 
 @app.command()
-@ui.def_command(is_long=True)
+@ui.def_command(long=True)
 def long_running_task(steps: int = 5):
     """Demonstrates a long-running task with real-time table updates."""
     # Shortcut: ui(str) renders as Markdown
@@ -128,7 +128,7 @@ def long_running_task(steps: int = 5):
 
 
 @app.command()
-@ui.def_command(is_long=True)
+@ui.def_command(long=True)
 async def async_task(delay: float = 1.0):
     """
     Demonstrates an async command.
