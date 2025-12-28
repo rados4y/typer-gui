@@ -660,24 +660,32 @@ class Tabs(UiBlock):
 
     def show_cli(self, runner) -> None:
         """Render tabs sequentially with separators in CLI."""
-        for i, tab in enumerate(self.tabs):
-            # Add spacing between tabs
-            if i > 0:
-                print()
+        # Save and set runner context for callable execution
+        saved_runner = get_current_runner()
+        set_current_runner(runner)
 
-            # Print tab header
-            separator = "=" * len(tab.label)
-            print(f"\n{separator}")
-            print(tab.label)
-            print(f"{separator}\n")
+        try:
+            for i, tab in enumerate(self.tabs):
+                # Add spacing between tabs
+                if i > 0:
+                    print()
 
-            # Render tab content
-            if callable(tab.content):
-                # Execute callable - it will use ui() to render content
-                tab.content()
-            else:
-                # Render UiBlock directly
-                tab.content.show_cli(runner)
+                # Print tab header
+                separator = "=" * len(tab.label)
+                print(f"\n{separator}")
+                print(tab.label)
+                print(f"{separator}\n")
+
+                # Render tab content
+                if callable(tab.content):
+                    # Execute callable - it will use ui() to render content
+                    tab.content()
+                else:
+                    # Render UiBlock directly
+                    tab.content.show_cli(runner)
+        finally:
+            # Restore original runner context
+            set_current_runner(saved_runner)
 
     def show_gui(self, runner) -> None:
         """Render tabs as Flet Tabs widget."""

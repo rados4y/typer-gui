@@ -1129,13 +1129,18 @@ class GUIRunner(Runner):
         if not current_view:
             return
 
-        # Save current output view and reactive container
+        # Save current output view, reactive container, and runner context
         saved_output_view = current_view.output_view
         saved_reactive = self._reactive_container
+        from ..ui_blocks import get_current_runner
+        saved_runner = get_current_runner()
 
         # Temporarily redirect output to the target container
         current_view.output_view = target_container
         self._reactive_container = None
+
+        # Ensure runner context is set for ui() calls
+        set_current_runner(self)
 
         try:
             # Execute the callable - all ui() calls will go to target_container
@@ -1147,8 +1152,9 @@ class GUIRunner(Runner):
 
         except Exception as e:
             # Show error in the tab
+            import traceback
             error_text = ft.Text(
-                f"Error rendering tab content: {str(e)}",
+                f"Error rendering tab content: {str(e)}\n{traceback.format_exc()}",
                 color=ft.Colors.RED,
             )
             target_container.controls.append(error_text)
@@ -1156,9 +1162,10 @@ class GUIRunner(Runner):
                 self.page.update()
 
         finally:
-            # Restore original output view and reactive container
+            # Restore original output view, reactive container, and runner context
             current_view.output_view = saved_output_view
             self._reactive_container = saved_reactive
+            set_current_runner(saved_runner)
 
     def _component_to_text(self, component) -> str:
         """Convert UI component to text representation.
