@@ -38,13 +38,14 @@ def welcome_screen():
     Demonstrates a command that runs automatically when selected in the GUI.
     This is useful for dashboards or information-only screens.
     """
-    ui(tg.Md("""
+    # Shortcut: ui(str) renders as Markdown
+    ui("""
 # Welcome!
 
 This command runs **automatically** when selected because `is_auto_exec=True`.
 
 It's a great way to present initial information or a dashboard without requiring user interaction to click a "Run" button.
-"""))
+""")
 
 
 @app.command()
@@ -56,46 +57,55 @@ def basic_parameters(
     priority: Priority = Priority.MEDIUM,
 ):
     """Demonstrates string, integer, boolean, and enum parameters."""
-    ui(tg.Md(f"## Greeting for {name}"))
+    # Shortcut: ui(str) renders as Markdown
+    ui(f"## Greeting for {name}")
 
     greeting = f"Hello, {name}!"
     if excited:
         greeting += " How exciting!"
 
     for i in range(times):
-        ui(tg.Text(f"({i+1}/{times}) {greeting}"))
+        # Shortcut: ui(str) works for simple text too
+        ui(f"({i+1}/{times}) {greeting}")
 
-    ui(tg.Text(f"Task priority set to: {priority.value}"))
+    ui(f"Task priority set to: {priority.value}")
 
 
 @app.command()
 def output_types():
-    """Demonstrates mixing different component types and print statements."""
-    ui(tg.Md("# Mixed Content Example"))
+    """Demonstrates shortcuts and different output methods."""
+    # Shortcut: ui(str) renders as Markdown
+    ui("# Output Methods Demo")
+    ui()  # Empty line (shortcut for spacing)
 
     # Regular print() statements are captured and displayed
     print("This line comes from a standard print() statement.")
 
-    # Use a Text component for simple, unformatted text
-    ui(tg.Text("This line comes from a tg.Text() component."))
+    # Shortcut: ui(str) renders as Markdown
+    ui("This line uses the **ui(str)** shortcut.")
 
-    # Use a Markdown component for rich, formatted content
-    ui(tg.Md("""
+    # Shortcut: ui() with no args creates empty line
+    ui()
+
+    # Rich markdown content
+    ui("""
 ---
 ### Markdown Content
 You can use **bold**, *italic*, and `code` formatting.
 - Item 1
 - Item 2
-"""))
+""")
 
-    # Use a Table component for structured data
+    # Use Table component for structured data (no shortcut for this)
     ui(tg.Table(
-        title="Output Methods",
-        cols=["Output Type", "Method", "When to Use"],
+        title="Output Methods Comparison",
+        cols=["Method", "Code", "Use Case"],
         data=[
-            ["Plain text", "print() or tg.Text()", "Simple messages"],
-            ["Formatted", "tg.Md()", "Rich content"],
-            ["Tabular", "tg.Table()", "Structured data"],
+            ["Print", "print(...)", "Quick debugging, simple text"],
+            ["UI Shortcut", "ui(str)", "Markdown-formatted content"],
+            ["UI Empty", "ui()", "Add spacing/empty lines"],
+            ["UI Object", "ui(42)", "Display any object as text"],
+            ["Table", "ui(tg.Table(...))", "Structured data"],
         ]
     ))
 
@@ -104,7 +114,8 @@ You can use **bold**, *italic*, and `code` formatting.
 @ui.def_command(is_long=True)
 def long_running_task(steps: int = 5):
     """Demonstrates a long-running task with real-time table updates."""
-    ui(tg.Md(f"## Processing {steps} steps..."))
+    # Shortcut: ui(str) renders as Markdown
+    ui(f"## Processing {steps} steps...")
 
     # Use a context manager for progressive table updates
     with ui(tg.Table(cols=["Step", "Status"], data=[])) as table:
@@ -113,7 +124,7 @@ def long_running_task(steps: int = 5):
             time.sleep(0.8)
             table.update_cell(i - 1, 1, "[OK] Complete")  # Update status to complete
 
-    ui(tg.Md("[OK] **All steps completed!**"))
+    ui("[OK] **All steps completed!**")
 
 
 @app.command()
@@ -125,17 +136,17 @@ async def async_task(delay: float = 1.0):
     NOTE: Async commands are currently supported in CLI mode but not in GUI mode.
     In GUI mode, this command may not execute as expected.
     """
-    ui(tg.Md("## Async Task Started"))
-    ui(tg.Text(f"Waiting for {delay:.1f} seconds..."))
+    ui("## Async Task Started")
+    ui(f"Waiting for {delay:.1f} seconds...")
 
     await asyncio.sleep(delay)
 
-    ui(tg.Text("First delay complete."))
-    ui(tg.Text(f"Waiting for another {delay:.1f} seconds..."))
+    ui("First delay complete.")
+    ui(f"Waiting for another {delay:.1f} seconds...")
 
     await asyncio.sleep(delay)
 
-    ui(tg.Md("[OK] **Async task finished!**"))
+    ui("[OK] **Async task finished!**")
 
 
 if __name__ == "__main__":

@@ -26,9 +26,9 @@ def state_demo():
     """Demonstrates reactive UI components tied to state."""
     counter = ui.state(0)
     # --- Counter Example ---
-    ui(tg.Md("## 🔢 Counter"))
-    # Pattern 1: Return a UiBlock (lambda returning component)
-    ui(lambda: tg.Md(f"### **Current Count:** {counter.value}"), counter)
+    ui("## 🔢 Counter")
+    # Reactive shortcut: lambda returns string → auto-converted to Markdown
+    ui(lambda: f"### **Current Count:** {counter.value}", counter)
 
     ui(
         tg.Row(
@@ -61,7 +61,7 @@ def orders_demo():
     selected_order_id = ui.state(None)
 
     # --- Display List of Orders ---
-    ui(tg.Md("## 📦 Orders"))
+    ui("## 📦 Orders")
 
     # The table of orders. We add a "Select" link to each row.
     table_data = [
@@ -76,39 +76,35 @@ def orders_demo():
         for order in orders_data
     ]
     ui(tg.Table(cols=["ID", "Item", "Quantity", "Total", "Action"], data=table_data))
-    print()
-    ui(tg.Md("---"))
+    ui()  # Empty line shortcut
+    ui("---")
 
     # --- Display Details of Selected Order ---
-    ui(tg.Md("## ℹ️ Order Details"))
+    ui("## ℹ️ Order Details")
 
-    # Pattern 2: Call ui() internally (renderer calls ui() instead of returning)
-    # This is a reactive renderer that depends on `selected_order_id`.
+    # Reactive renderer that calls ui() internally with shortcuts
     # When `selected_order_id` changes, this function is re-executed.
     def render_order_details():
         order_id = selected_order_id.value
         if order_id is None:
-            ui(tg.Text("Select an order from the list above to see its details."))
+            # Shortcut: ui(str) renders as Markdown
+            ui("Select an order from the list above to see its details.")
             return
 
         # Find the selected order from the plain data list
         order = next((o for o in orders_data if o.id == order_id), None)
 
         if order is None:
-            ui(tg.Text(f"Error: Order with ID {order_id} not found."))
+            ui(f"Error: Order with ID {order_id} not found.")
             return
 
-        # Call ui() to display order details
-        ui(
-            tg.Md(
-                f"""
+        # Shortcut: ui(str) renders markdown
+        ui(f"""
 - **Order ID:** `{order.id}`
 - **Item:** {order.item}
 - **Quantity:** {order.quantity}
 - **Total:** ${order.total:.2f}
-        """
-            )
-        )
+        """)
 
     # The ui() call registers the dependency on the `selected_order_id` state
     ui(render_order_details, selected_order_id)
