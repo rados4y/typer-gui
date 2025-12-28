@@ -957,42 +957,22 @@ class GUIRunner(Runner):
     def _component_to_text(self, component) -> str:
         """Convert UI component to text representation.
 
+        Delegates to the component's to_text() method, which reuses
+        the component's show_cli() logic. This eliminates code duplication
+        and maintains separation of concerns.
+
         Args:
             component: UiBlock component
 
         Returns:
             Text representation of the component
         """
-        from ..ui_blocks import Text, Md, Table
+        from ..ui_blocks import UiBlock
 
-        if isinstance(component, Text):
-            return component.content
-        elif isinstance(component, Md):
-            # Strip markdown formatting for text output
-            import re
-            text = component.content
-            text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
-            text = re.sub(r'\*([^*]+)\*', r'\1', text)
-            text = re.sub(r'__([^_]+)__', r'\1', text)
-            text = re.sub(r'_([^_]+)_', r'\1', text)
-            text = re.sub(r'`([^`]+)`', r'\1', text)
-            text = re.sub(r'^#+\s+(.+)$', lambda m: m.group(1).upper(), text, flags=re.MULTILINE)
-            return text
-        elif isinstance(component, Table):
-            # Format table as text
-            lines = []
-            if component.title:
-                lines.append(component.title)
-                lines.append("")
-            # Column headers
-            lines.append(" | ".join(component.cols))
-            lines.append("-" * (sum(len(c) for c in component.cols) + 3 * (len(component.cols) - 1)))
-            # Data rows
-            for row in component.data:
-                lines.append(" | ".join(str(cell) for cell in row))
-            return "\n".join(lines)
+        if isinstance(component, UiBlock):
+            return component.to_text()
         else:
-            # For other components, try to get a simple string representation
+            # For non-UiBlock objects (strings, etc.)
             return str(component)
 
     def _append_text(self, text: str) -> None:

@@ -59,6 +59,32 @@ class UiBlock(ABC):
         """Serialize component to dict for REST API."""
         return {"type": self.__class__.__name__.lower()}
 
+    def to_text(self) -> str:
+        """Convert component to plain text representation.
+
+        This method reuses the component's show_cli() logic by capturing
+        its stdout output. Components can override this for better performance
+        or different text representation.
+
+        Returns:
+            Plain text representation of the component
+        """
+        import io
+        from contextlib import redirect_stdout
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            # Create a minimal mock runner just for text conversion
+            # We can't import CLIRunner here due to circular dependency,
+            # so we use a simple object with the required interface
+            class MockRunner:
+                channel = "cli"
+
+            mock_runner = MockRunner()
+            self.show_cli(mock_runner)
+
+        return buffer.getvalue().rstrip('\n')
+
     def is_gui_only(self) -> bool:
         """Whether this component should only appear in GUI mode."""
         return False
