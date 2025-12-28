@@ -76,7 +76,7 @@ def orders_demo():
         for order in orders_data
     ]
     ui(tg.Table(cols=["ID", "Item", "Quantity", "Total", "Action"], data=table_data))
-    ui(tg.Md("x"))
+    print()
     ui(tg.Md("---"))
 
     # --- Display Details of Selected Order ---

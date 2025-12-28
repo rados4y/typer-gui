@@ -23,6 +23,37 @@ def set_current_runner(runner):
     _current_runner = runner
 
 
+def to_component(value):
+    """Convert a value to a UiBlock component.
+
+    Handles automatic conversion:
+    - None → Text("") (empty line)
+    - str → Md(str) (markdown)
+    - UiBlock → unchanged
+    - any other object → Text(str(obj))
+
+    Args:
+        value: Value to convert
+
+    Returns:
+        UiBlock component
+    """
+    # Already a component - return as-is
+    if isinstance(value, UiBlock):
+        return value
+
+    # None → empty line
+    if value is None:
+        return Text("")
+
+    # String → Markdown
+    if isinstance(value, str):
+        return Md(value)
+
+    # Anything else → convert to string
+    return Text(str(value))
+
+
 class UiBlock(ABC):
     """Base class for all UI components.
 

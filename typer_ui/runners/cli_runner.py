@@ -143,11 +143,11 @@ class CLIRunner(Runner):
         # Execute the renderer - it will call ui() which will print
         result = renderer()
 
-        # If renderer returns a UiBlock, show it
+        # If renderer returns something, convert and show it
         if result is not None:
-            from ..ui_blocks import UiBlock
-            if isinstance(result, UiBlock):
-                self.show(result)
+            from ..ui_blocks import to_component
+            component = to_component(result)
+            self.show(component)
 
         # Return container and None (no flet_control in CLI)
         return container, None

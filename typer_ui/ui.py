@@ -63,15 +63,31 @@ class Ui:
         self.runner: Optional[Any] = None
         self.current_command: Optional[CommandSpec] = None
 
-    def __call__(self, component_or_renderer, *dependencies):
-        """Present a component and return it for further use.
-
-        Supports two patterns:
-        1. Normal: ui(component) - Display a component
-        2. Reactive: ui(renderer, state1, state2, ...) - Display and auto-update
+    def _to_component(self, value):
+        """Convert value to a UiBlock component.
 
         Args:
-            component_or_renderer: Component to display OR callable returning component
+            value: Value to convert (None, str, UiBlock, or any object)
+
+        Returns:
+            UiBlock component
+        """
+        from .ui_blocks import to_component
+        return to_component(value)
+
+    def __call__(self, component_or_renderer=None, *dependencies):
+        """Present a component and return it for further use.
+
+        Supports multiple patterns:
+        1. Normal: ui(component) - Display a component
+        2. Reactive: ui(renderer, state1, state2, ...) - Display and auto-update
+        3. Shortcut: ui() - Display empty line (like print())
+        4. Shortcut: ui(str) - Display string as Markdown
+        5. Shortcut: ui(obj) - Display object as text
+
+        Args:
+            component_or_renderer: Component to display OR callable returning component.
+                Can be None (empty line), str (markdown), or any object (converted to text)
             *dependencies: State objects this component depends on (reactive mode)
 
         Returns:
@@ -81,9 +97,14 @@ class Ui:
             >>> # Normal pattern
             >>> ui(tg.Text("Hello"))
             >>>
+            >>> # Shortcuts
+            >>> ui()  # Empty line
+            >>> ui("# Hello")  # Markdown
+            >>> ui(42)  # Prints "42"
+            >>>
             >>> # Reactive pattern with state
             >>> counter = ui.state(0)
-            >>> ui(lambda: tg.Text(f"Count: {counter.value}"), counter)
+            >>> ui(lambda: f"Count: {counter.value}", counter)  # Returns string → Markdown
             >>> counter.set(1)  # Automatically re-renders
             >>>
             >>> # Context manager
@@ -99,6 +120,10 @@ class Ui:
                 "ui() can only be called during command execution. "
                 "Ensure you're calling it from within a command function."
             )
+
+        # Auto-convert input to UiBlock if needed (unless it's a callable with dependencies)
+        if not (callable(component_or_renderer) and dependencies):
+            component_or_renderer = self._to_component(component_or_renderer)
 
         # Check if this is reactive pattern: ui(renderer, state1, state2, ...)
         if callable(component_or_renderer) and dependencies:

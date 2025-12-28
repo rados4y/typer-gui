@@ -292,11 +292,11 @@ class GUIRunner(Runner):
             # Execute renderer - all ui() calls go to container
             result = renderer()
 
-            # If renderer returns a UiBlock, add it to container
+            # If renderer returns something, convert and add it to container
             if result is not None:
-                from ..ui_blocks import UiBlock
-                if isinstance(result, UiBlock):
-                    self.add_to_reactive_container(result)
+                from ..ui_blocks import to_component
+                component = to_component(result)
+                self.add_to_reactive_container(component)
         finally:
             # Pop context
             self._reactive_contexts.pop()
@@ -365,11 +365,11 @@ class GUIRunner(Runner):
             # Re-execute renderer - fills container with new components
             result = renderer()
 
-            # If renderer returns a UiBlock, add it to container
+            # If renderer returns something, convert and add it to container
             if result is not None:
-                from ..ui_blocks import UiBlock
-                if isinstance(result, UiBlock):
-                    self.add_to_reactive_container(result)
+                from ..ui_blocks import to_component
+                component = to_component(result)
+                self.add_to_reactive_container(component)
         finally:
             # Pop context
             self._reactive_contexts.pop()
