@@ -912,7 +912,7 @@ class GUIRunner(Runner):
         exception = None
         output_lines = []  # Capture text output
 
-        # Temporarily replace show method to capture output
+        # Temporarily replace show method to capture and display output
         original_show = self.show
 
         def capturing_show(component):
@@ -920,27 +920,29 @@ class GUIRunner(Runner):
             text_repr = self._component_to_text(component)
             if text_repr:
                 output_lines.append(text_repr)
-            # Still show in GUI
+            # Show in GUI immediately
             original_show(component)
 
         self.show = capturing_show
 
-        # Buffered output
-        stdout_capture = io.StringIO()
+        # Create real-time writer for print() statements
+        # This displays print() output immediately while also capturing it
+        def display_print_line(line: str):
+            """Display and capture a line from print()."""
+            output_lines.append(line)
+            Text(line).show_gui(self)
+
+        stdout_writer = _RealTimeWriter(display_print_line)
         stderr_capture = io.StringIO()
 
         try:
-            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
                 result = command_spec.callback(**params)
 
-            stdout_text = stdout_capture.getvalue()
-            stderr_text = stderr_capture.getvalue()
+                # Flush any remaining buffered output
+                stdout_writer.flush()
 
-            if stdout_text:
-                # Convert print statements to Text components (including empty lines for spacing)
-                for line in stdout_text.rstrip('\n').split('\n'):
-                    output_lines.append(line)
-                    Text(line).show_gui(self)
+            stderr_text = stderr_capture.getvalue()
 
             if stderr_text:
                 stderr_msg = f"[STDERR]\n{stderr_text}"

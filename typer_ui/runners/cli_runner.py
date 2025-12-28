@@ -5,11 +5,55 @@ import inspect
 import sys
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 
 from .base import Runner
 from ..specs import AppSpec, CommandSpec
 from ..ui_blocks import Text, set_current_runner
+
+
+class _PassThroughWriter(StringIO):
+    """Custom writer that both captures and immediately displays output."""
+
+    def __init__(self, display_callback: Callable[[str], None]):
+        """Initialize the writer.
+
+        Args:
+            display_callback: Function to call with each line to display it
+        """
+        super().__init__()
+        self.display_callback = display_callback
+        self._buffer = ""
+
+    def write(self, text: str) -> int:
+        """Write text, capturing it and displaying complete lines immediately.
+
+        Args:
+            text: Text to write
+
+        Returns:
+            Number of characters written
+        """
+        # Capture in buffer for later retrieval
+        result = super().write(text)
+
+        # Also display immediately (line by line)
+        self._buffer += text
+
+        # Process complete lines
+        while '\n' in self._buffer:
+            line, self._buffer = self._buffer.split('\n', 1)
+            self.display_callback(line)
+
+        return result
+
+    def flush(self):
+        """Flush any remaining buffer."""
+        super().flush()
+        # Display any remaining partial line
+        if self._buffer:
+            self.display_callback(self._buffer)
+            self._buffer = ""
 
 
 class CLIRunner(Runner):
@@ -158,17 +202,15 @@ class CLIRunner(Runner):
         if self.ui:
             self.ui.current_command = command_spec
 
-        # Capture stdout/stderr and UI components
-        stdout_capture = StringIO()
-        stderr_capture = StringIO()
+        # Capture output lines for cmd.output property
         output_lines = []  # Capture rendered text output
 
-        # Temporarily replace show method to capture output
+        # Temporarily replace show method to capture and display output
         original_show = self.show
 
         def capturing_show(component):
             """Capture text representation while showing."""
-            # Capture the text output by temporarily redirecting stdout
+            # Capture the text output
             text_capture = StringIO()
             with redirect_stdout(text_capture):
                 # Call the component's show_cli directly
@@ -176,36 +218,39 @@ class CLIRunner(Runner):
             captured = text_capture.getvalue()
             if captured:
                 output_lines.append(captured.rstrip('\n'))
+                # Display immediately by printing directly (avoid double-capture)
+                print(captured.rstrip('\n'), file=sys.__stdout__)
 
         self.show = capturing_show
+
+        # Create pass-through writer for print() statements
+        # This displays print() output immediately while also capturing it
+        def display_print_line(line: str):
+            """Display a line from print() and capture it."""
+            output_lines.append(line)
+            # Print directly to avoid recursion (don't go through runner.show)
+            print(line, file=sys.__stdout__)
+
+        stdout_writer = _PassThroughWriter(display_print_line)
+        stderr_capture = StringIO()
 
         result = None
         exception = None
 
         try:
-            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
                 # Call the command callback directly
                 # Async commands are already wrapped by def_command decorator
                 result = command_spec.callback(**params)
 
+                # Flush any remaining buffered output
+                stdout_writer.flush()
+
         except Exception as e:
             exception = e
         finally:
-            # Restore original show method AFTER capturing output
+            # Restore original show method
             self.show = original_show
-
-        # Capture print statements as output lines
-        stdout_text = stdout_capture.getvalue()
-        if stdout_text:
-            # Add print statements to output (including empty lines)
-            for line in stdout_text.rstrip('\n').split('\n'):
-                output_lines.append(line)
-
-        # Print everything for display (using restored show method)
-        if stdout_text:
-            for line in stdout_text.rstrip('\n').split('\n'):
-                # Show all lines including empty ones for spacing
-                Text(line).show_cli(self)
 
         stderr_text = stderr_capture.getvalue()
         if stderr_text:
