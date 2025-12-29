@@ -660,12 +660,15 @@ class Tabs(UiBlock):
 
     def show_cli(self, runner) -> None:
         """Render tabs sequentially with separators in CLI."""
-        # Save and set runner context for callable execution
-        # Only set runner context if it's a real runner (has show method), not a MockRunner
+        # Save current runner context
         saved_runner = get_current_runner()
-        is_real_runner = hasattr(runner, 'show')
 
-        if is_real_runner:
+        # Detect if this is a MockRunner (used during to_text() conversion)
+        # MockRunner only has 'channel' attribute, not 'show' method
+        is_mock_runner = not hasattr(runner, 'show')
+
+        # Only set runner context if it's a real runner
+        if not is_mock_runner:
             set_current_runner(runner)
 
         try:
@@ -683,19 +686,19 @@ class Tabs(UiBlock):
                 # Render tab content
                 if callable(tab.content):
                     # Execute callable - it will use ui() to render content
-                    # If this is a MockRunner (during to_text()), skip callable execution
-                    # since it would fail without a proper runner context
-                    if is_real_runner:
+                    # Skip callable execution if this is a MockRunner (during to_text())
+                    # since callable would fail without a proper runner context
+                    if not is_mock_runner:
                         tab.content()
                     else:
-                        # During to_text(), just show a placeholder for callable content
-                        print("[Dynamic content - not available in text mode]")
+                        # During to_text(), show a placeholder for callable content
+                        print("[Dynamic content]")
                 else:
                     # Render UiBlock directly
                     tab.content.show_cli(runner)
         finally:
             # Restore original runner context only if we changed it
-            if is_real_runner:
+            if not is_mock_runner:
                 set_current_runner(saved_runner)
 
     def show_gui(self, runner) -> None:
