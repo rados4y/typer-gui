@@ -1129,15 +1129,13 @@ class GUIRunner(Runner):
         if not current_view:
             return
 
-        # Save current output view, reactive container, and runner context
+        # Save current output view and runner context
         saved_output_view = current_view.output_view
-        saved_reactive = self._reactive_container
         from ..ui_blocks import get_current_runner
         saved_runner = get_current_runner()
 
         # Temporarily redirect output to the target container
         current_view.output_view = target_container
-        self._reactive_container = None
 
         # Ensure runner context is set for ui() calls
         set_current_runner(self)
@@ -1162,9 +1160,8 @@ class GUIRunner(Runner):
                 self.page.update()
 
         finally:
-            # Restore original output view, reactive container, and runner context
+            # Restore original output view and runner context
             current_view.output_view = saved_output_view
-            self._reactive_container = saved_reactive
             set_current_runner(saved_runner)
 
     def _component_to_text(self, component) -> str:
