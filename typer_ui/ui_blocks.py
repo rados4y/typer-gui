@@ -661,8 +661,12 @@ class Tabs(UiBlock):
     def show_cli(self, runner) -> None:
         """Render tabs sequentially with separators in CLI."""
         # Save and set runner context for callable execution
+        # Only set runner context if it's a real runner (has show method), not a MockRunner
         saved_runner = get_current_runner()
-        set_current_runner(runner)
+        is_real_runner = hasattr(runner, 'show')
+
+        if is_real_runner:
+            set_current_runner(runner)
 
         try:
             for i, tab in enumerate(self.tabs):
@@ -679,13 +683,20 @@ class Tabs(UiBlock):
                 # Render tab content
                 if callable(tab.content):
                     # Execute callable - it will use ui() to render content
-                    tab.content()
+                    # If this is a MockRunner (during to_text()), skip callable execution
+                    # since it would fail without a proper runner context
+                    if is_real_runner:
+                        tab.content()
+                    else:
+                        # During to_text(), just show a placeholder for callable content
+                        print("[Dynamic content - not available in text mode]")
                 else:
                     # Render UiBlock directly
                     tab.content.show_cli(runner)
         finally:
-            # Restore original runner context
-            set_current_runner(saved_runner)
+            # Restore original runner context only if we changed it
+            if is_real_runner:
+                set_current_runner(saved_runner)
 
     def show_gui(self, runner) -> None:
         """Render tabs as Flet Tabs widget."""
