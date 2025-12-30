@@ -409,7 +409,7 @@ class Row(Container):
         for child in self.children:
             if isinstance(child, UiBlock):
                 if not child.is_gui_only():
-                    runner.show(child)
+                    child.show_cli(runner)
             else:
                 print(str(child))
 
@@ -456,7 +456,7 @@ class Column(Container):
     def show_cli(self, runner) -> None:
         for child in self.children:
             if isinstance(child, UiBlock):
-                runner.show(child)
+                child.show_cli(runner)
 
     def show_gui(self, runner) -> None:
         import flet as ft
