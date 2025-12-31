@@ -117,7 +117,7 @@ class GUIRunner(Runner):
         Args:
             component: UiBlock component to update
         """
-        from ..ui_blocks import Table  # Avoid circular import
+        from ..ui_blocks import Table, DataTable  # Avoid circular import
 
         # --- Smarter update for Table component ---
         if isinstance(component, Table) and component.flet_control:
@@ -141,6 +141,13 @@ class GUIRunner(Runner):
             ]
             if self.page:
                 self.page.update()
+            return  # Smart update complete
+
+        # --- Smarter update for DataTable component ---
+        if isinstance(component, DataTable) and component.flet_control:
+            # DataTable handles its own updates in show_gui()
+            # Just call show_gui() which will update rows, pagination, sort indicators, etc.
+            component.show_gui(self)
             return  # Smart update complete
 
         # --- Fallback to old logic for other components ---

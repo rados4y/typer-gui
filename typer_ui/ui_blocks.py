@@ -7,6 +7,7 @@ import re
 
 if TYPE_CHECKING:
     import flet as ft
+    from .data_source import DataSource
 
 # Global reference to current runner (set by runner during command execution)
 _current_runner = None
@@ -114,7 +115,7 @@ class UiBlock(ABC):
             mock_runner = MockRunner()
             self.show_cli(mock_runner)
 
-        return buffer.getvalue().rstrip('\n')
+        return buffer.getvalue().rstrip("\n")
 
     def is_gui_only(self) -> bool:
         """Whether this component should only appear in GUI mode."""
@@ -130,7 +131,7 @@ class Container(UiBlock, ABC):
 
     def __init__(self):
         # Only initialize children if not already set by dataclass
-        if not hasattr(self, 'children'):
+        if not hasattr(self, "children"):
             self.children: List[UiBlock] = []
         self._context_active = False
         self._runner = None
@@ -189,6 +190,7 @@ class Container(UiBlock, ABC):
 # Simple Components
 # ============================================================================
 
+
 @dataclass
 class Text(UiBlock):
     """Display plain text."""
@@ -200,6 +202,7 @@ class Text(UiBlock):
 
     def show_gui(self, runner) -> None:
         import flet as ft
+
         runner.add_to_output(ft.Text(self.content, selectable=True), component=self)
 
     def to_dict(self) -> dict:
@@ -215,24 +218,29 @@ class Md(UiBlock):
     def show_cli(self, runner) -> None:
         # Strip markdown formatting for CLI
         text = self.content
-        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
-        text = re.sub(r'\*([^*]+)\*', r'\1', text)
-        text = re.sub(r'__([^_]+)__', r'\1', text)
-        text = re.sub(r'_([^_]+)_', r'\1', text)
-        text = re.sub(r'`([^`]+)`', r'\1', text)
-        text = re.sub(r'^#+\s+(.+)$', lambda m: m.group(1).upper(), text, flags=re.MULTILINE)
+        text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+        text = re.sub(r"\*([^*]+)\*", r"\1", text)
+        text = re.sub(r"__([^_]+)__", r"\1", text)
+        text = re.sub(r"_([^_]+)_", r"\1", text)
+        text = re.sub(r"`([^`]+)`", r"\1", text)
+        text = re.sub(
+            r"^#+\s+(.+)$", lambda m: m.group(1).upper(), text, flags=re.MULTILINE
+        )
         print(text)
 
     def show_gui(self, runner) -> None:
         import flet as ft
+
         runner.add_to_output(
             ft.Markdown(
                 self.content,
                 selectable=True,
                 extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-                on_tap_link=lambda e: runner.page.launch_url(e.data) if runner.page else None,
+                on_tap_link=lambda e: (
+                    runner.page.launch_url(e.data) if runner.page else None
+                ),
             ),
-            component=self
+            component=self,
         )
 
     def to_dict(self) -> dict:
@@ -242,6 +250,7 @@ class Md(UiBlock):
 # ============================================================================
 # Data Display Components
 # ============================================================================
+
 
 @dataclass
 class Table(Container):
@@ -259,7 +268,7 @@ class Table(Container):
         super().__init__()
         self.flet_control: Optional["ft.DataTable"] = None
 
-    def add_row(self, row: Union[List[Any], 'Row']) -> None:
+    def add_row(self, row: Union[List[Any], "Row"]) -> None:
         """Add a row to the table.
 
         Args:
@@ -281,7 +290,9 @@ class Table(Container):
             col_index: Column index (0-based)
             value: New cell value
         """
-        if 0 <= row_index < len(self.data) and 0 <= col_index < len(self.data[row_index]):
+        if 0 <= row_index < len(self.data) and 0 <= col_index < len(
+            self.data[row_index]
+        ):
             self.data[row_index][col_index] = value
             self._update()
 
@@ -297,7 +308,7 @@ class Table(Container):
         def cell_to_str(cell):
             if isinstance(cell, UiBlock):
                 # For GUI-only components, show their text if available
-                if hasattr(cell, 'text'):
+                if hasattr(cell, "text"):
                     return f"[{cell.text}]"
                 else:
                     return "[UI Component]"
@@ -321,7 +332,11 @@ class Table(Container):
         # Rows
         for row in self.data:
             row_line = " | ".join(
-                cell_to_str(cell).ljust(col_widths[i]) if i < len(col_widths) else cell_to_str(cell)
+                (
+                    cell_to_str(cell).ljust(col_widths[i])
+                    if i < len(col_widths)
+                    else cell_to_str(cell)
+                )
                 for i, cell in enumerate(row)
             )
             lines.append(row_line)
@@ -349,9 +364,7 @@ class Table(Container):
                     return ft.Text(str(cell))
 
             data_rows = [
-                ft.DataRow(
-                    cells=[ft.DataCell(cell_to_control(cell)) for cell in row]
-                )
+                ft.DataRow(cells=[ft.DataCell(cell_to_control(cell)) for cell in row])
                 for row in self.data
             ]
 
@@ -365,10 +378,12 @@ class Table(Container):
 
             if self.title:
                 # If there's a title, wrap the table in a Column
-                control_to_add = ft.Column([
-                    ft.Text(self.title, size=16, weight=ft.FontWeight.BOLD),
-                    self.flet_control,
-                ])
+                control_to_add = ft.Column(
+                    [
+                        ft.Text(self.title, size=16, weight=ft.FontWeight.BOLD),
+                        self.flet_control,
+                    ]
+                )
             else:
                 control_to_add = self.flet_control
 
@@ -387,6 +402,7 @@ class Table(Container):
 # Layout Components
 # ============================================================================
 
+
 @dataclass
 class Row(Container):
     """Display components horizontally."""
@@ -396,7 +412,7 @@ class Row(Container):
     def __post_init__(self):
         """Initialize Container attributes after dataclass init."""
         # Only call super().__init__() if not already initialized
-        if not hasattr(self, '_context_active'):
+        if not hasattr(self, "_context_active"):
             super().__init__()
 
     def add(self, child: UiBlock) -> None:
@@ -425,7 +441,9 @@ class Row(Container):
             else:
                 controls.append(ft.Text(str(child)))
 
-        runner.add_to_output(ft.Row(controls=controls, spacing=10, wrap=True), component=self)
+        runner.add_to_output(
+            ft.Row(controls=controls, spacing=10, wrap=True), component=self
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -445,7 +463,7 @@ class Column(Container):
 
     def __post_init__(self):
         """Initialize Container attributes after dataclass init."""
-        if not hasattr(self, '_context_active'):
+        if not hasattr(self, "_context_active"):
             super().__init__()
 
     def add(self, child: UiBlock) -> None:
@@ -475,6 +493,7 @@ class Column(Container):
 # Interactive Components
 # ============================================================================
 
+
 @dataclass
 class Button(UiBlock):
     """Interactive button that executes an action (GUI only)."""
@@ -503,7 +522,7 @@ class Button(UiBlock):
             finally:
                 set_current_runner(saved_runner)
             # Optionally refresh runner
-            if hasattr(runner, 'refresh'):
+            if hasattr(runner, "refresh"):
                 runner.refresh()
 
         runner.add_to_output(
@@ -512,7 +531,7 @@ class Button(UiBlock):
                 icon=icon_obj,
                 on_click=handle_click,
             ),
-            component=self
+            component=self,
         )
 
     def is_gui_only(self) -> bool:
@@ -556,7 +575,7 @@ class Link(UiBlock):
                 icon=ft.Icons.LINK,
                 on_click=handle_click,
             ),
-            component=self
+            component=self,
         )
 
     def is_gui_only(self) -> bool:
@@ -607,7 +626,7 @@ class TextInput(UiBlock):
         runner.add_to_output(textfield)
 
         # Store reference for later access if needed
-        if hasattr(runner, 'register_control'):
+        if hasattr(runner, "register_control"):
             runner.register_control(self, textfield)
 
     def to_dict(self) -> dict:
@@ -629,17 +648,19 @@ class Tab:
 
     Args:
         label: Tab label/title
-        content: Either a UiBlock component or a callable that builds content using ui()
+        content: Either a UiBlock component, a callable that builds content using ui(), or a string (converted to markdown)
     """
+
     label: str
-    content: Union[UiBlock, Callable]
+    content: Union[UiBlock, Callable, str, Any]
 
     def __post_init__(self):
-        """Validate the tab configuration."""
-        if not callable(self.content) and not isinstance(self.content, UiBlock):
-            raise ValueError(
-                f"Tab content must be a UiBlock or callable, got {type(self.content)}"
-            )
+        """Validate and convert tab content."""
+        if not callable(self.content):
+            # Convert non-callable content to a UiBlock component
+            # This handles strings (→ Md), None (→ Text("")), and other values
+            if not isinstance(self.content, UiBlock):
+                self.content = to_component(self.content)
 
 
 @dataclass
@@ -649,6 +670,7 @@ class Tabs(UiBlock):
     Args:
         tabs: List of Tab objects
     """
+
     tabs: List[Tab]
 
     def __post_init__(self):
@@ -665,7 +687,7 @@ class Tabs(UiBlock):
 
         # Detect if this is a MockRunner (used during to_text() conversion)
         # MockRunner only has 'channel' attribute, not 'show' method
-        is_mock_runner = not hasattr(runner, 'show')
+        is_mock_runner = not hasattr(runner, "show")
 
         # Only set runner context if it's a real runner
         if not is_mock_runner:
@@ -744,10 +766,7 @@ class Tabs(UiBlock):
             flet_tabs.append(flet_tab)
 
         # Create Tabs widget
-        tabs_widget = ft.Tabs(
-            tabs=flet_tabs,
-            animation_duration=300,
-        )
+        tabs_widget = ft.Tabs(tabs=flet_tabs, animation_duration=300, height=100)
 
         runner.add_to_output(tabs_widget)
 
@@ -757,8 +776,356 @@ class Tabs(UiBlock):
             "tabs": [
                 {
                     "label": tab.label,
-                    "content": tab.content.to_dict() if isinstance(tab.content, UiBlock) else "<callable>"
+                    "content": (
+                        tab.content.to_dict()
+                        if isinstance(tab.content, UiBlock)
+                        else "<callable>"
+                    ),
                 }
                 for tab in self.tabs
             ],
+        }
+
+
+# ============================================================================
+# DataTable Component
+# ============================================================================
+
+
+@dataclass
+class DataTable(Container):
+    """Advanced table with dynamic data loading, pagination, sorting, and filtering.
+
+    Unlike the basic Table component which holds all data in memory, DataTable
+    fetches data on-demand from a DataSource, supporting large datasets efficiently.
+
+    Features:
+    - Pagination with configurable page size
+    - Column sorting (ascending/descending)
+    - Full-text filtering/search
+    - Displays total count and current page info
+
+    Example:
+        class UserDataSource(tu.DataSource):
+            def fetch(self, offset, limit, sort_by=None, ascending=True, filter_text=None):
+                # Fetch from database/API
+                return rows, total_count
+
+        table = tu.DataTable(
+            cols=["Name", "Email", "Role"],
+            page_size=25,
+            title="User Directory"
+        )
+        table.set_data_source(UserDataSource())
+        ui(table)
+    """
+
+    cols: List[str]
+    page_size: int = 25
+    title: Optional[str] = None
+    initial_sort_by: Optional[str] = None
+    initial_sort_desc: bool = False
+
+    def __post_init__(self):
+        """Initialize Container and state variables."""
+        super().__init__()
+
+        # Internal state
+        self._current_page: int = 0
+        self._sort_column: Optional[str] = self.initial_sort_by
+        self._sort_ascending: bool = not self.initial_sort_desc
+        self._filter_text: str = ""
+        self._data_cache: List[List[Any]] = []
+        self._total_count: int = 0
+        self._data_source: Optional["DataSource"] = None
+
+        # GUI control caching
+        self.flet_control: Optional["ft.DataTable"] = None
+        self.flet_filter_field: Optional["ft.TextField"] = None
+        self.flet_pagination_prev: Optional["ft.IconButton"] = None
+        self.flet_pagination_next: Optional["ft.IconButton"] = None
+        self.flet_pagination_info: Optional["ft.Text"] = None
+
+    def set_data_source(self, source: "DataSource") -> None:
+        """Set the data source and load the first page.
+
+        Args:
+            source: DataSource implementation
+        """
+        self._data_source = source
+        self._load_data()
+
+    def _load_data(self) -> None:
+        """Fetch data from the data source with current state."""
+        if not self._data_source:
+            return
+
+        offset = self._current_page * self.page_size
+
+        self._data_cache, self._total_count = self._data_source.fetch(
+            offset=offset,
+            limit=self.page_size,
+            sort_by=self._sort_column,
+            ascending=self._sort_ascending,
+            filter_text=self._filter_text if self._filter_text else None,
+        )
+
+        # Update display if already presented
+        self._update()
+
+    def next_page(self) -> None:
+        """Navigate to the next page if available."""
+        max_page = (self._total_count - 1) // self.page_size if self._total_count > 0 else 0
+        if self._current_page < max_page:
+            self._current_page += 1
+            self._load_data()
+
+    def prev_page(self) -> None:
+        """Navigate to the previous page if available."""
+        if self._current_page > 0:
+            self._current_page -= 1
+            self._load_data()
+
+    def sort_by(self, column: str) -> None:
+        """Sort by the specified column, toggling direction if already sorted.
+
+        Args:
+            column: Column name to sort by
+        """
+        if self._sort_column == column:
+            # Toggle direction
+            self._sort_ascending = not self._sort_ascending
+        else:
+            # New column, default to ascending
+            self._sort_column = column
+            self._sort_ascending = True
+
+        # Reset to first page when sorting changes
+        self._current_page = 0
+        self._load_data()
+
+    def set_filter(self, text: str) -> None:
+        """Set the filter text and reload from first page.
+
+        Args:
+            text: Filter/search text
+        """
+        self._filter_text = text
+        self._current_page = 0  # Reset to first page
+        self._load_data()
+
+    def _get_pagination_info(self) -> str:
+        """Get pagination info string (e.g., 'showing 1-25 of 247')."""
+        if self._total_count == 0:
+            return "No records found"
+
+        start = self._current_page * self.page_size + 1
+        end = min(start + len(self._data_cache) - 1, self._total_count)
+        total_pages = (self._total_count - 1) // self.page_size + 1
+        current_page = self._current_page + 1
+
+        return f"Page {current_page} of {total_pages} (showing {start}-{end} of {self._total_count})"
+
+    def show_cli(self, runner) -> None:
+        """Render as ASCII table with pagination and filter info."""
+        lines = []
+
+        # Title
+        if self.title:
+            lines.append("")
+            lines.append(self.title)
+            lines.append("=" * len(self.title))
+
+        # Filter info
+        if self._filter_text:
+            lines.append(f"Filter: {self._filter_text}")
+
+        # Pagination info
+        lines.append(self._get_pagination_info())
+        lines.append("")
+
+        # Calculate column widths
+        col_widths = [len(h) for h in self.cols]
+        for row in self._data_cache:
+            for i, cell in enumerate(row):
+                if i < len(col_widths):
+                    col_widths[i] = max(col_widths[i], len(str(cell)))
+
+        # Header
+        header_line = " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(self.cols))
+        lines.append(header_line)
+        lines.append("-" * len(header_line))
+
+        # Data rows
+        for row in self._data_cache:
+            row_line = " | ".join(
+                str(cell).ljust(col_widths[i]) if i < len(col_widths) else str(cell)
+                for i, cell in enumerate(row)
+            )
+            lines.append(row_line)
+
+        # Sort indicator
+        if self._sort_column:
+            direction = "ASC" if self._sort_ascending else "DESC"
+            lines.append("")
+            lines.append(f"Sorted by: {self._sort_column} ({direction})")
+
+        # Navigation hint
+        lines.append("")
+        lines.append("[<< prev | next >>]")
+
+        print("\n".join(lines))
+
+    def show_gui(self, runner) -> None:
+        """Render with Flet DataTable and interactive controls."""
+        import flet as ft
+
+        # First render - create all controls
+        if self.flet_control is None:
+            # Create filter field
+            def handle_filter_change(e):
+                self.set_filter(e.control.value)
+
+            self.flet_filter_field = ft.TextField(
+                label="Search",
+                prefix_icon=ft.Icons.SEARCH,
+                on_change=handle_filter_change,
+                dense=True,
+            )
+
+            # Create sortable columns
+            columns = []
+            for col_name in self.cols:
+
+                def make_sort_handler(column):
+                    def handle_sort(e):
+                        self.sort_by(column)
+
+                    return handle_sort
+
+                # Create column header with sort indicator
+                header_text = col_name
+                if self._sort_column == col_name:
+                    header_text += " ↑" if self._sort_ascending else " ↓"
+
+                columns.append(
+                    ft.DataColumn(
+                        ft.TextButton(
+                            text=header_text,
+                            on_click=make_sort_handler(col_name),
+                        )
+                    )
+                )
+
+            # Create DataTable
+            self.flet_control = ft.DataTable(
+                columns=columns,
+                rows=[],
+                border=ft.border.all(1, ft.Colors.GREY_400),
+                border_radius=10,
+                horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_300),
+            )
+
+            # Create pagination controls
+            def handle_prev(e):
+                self.prev_page()
+
+            def handle_next(e):
+                self.next_page()
+
+            self.flet_pagination_prev = ft.IconButton(
+                icon=ft.Icons.NAVIGATE_BEFORE,
+                on_click=handle_prev,
+                tooltip="Previous page",
+            )
+
+            self.flet_pagination_next = ft.IconButton(
+                icon=ft.Icons.NAVIGATE_NEXT,
+                on_click=handle_next,
+                tooltip="Next page",
+            )
+
+            self.flet_pagination_info = ft.Text(
+                value=self._get_pagination_info(),
+                size=12,
+            )
+
+            pagination_row = ft.Row(
+                controls=[
+                    self.flet_pagination_prev,
+                    self.flet_pagination_info,
+                    self.flet_pagination_next,
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=10,
+            )
+
+            # Build complete layout
+            container = ft.Column(
+                controls=[
+                    self.flet_filter_field,
+                    ft.Container(
+                        content=self.flet_control,
+                        border=ft.border.all(1, ft.Colors.GREY_400),
+                        border_radius=10,
+                        padding=10,
+                    ),
+                    pagination_row,
+                ],
+                spacing=10,
+            )
+
+            # Wrap with title if provided
+            if self.title:
+                final_control = ft.Column(
+                    controls=[
+                        ft.Text(self.title, size=16, weight=ft.FontWeight.BOLD),
+                        container,
+                    ],
+                    spacing=10,
+                )
+            else:
+                final_control = container
+
+            runner.add_to_output(final_control, component=self)
+
+        # Update data rows
+        self.flet_control.rows = [
+            ft.DataRow(cells=[ft.DataCell(ft.Text(str(cell))) for cell in row])
+            for row in self._data_cache
+        ]
+
+        # Update column headers with sort indicators
+        for i, col_name in enumerate(self.cols):
+            header_text = col_name
+            if self._sort_column == col_name:
+                header_text += " ↑" if self._sort_ascending else " ↓"
+            self.flet_control.columns[i].label.text = header_text
+
+        # Update pagination info
+        self.flet_pagination_info.value = self._get_pagination_info()
+
+        # Update button states
+        self.flet_pagination_prev.disabled = self._current_page == 0
+        max_page = (
+            (self._total_count - 1) // self.page_size if self._total_count > 0 else 0
+        )
+        self.flet_pagination_next.disabled = self._current_page >= max_page
+
+        # Refresh page
+        if runner.page:
+            runner.page.update()
+
+    def to_dict(self) -> dict:
+        return {
+            "type": "data_table",
+            "cols": self.cols,
+            "page_size": self.page_size,
+            "title": self.title,
+            "current_page": self._current_page,
+            "sort_column": self._sort_column,
+            "sort_ascending": self._sort_ascending,
+            "filter_text": self._filter_text,
+            "total_count": self._total_count,
+            "data": self._data_cache,
         }

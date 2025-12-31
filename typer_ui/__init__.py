@@ -4,6 +4,7 @@ from .spec_builder import build_app_spec
 from .state import State
 from .ui_app import UiApp, UICommand
 from .output import ui, text, dx
+from .data_source import DataSource
 from .ui_blocks import (
     UiBlock,
     Container,
@@ -17,6 +18,7 @@ from .ui_blocks import (
     TextInput,
     Tab,
     Tabs,
+    DataTable,
 )
 
 __version__ = "0.2.0"
@@ -28,11 +30,13 @@ __all__ = [
     "ui",
     "text",
     "dx",
+    "DataSource",
     "UiBlock",
     "Container",
     "Text",
     "Md",
     "Table",
+    "DataTable",
     "Row",
     "Column",
     "Button",
