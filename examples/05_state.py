@@ -2,11 +2,12 @@
 
 from dataclasses import dataclass
 import typer
-import typer_ui as tg
+import typer_ui as tu
+from typer_ui import ui, text, dx
 
-app = typer.Typer()
-ui = tg.Ui(
-    app,
+typer_app = typer.Typer()
+app = tu.UiApp(
+    typer_app,
     title="State Management Demo",
     description="Demonstrates reactive UI based on application state.",
 )
@@ -20,33 +21,33 @@ class Order:
     total: float
 
 
-@app.command()
-@ui.def_command(auto=True, header=False)
+@typer_app.command()
+@app.def_command(auto=True, header=False)
 def state_demo():
     """Demonstrates reactive UI components tied to state."""
-    counter = ui.state(0)
+    counter = app.state(0)
     # --- Counter Example ---
     ui("## 🔢 Counter")
     # Reactive shortcut: lambda returns string → auto-converted to Markdown
-    ui(lambda: f"### **Current Count:** {counter.value}", counter)
+    ui(dx(lambda: f"### **Current Count:** {counter.value}", counter))
 
     ui(
-        tg.Row(
+        tu.Row(
             [
-                tg.Button(
+                tu.Button(
                     "Increment +", on_click=lambda: counter.set(counter.value + 1)
                 ),
-                tg.Button(
+                tu.Button(
                     "Decrement -", on_click=lambda: counter.set(counter.value - 1)
                 ),
-                tg.Button("Reset", on_click=lambda: counter.set(0)),
+                tu.Button("Reset", on_click=lambda: counter.set(0)),
             ]
         )
     )
 
 
-@app.command()
-@ui.def_command(auto=True, header=False)
+@typer_app.command()
+@app.def_command(auto=True, header=False)
 def orders_demo():
     """Demonstrates a master-detail view using state."""
 
@@ -58,7 +59,7 @@ def orders_demo():
     ]
 
     # The ID of the currently selected order is the only state we need
-    selected_order_id = ui.state(None)
+    selected_order_id = app.state(None)
 
     # --- Display List of Orders ---
     ui("## 📦 Orders")
@@ -71,11 +72,11 @@ def orders_demo():
             order.quantity,
             f"${order.total:.2f}",
             # This Link modifies the `selected_order_id` state on click
-            tg.Link("Select", on_click=lambda o=order: selected_order_id.set(o)),
+            tu.Link("Select", on_click=lambda o=order: selected_order_id.set(o)),
         ]
         for order in orders_data
     ]
-    ui(tg.Table(cols=["ID", "Item", "Quantity", "Total", "Action"], data=table_data))
+    ui(tu.Table(cols=["ID", "Item", "Quantity", "Total", "Action"], data=table_data))
     ui()  # Empty line shortcut
     ui("---")
 
@@ -101,9 +102,9 @@ def orders_demo():
         """
         )
 
-    # The ui() call registers the dependency on the `selected_order_id` state
-    ui(render_order_details, selected_order_id)
+    # The dx() call wraps the renderer and dependencies, ui() displays it
+    ui(dx(render_order_details, selected_order_id))
 
 
 if __name__ == "__main__":
-    ui.app()
+    app()

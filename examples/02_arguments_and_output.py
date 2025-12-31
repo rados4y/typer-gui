@@ -13,43 +13,47 @@ import time
 from enum import Enum
 
 import typer
-import typer_ui as tg
+import typer_ui as tu
+from typer_ui import ui, text, dx
 
-app = typer.Typer()
-ui = tg.Ui(
-    app,
+typer_app = typer.Typer()
+app = tu.UiApp(
+    typer_app,
     title="Parameters & Outputs",
-    description="Demonstrates arguments, UI components, and async commands."
+    description="Demonstrates arguments, UI components, and async commands.",
 )
 
 
 class Priority(str, Enum):
     """Priority levels for tasks."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     URGENT = "urgent"
 
 
-@app.command()
-@ui.def_command(auto=True)
+@typer_app.command()
+@app.def_command(auto=True)
 def welcome_screen():
     """
     Demonstrates a command that runs automatically when selected in the GUI.
     This is useful for dashboards or information-only screens.
     """
     # Shortcut: ui(str) renders as Markdown
-    ui("""
+    ui(
+        """
 # Welcome!
 
 This command runs **automatically** when selected because `auto=True`.
 
 It's a great way to present initial information or a dashboard without requiring user interaction to click a "Run" button.
-""")
+"""
+    )
 
 
-@app.command()
-@ui.def_command(button=True)
+@typer_app.command()
+@app.def_command(button=True)
 def basic_parameters(
     name: str,
     times: int = 1,
@@ -71,7 +75,7 @@ def basic_parameters(
     ui(f"Task priority set to: {priority.value}")
 
 
-@app.command()
+@typer_app.command()
 def output_types():
     """Demonstrates shortcuts and different output methods."""
     # Shortcut: ui(str) renders as Markdown
@@ -88,37 +92,41 @@ def output_types():
     ui()
 
     # Rich markdown content
-    ui("""
+    ui(
+        """
 ---
 ### Markdown Content
 You can use **bold**, *italic*, and `code` formatting.
 - Item 1
 - Item 2
-""")
+"""
+    )
 
     # Use Table component for structured data (no shortcut for this)
-    ui(tg.Table(
-        title="Output Methods Comparison",
-        cols=["Method", "Code", "Use Case"],
-        data=[
-            ["Print", "print(...)", "Quick debugging, simple text"],
-            ["UI Shortcut", "ui(str)", "Markdown-formatted content"],
-            ["UI Empty", "ui()", "Add spacing/empty lines"],
-            ["UI Object", "ui(42)", "Display any object as text"],
-            ["Table", "ui(tg.Table(...))", "Structured data"],
-        ]
-    ))
+    ui(
+        tu.Table(
+            title="Output Methods Comparison",
+            cols=["Method", "Code", "Use Case"],
+            data=[
+                ["Print", "print(...)", "Quick debugging, simple text"],
+                ["UI Shortcut", "ui(str)", "Markdown-formatted content"],
+                ["UI Empty", "ui()", "Add spacing/empty lines"],
+                ["UI Object", "ui(42)", "Display any object as text"],
+                ["Table", "ui(tu.Table(...))", "Structured data"],
+            ],
+        )
+    )
 
 
-@app.command()
-@ui.def_command(long=True)
+@typer_app.command()
+@app.def_command(long=True)
 def long_running_task(steps: int = 5):
     """Demonstrates a long-running task with real-time table updates."""
     # Shortcut: ui(str) renders as Markdown
     ui(f"## Processing {steps} steps...")
 
     # Use a context manager for progressive table updates
-    with ui(tg.Table(cols=["Step", "Status"], data=[])) as table:
+    with ui(tu.Table(cols=["Step", "Status"], data=[])) as table:
         for i in range(1, steps + 1):
             table.add_row([f"Step {i}/{steps}", "In Progress..."])
             time.sleep(0.8)
@@ -127,8 +135,8 @@ def long_running_task(steps: int = 5):
     ui("[OK] **All steps completed!**")
 
 
-@app.command()
-@ui.def_command(long=True)
+@typer_app.command()
+@app.def_command(long=True)
 async def async_task(delay: float = 1.0):
     """
     Demonstrates an async command.
@@ -150,7 +158,7 @@ async def async_task(delay: float = 1.0):
 
 
 if __name__ == "__main__":
-    ui.app()
+    app()
 
 
 """

@@ -1,19 +1,20 @@
-"""Example 4: Application Control with ui.command() API
+"""Example 4: Application Control with app.command() API
 
 This example demonstrates:
-- ui.command("name").run(**kwargs) - Execute with output capture
-- ui.command("name").include(**kwargs) - Execute inline
-- ui.command("name").select() - Select a command (GUI mode)
+- app.command("name").run(**kwargs) - Execute with output capture
+- app.command("name").include(**kwargs) - Execute inline
+- app.command("name").select() - Select a command (GUI mode)
 """
 
 import typer
-import typer_ui as tg
+import typer_ui as tu
+from typer_ui import ui, text, dx
 
-app = typer.Typer()
-ui = tg.Ui(
-    app,
+typer_app = typer.Typer()
+app = tu.UiApp(
+    typer_app,
     title="App Control Demo",
-    description="Interactive demo of ui.command() operations",
+    description="Interactive demo of app.command() operations",
 )
 
 
@@ -22,20 +23,20 @@ ui = tg.Ui(
 # ============================================================================
 
 
-@app.command()
+@typer_app.command()
 def fetch_data(source: str = "database"):
     """Fetch data from a source."""
-    ui(tg.Md(f"### Fetching from {source}"))
-    ui(tg.Md(f"- Fetched 150 records from {source}"))
+    ui(f"### Fetching from {source}")
+    ui(f"- Fetched 150 records from {source}")
     return {"records": 150, "source": source}
 
 
-@app.command()
+@typer_app.command()
 def generate_report():
     """Generate a final report."""
-    ui(tg.Md("### Final Report"))
+    ui("### Final Report")
     ui(
-        tg.Table(
+        tu.Table(
             cols=["Metric", "Value"],
             data=[
                 ["Total Records", "150"],
@@ -53,66 +54,64 @@ def generate_report():
 # ============================================================================
 
 
-@app.command()
-@ui.def_command(auto=True)
+@typer_app.command()
+@app.def_command(auto=True)
 def control_demo():
     """Interactive demo of run(), include(), and select()."""
-    ui(tg.Md("# Command Control Demo"))
-    ui(tg.Md("Click buttons to see how each method works:"))
-    ui(tg.Md("---"))
+    ui("# Command Control Demo")
+    ui("Click buttons to see how each method works:")
+    ui("---")
 
     # Interactive buttons
     ui(
-        tg.Row(
+        tu.Row(
             [
-                tg.Button(
+                tu.Button(
                     "Demo .run()",
-                    on_click=lambda: ui.command("fetch-data").run(source="api"),
+                    on_click=lambda: app.command("fetch-data").run(source="api"),
                 ),
-                tg.Button(
+                tu.Button(
                     "Demo .include()",
-                    on_click=lambda: ui.command("generate-report").include(),
+                    on_click=lambda: app.command("generate-report").include(),
                 ),
-                tg.Button(
+                tu.Button(
                     "Demo .clear()",
-                    on_click=lambda: ui.command().clear(),
+                    on_click=lambda: app.command().clear(),
                 ),
-                tg.Button(
-                    "Demo .select()", on_click=lambda: ui.command("fetch-data").select()
+                tu.Button(
+                    "Demo .select()", on_click=lambda: app.command("fetch-data").select()
                 ),
             ]
         )
     )
 
-    ui(tg.Md("---"))
+    ui("---")
     ui(
-        tg.Md(
-            """
+        """
 ### Quick Reference
 
 **`.run(**kwargs)`** - Execute and capture output separately
 ```python
-cmd = ui.command("fetch-data").run(source="api")
+cmd = app.command("fetch-data").run(source="api")
 output = cmd.out      # Captured text output
 result = cmd.result   # Return value
 ```
 
 **`.include(**kwargs)`** - Execute inline (output appears in current context)
 ```python
-result = ui.command("generate-report").include()
+result = app.command("generate-report").include()
 ```
 
 **`.select()`** - Select command in GUI (changes form)
 ```python
-ui.command("fetch-data").select()
+app.command("fetch-data").select()
 ```
     """
-        )
     )
 
 
 if __name__ == "__main__":
-    ui.app()
+    app()
 
 
 """
