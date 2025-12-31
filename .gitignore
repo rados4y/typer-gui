@@ -146,3 +146,4 @@ cython_debug/
 # Project specific
 uv.lock
 .claude/
+nul

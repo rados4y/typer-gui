@@ -66,22 +66,6 @@ class CommandUiSpec:
     on_select: Optional[Callable] = None
     """Callback function called when command is selected in GUI"""
 
-    # Backward compatibility aliases (deprecated)
-    @property
-    def is_button(self) -> bool:
-        """Deprecated: use 'button' instead"""
-        return self.button
-
-    @property
-    def is_long(self) -> bool:
-        """Deprecated: use 'long' instead"""
-        return self.long
-
-    @property
-    def is_auto_exec(self) -> bool:
-        """Deprecated: use 'auto' instead"""
-        return self.auto
-
 
 @dataclass(frozen=True)
 class CommandSpec:

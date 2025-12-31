@@ -2,7 +2,8 @@
 
 from .spec_builder import build_app_spec
 from .state import State
-from .ui import Ui
+from .ui_app import UiApp, UICommand
+from .output import ui, text, dx
 from .ui_blocks import (
     UiBlock,
     Container,
@@ -17,13 +18,16 @@ from .ui_blocks import (
     Tab,
     Tabs,
 )
-from .ui_app import UICommand
 
 __version__ = "0.2.0"
 __all__ = [
     "build_app_spec",
     "State",
-    "Ui",
+    "UiApp",
+    "UICommand",
+    "ui",
+    "text",
+    "dx",
     "UiBlock",
     "Container",
     "Text",
@@ -36,5 +40,4 @@ __all__ = [
     "TextInput",
     "Tab",
     "Tabs",
-    "UICommand",
 ]

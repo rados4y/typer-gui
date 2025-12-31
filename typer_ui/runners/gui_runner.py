@@ -530,7 +530,7 @@ class GUIRunner(Runner):
             async def handle_click(e, command=cmd):
                 await self._select_command(command)
 
-            if cmd.ui_spec.is_button:
+            if cmd.ui_spec.button:
                 btn = ft.ElevatedButton(
                     text=cmd.name,
                     on_click=handle_click,
@@ -583,7 +583,7 @@ class GUIRunner(Runner):
 
         # Clear output for non-long-running tasks on selection
         # Long-running tasks keep their output for review
-        if not command.ui_spec.is_long and selected_view.output_view:
+        if not command.ui_spec.long and selected_view.output_view:
             if selected_view.output_view.controls:
                 selected_view.output_view.controls.clear()
 
@@ -592,7 +592,7 @@ class GUIRunner(Runner):
 
         # Auto-execute only if this is the first time selecting this command
         # (Check if output is empty to avoid re-running on switch back)
-        if command.ui_spec.is_auto_exec and selected_view.output_view:
+        if command.ui_spec.auto and selected_view.output_view:
             if not selected_view.output_view.controls:
                 await self._run_command()
 
@@ -644,7 +644,7 @@ class GUIRunner(Runner):
         )
 
         # Buttons row
-        if not command.ui_spec.is_auto_exec:
+        if not command.ui_spec.auto:
             async def handle_run(e):
                 await self._run_command()
 
@@ -659,7 +659,7 @@ class GUIRunner(Runner):
             buttons = [run_button]
 
             # Add Clear button for long-running tasks
-            if command.ui_spec.is_long:
+            if command.ui_spec.long:
                 async def handle_clear(e):
                     # Clear output and re-run
                     if view.output_view:
@@ -889,7 +889,7 @@ class GUIRunner(Runner):
         # Check if the callback has an original async function stored
         original_async = getattr(command_spec.callback, '_original_async_func', None)
         is_async = inspect.iscoroutinefunction(command_spec.callback) or original_async is not None
-        is_long = command_spec.ui_spec.is_long
+        is_long = command_spec.ui_spec.long
 
         if is_long:
             # Mode 3: Execute in background thread with immediate updates
