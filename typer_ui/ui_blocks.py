@@ -61,21 +61,31 @@ class UiBlock(ABC):
     Each component contains all presentation logic for every channel in a single class.
     """
 
+    def __init__(self):
+        """Initialize the UI block with hierarchy support."""
+        # Parent-child hierarchy (for new architecture)
+        self._parent: Optional['UiBlock'] = None
+        self._children: List['UiBlock'] = []
+
+        # Context and control references (for new architecture)
+        self._ctx: Optional[Any] = None  # UIRunnerCtx instance
+        self._flet_control: Optional[Any] = None  # ft.Control for GUI
+
     @abstractmethod
-    def show_cli(self, runner) -> None:
-        """Render the component for CLI output.
+    def build_cli(self, ctx) -> Any:
+        """Build component for CLI (returns Rich renderable).
 
         Args:
-            runner: CLIRunner instance with helper methods
+            ctx: CLI runner context
         """
         pass
 
     @abstractmethod
-    def show_gui(self, runner) -> None:
-        """Render the component for GUI output.
+    def build_gui(self, ctx) -> Any:
+        """Build component for GUI (returns Flet control).
 
         Args:
-            runner: GUIRunner instance with Flet page and output view
+            ctx: GUI runner context
         """
         pass
 
@@ -103,23 +113,62 @@ class UiBlock(ABC):
         """
         import io
         from contextlib import redirect_stdout
+        from rich.console import Console
 
         buffer = io.StringIO()
-        with redirect_stdout(buffer):
-            # Create a minimal mock runner just for text conversion
-            # We can't import CLIRunner here due to circular dependency,
-            # so we use a simple object with the required interface
-            class MockRunner:
-                channel = "cli"
+        console = Console(file=buffer, force_terminal=False)
 
-            mock_runner = MockRunner()
-            self.show_cli(mock_runner)
+        # Use CLIRunnerCtx to build the component
+        from .runners.cli_context import CLIRunnerCtx
+        ctx = CLIRunnerCtx()
+        ctx.console = console
+
+        # Build and render
+        renderable = self.build_cli(ctx)
+        console.print(renderable)
 
         return buffer.getvalue().rstrip("\n")
 
     def is_gui_only(self) -> bool:
         """Whether this component should only appear in GUI mode."""
         return False
+
+    # Hierarchy management methods (for new architecture)
+    @property
+    def parent(self) -> Optional['UiBlock']:
+        """Get parent component."""
+        return self._parent
+
+    @property
+    def children(self) -> List['UiBlock']:
+        """Get child components."""
+        return self._children
+
+    @children.setter
+    def children(self, value: List['UiBlock']) -> None:
+        """Set child components."""
+        self._children = value
+
+    def add_child(self, child: 'UiBlock') -> None:
+        """Add child and establish parent-child relationship.
+
+        Args:
+            child: The child component to add
+        """
+        child._parent = self
+        if child not in self._children:
+            self._children.append(child)
+
+    def get_root(self) -> 'UiBlock':
+        """Get root component by walking up the hierarchy.
+
+        Returns:
+            The root component (has no parent)
+        """
+        current = self
+        while current._parent:
+            current = current._parent
+        return current
 
 
 class Container(UiBlock, ABC):
@@ -130,6 +179,9 @@ class Container(UiBlock, ABC):
     """
 
     def __init__(self):
+        # Initialize parent class
+        super().__init__()
+
         # Only initialize children if not already set by dataclass
         if not hasattr(self, "children"):
             self.children: List[UiBlock] = []
@@ -154,9 +206,11 @@ class Container(UiBlock, ABC):
         self._context_active = True
         self._runner = get_current_runner()
 
-        # If not already presented, show initial state
+        # Mark as presented for update tracking
+        # Note: The container is already in the ui_stack via ui() call
+        # It will be built and displayed when stack is processed
         if not self._presented and self._runner:
-            self._runner.show(self)
+            self._mark_presented(self._runner)
 
         return self
 
@@ -169,21 +223,16 @@ class Container(UiBlock, ABC):
     def _update(self) -> None:
         """Update display if presented or in context manager.
 
-        Checks in priority order:
-        1. Context manager runner (if active)
-        2. Presentation runner (if component was presented via ui())
+        In the new architecture, components update by calling page.update()
+        on their context's page. The Flet control is already in the page,
+        so we just need to refresh it.
         """
-        runner = None
-
-        # Context manager takes priority
-        if self._context_active and self._runner:
-            runner = self._runner
-        # Fallback to presentation runner
-        elif self._presented and self._presentation_runner:
-            runner = self._presentation_runner
-
-        if runner:
-            runner.update(self)
+        # New architecture: use _ctx if available
+        if self._ctx and hasattr(self._ctx, 'page'):
+            # Component's Flet control is already in the page
+            # Just trigger a page refresh to show updates
+            if self._ctx.page:
+                self._ctx.page.update()
 
 
 # ============================================================================
@@ -197,16 +246,36 @@ class Text(UiBlock):
 
     content: str
 
-    def show_cli(self, runner) -> None:
-        print(self.content)
-
-    def show_gui(self, runner) -> None:
-        import flet as ft
-
-        runner.add_to_output(ft.Text(self.content, selectable=True), component=self)
+    def __post_init__(self):
+        """Initialize parent class after dataclass fields."""
+        UiBlock.__init__(self)
 
     def to_dict(self) -> dict:
         return {"type": "text", "content": self.content}
+
+    def build_cli(self, ctx) -> Any:
+        """Build Text for CLI (returns Rich Text).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Text renderable
+        """
+        from rich.text import Text as RichText
+        return RichText(self.content)
+
+    def build_gui(self, ctx) -> Any:
+        """Build Text for GUI (returns Flet Text).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet Text control
+        """
+        import flet as ft
+        return ft.Text(self.content, selectable=True)
 
 
 @dataclass
@@ -215,36 +284,41 @@ class Md(UiBlock):
 
     content: str
 
-    def show_cli(self, runner) -> None:
-        # Strip markdown formatting for CLI
-        text = self.content
-        text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
-        text = re.sub(r"\*([^*]+)\*", r"\1", text)
-        text = re.sub(r"__([^_]+)__", r"\1", text)
-        text = re.sub(r"_([^_]+)_", r"\1", text)
-        text = re.sub(r"`([^`]+)`", r"\1", text)
-        text = re.sub(
-            r"^#+\s+(.+)$", lambda m: m.group(1).upper(), text, flags=re.MULTILINE
-        )
-        print(text)
-
-    def show_gui(self, runner) -> None:
-        import flet as ft
-
-        runner.add_to_output(
-            ft.Markdown(
-                self.content,
-                selectable=True,
-                extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-                on_tap_link=lambda e: (
-                    runner.page.launch_url(e.data) if runner.page else None
-                ),
-            ),
-            component=self,
-        )
+    def __post_init__(self):
+        """Initialize parent class after dataclass fields."""
+        UiBlock.__init__(self)
 
     def to_dict(self) -> dict:
         return {"type": "markdown", "content": self.content}
+
+    def build_cli(self, ctx) -> Any:
+        """Build Markdown for CLI (returns Rich Markdown).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Markdown renderable
+        """
+        from rich.markdown import Markdown
+        return Markdown(self.content)
+
+    def build_gui(self, ctx) -> Any:
+        """Build Markdown for GUI (returns Flet Markdown).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet Markdown control
+        """
+        import flet as ft
+        return ft.Markdown(
+            self.content,
+            selectable=True,
+            extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
+            on_tap_link=lambda e: print(f"Link tapped: {e.data}"),
+        )
 
 
 # ============================================================================
@@ -280,6 +354,23 @@ class Table(Container):
             row_data = row
 
         self.data.append(row_data)
+
+        # New architecture: if ctx and flet_control exist, add row progressively
+        if self._ctx and self._flet_control:
+            import flet as ft
+
+            # Build cells using ctx.build_child for new architecture
+            cells = []
+            for cell in row_data:
+                if isinstance(cell, UiBlock):
+                    cell_control = self._ctx.build_child(self, cell)
+                else:
+                    cell_control = ft.Text(str(cell))
+                cells.append(ft.DataCell(cell_control))
+
+            # Append to existing table
+            self._flet_control.rows.append(ft.DataRow(cells=cells))
+
         self._update()
 
     def update_cell(self, row_index: int, col_index: int, value: Any) -> None:
@@ -296,99 +387,6 @@ class Table(Container):
             self.data[row_index][col_index] = value
             self._update()
 
-    def show_cli(self, runner) -> None:
-        lines = []
-
-        if self.title:
-            lines.append(self.title)
-            lines.append("=" * len(self.title))
-            lines.append("")
-
-        # Helper function to get CLI-friendly cell representation
-        def cell_to_str(cell):
-            if isinstance(cell, UiBlock):
-                # For GUI-only components, show their text if available
-                if hasattr(cell, "text"):
-                    return f"[{cell.text}]"
-                else:
-                    return "[UI Component]"
-            else:
-                return str(cell)
-
-        # Calculate column widths
-        col_widths = [len(h) for h in self.cols]
-        for row in self.data:
-            for i, cell in enumerate(row):
-                if i < len(col_widths):
-                    col_widths[i] = max(col_widths[i], len(cell_to_str(cell)))
-
-        # Header
-        header_line = " | ".join(
-            h.ljust(col_widths[i]) for i, h in enumerate(self.cols)
-        )
-        lines.append(header_line)
-        lines.append("-" * len(header_line))
-
-        # Rows
-        for row in self.data:
-            row_line = " | ".join(
-                (
-                    cell_to_str(cell).ljust(col_widths[i])
-                    if i < len(col_widths)
-                    else cell_to_str(cell)
-                )
-                for i, cell in enumerate(row)
-            )
-            lines.append(row_line)
-
-        print("\n".join(lines))
-
-    def show_gui(self, runner) -> None:
-        import flet as ft
-
-        # On first render, create the control and add it to the output
-        if self.flet_control is None:
-            columns = [
-                ft.DataColumn(ft.Text(header, weight=ft.FontWeight.BOLD))
-                for header in self.cols
-            ]
-
-            # Helper function to convert cell to Flet control
-            def cell_to_control(cell):
-                if isinstance(cell, UiBlock):
-                    # Render UI component to Flet control
-                    control = runner.render_to_control(cell)
-                    return control if control else ft.Text("")
-                else:
-                    # Convert to text
-                    return ft.Text(str(cell))
-
-            data_rows = [
-                ft.DataRow(cells=[ft.DataCell(cell_to_control(cell)) for cell in row])
-                for row in self.data
-            ]
-
-            self.flet_control = ft.DataTable(
-                columns=columns,
-                rows=data_rows,
-                border=ft.border.all(1, ft.Colors.GREY_400),
-                border_radius=10,
-                horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_300),
-            )
-
-            if self.title:
-                # If there's a title, wrap the table in a Column
-                control_to_add = ft.Column(
-                    [
-                        ft.Text(self.title, size=16, weight=ft.FontWeight.BOLD),
-                        self.flet_control,
-                    ]
-                )
-            else:
-                control_to_add = self.flet_control
-
-            runner.add_to_output(control_to_add, component=self)
-
     def to_dict(self) -> dict:
         return {
             "type": "table",
@@ -396,6 +394,85 @@ class Table(Container):
             "data": self.data,
             "title": self.title,
         }
+
+    def build_cli(self, ctx) -> Any:
+        """Build Table for CLI (returns Rich Table).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Table renderable
+        """
+        from rich.table import Table as RichTable
+
+        table = RichTable(show_header=True, header_style="bold magenta", title=self.title)
+
+        # Add columns
+        for col in self.cols:
+            table.add_column(col, style="cyan")
+
+        # Add rows - convert cells to strings
+        for row in self.data:
+            cells = []
+            for cell in row:
+                if isinstance(cell, UiBlock):
+                    # Use build_cli for UiBlock cells
+                    renderable = ctx.build_child(self, cell)
+                    # Convert to string for table cell
+                    cells.append(str(renderable))
+                else:
+                    cells.append(str(cell))
+            table.add_row(*cells)
+
+        return table
+
+    def build_gui(self, ctx) -> Any:
+        """Build Table for GUI (returns Flet DataTable).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet DataTable control (or Column if title is present)
+        """
+        import flet as ft
+
+        columns = [
+            ft.DataColumn(ft.Text(header, weight=ft.FontWeight.BOLD))
+            for header in self.cols
+        ]
+
+        # Build cells - can be UIBlocks or plain values
+        def cell_to_control(cell):
+            if isinstance(cell, UiBlock):
+                return ctx.build_child(self, cell)
+            else:
+                return ft.Text(str(cell))
+
+        data_rows = [
+            ft.DataRow(cells=[ft.DataCell(cell_to_control(cell)) for cell in row])
+            for row in self.data
+        ]
+
+        self._flet_control = ft.DataTable(
+            columns=columns,
+            rows=data_rows,
+            border=ft.border.all(1, ft.Colors.GREY_400),
+            border_radius=10,
+            horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_300),
+        )
+
+        if self.title:
+            # If there's a title, wrap the table in a Column
+            return ft.Column(
+                [
+                    ft.Text(self.title, size=16, weight=ft.FontWeight.BOLD),
+                    self._flet_control,
+                ]
+            )
+        else:
+            return self._flet_control
 
 
 # ============================================================================
@@ -411,39 +488,23 @@ class Row(Container):
 
     def __post_init__(self):
         """Initialize Container attributes after dataclass init."""
+        # Store the children list from dataclass field before calling super().__init__()
+        # because dataclass sets self.children directly, bypassing the property setter
+        children_from_dataclass = self.children if hasattr(self, 'children') else []
+
         # Only call super().__init__() if not already initialized
         if not hasattr(self, "_context_active"):
             super().__init__()
+
+        # Now set children properly through the property setter
+        # This ensures self._children gets populated
+        if children_from_dataclass:
+            self.children = children_from_dataclass
 
     def add(self, child: UiBlock) -> None:
         """Add a child component to the row."""
         self.children.append(child)
         self._update()
-
-    def show_cli(self, runner) -> None:
-        # CLI shows children vertically (no horizontal layout in terminal)
-        for child in self.children:
-            if isinstance(child, UiBlock):
-                if not child.is_gui_only():
-                    child.show_cli(runner)
-            else:
-                print(str(child))
-
-    def show_gui(self, runner) -> None:
-        import flet as ft
-
-        controls = []
-        for child in self.children:
-            if isinstance(child, UiBlock):
-                control = runner.render_to_control(child)
-                if control:
-                    controls.append(control)
-            else:
-                controls.append(ft.Text(str(child)))
-
-        runner.add_to_output(
-            ft.Row(controls=controls, spacing=10, wrap=True), component=self
-        )
 
     def to_dict(self) -> dict:
         return {
@@ -454,6 +515,43 @@ class Row(Container):
             ],
         }
 
+    def build_cli(self, ctx) -> Any:
+        """Build Row for CLI (returns Rich Group - vertical in CLI).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Group renderable
+        """
+        from rich.console import Group
+
+        # CLI shows children vertically (no horizontal layout in terminal)
+        renderables = []
+        for child in self.children:
+            if isinstance(child, UiBlock) and not child.is_gui_only():
+                renderable = ctx.build_child(self, child)
+                renderables.append(renderable)
+            elif not isinstance(child, UiBlock):
+                from rich.text import Text as RichText
+                renderables.append(RichText(str(child)))
+
+        return Group(*renderables) if renderables else ""
+
+    def build_gui(self, ctx) -> Any:
+        """Build Row for GUI (returns Flet Row).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet Row control
+        """
+        import flet as ft
+
+        controls = [ctx.build_child(self, child) for child in self.children]
+        return ft.Row(controls=controls, spacing=10, wrap=True)
+
 
 @dataclass
 class Column(Container):
@@ -463,30 +561,57 @@ class Column(Container):
 
     def __post_init__(self):
         """Initialize Container attributes after dataclass init."""
+        # Store the children list from dataclass field before calling super().__init__()
+        # because dataclass sets self.children directly, bypassing the property setter
+        children_from_dataclass = self.children if hasattr(self, 'children') else []
+
+        # Only call super().__init__() if not already initialized
         if not hasattr(self, "_context_active"):
             super().__init__()
+
+        # Now set children properly through the property setter
+        # This ensures self._children gets populated
+        if children_from_dataclass:
+            self.children = children_from_dataclass
 
     def add(self, child: UiBlock) -> None:
         """Add a child component to the column."""
         self.children.append(child)
         self._update()
 
-    def show_cli(self, runner) -> None:
-        for child in self.children:
-            if isinstance(child, UiBlock):
-                child.show_cli(runner)
-
-    def show_gui(self, runner) -> None:
-        import flet as ft
-
-        controls = [runner.render_to_control(child) for child in self.children]
-        runner.add_to_output(ft.Column(controls=controls, spacing=10), component=self)
-
     def to_dict(self) -> dict:
         return {
             "type": "column",
             "children": [child.to_dict() for child in self.children],
         }
+
+    def build_cli(self, ctx) -> Any:
+        """Build Column for CLI (returns Rich Group - vertical layout).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Group renderable
+        """
+        from rich.console import Group
+
+        renderables = [ctx.build_child(self, child) for child in self.children]
+        return Group(*renderables) if renderables else ""
+
+    def build_gui(self, ctx) -> Any:
+        """Build Column for GUI (returns Flet Column).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet Column control
+        """
+        import flet as ft
+
+        controls = [ctx.build_child(self, child) for child in self.children]
+        return ft.Column(controls=controls, spacing=10)
 
 
 # ============================================================================
@@ -502,37 +627,9 @@ class Button(UiBlock):
     on_click: Callable
     icon: Optional[str] = None
 
-    def show_cli(self, runner) -> None:
-        # Buttons don't render in CLI
-        pass
-
-    def show_gui(self, runner) -> None:
-        import flet as ft
-
-        icon_obj = None
-        if self.icon:
-            icon_obj = getattr(ft.Icons, self.icon.upper(), None)
-
-        def handle_click(e):
-            # Set runner context for callback execution
-            saved_runner = get_current_runner()
-            set_current_runner(runner)
-            try:
-                self.on_click()
-            finally:
-                set_current_runner(saved_runner)
-            # Optionally refresh runner
-            if hasattr(runner, "refresh"):
-                runner.refresh()
-
-        runner.add_to_output(
-            ft.ElevatedButton(
-                text=self.text,
-                icon=icon_obj,
-                on_click=handle_click,
-            ),
-            component=self,
-        )
+    def __post_init__(self):
+        """Initialize parent class after dataclass fields."""
+        UiBlock.__init__(self)
 
     def is_gui_only(self) -> bool:
         return True
@@ -545,6 +642,50 @@ class Button(UiBlock):
             "action_id": id(self.on_click),  # Can't serialize callback
         }
 
+    def build_cli(self, ctx) -> Any:
+        """Build Button for CLI (returns empty string - GUI only).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Empty string (buttons don't render in CLI)
+        """
+        return ""
+
+    def build_gui(self, ctx) -> Any:
+        """Build Button for GUI (returns Flet ElevatedButton).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet ElevatedButton control
+        """
+        import flet as ft
+
+        icon_obj = None
+        if self.icon:
+            icon_obj = getattr(ft.Icons, self.icon.upper(), None)
+
+        def handle_click(e):
+            # Set runner context for callback execution
+            saved_runner = get_current_runner()
+            # Try to get runner from ctx if available
+            runner = getattr(ctx, 'runner', None)
+            if runner:
+                set_current_runner(runner)
+            try:
+                self.on_click()
+            finally:
+                set_current_runner(saved_runner)
+
+        return ft.ElevatedButton(
+            text=self.text,
+            icon=icon_obj,
+            on_click=handle_click,
+        )
+
 
 @dataclass
 class Link(UiBlock):
@@ -553,30 +694,9 @@ class Link(UiBlock):
     text: str
     on_click: Callable
 
-    def show_cli(self, runner) -> None:
-        # Links don't render in CLI
-        pass
-
-    def show_gui(self, runner) -> None:
-        import flet as ft
-
-        def handle_click(e):
-            # Set runner context for callback execution
-            saved_runner = get_current_runner()
-            set_current_runner(runner)
-            try:
-                self.on_click()
-            finally:
-                set_current_runner(saved_runner)
-
-        runner.add_to_output(
-            ft.TextButton(
-                text=self.text,
-                icon=ft.Icons.LINK,
-                on_click=handle_click,
-            ),
-            component=self,
-        )
+    def __post_init__(self):
+        """Initialize parent class after dataclass fields."""
+        UiBlock.__init__(self)
 
     def is_gui_only(self) -> bool:
         return True
@@ -588,6 +708,45 @@ class Link(UiBlock):
             "action_id": id(self.on_click),
         }
 
+    def build_cli(self, ctx) -> Any:
+        """Build Link for CLI (returns empty string - GUI only).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Empty string (links don't render in CLI)
+        """
+        return ""
+
+    def build_gui(self, ctx) -> Any:
+        """Build Link for GUI (returns Flet TextButton).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet TextButton control
+        """
+        import flet as ft
+
+        def handle_click(e):
+            # Set runner context for callback execution
+            saved_runner = get_current_runner()
+            runner = getattr(ctx, 'runner', None)
+            if runner:
+                set_current_runner(runner)
+            try:
+                self.on_click()
+            finally:
+                set_current_runner(saved_runner)
+
+        return ft.TextButton(
+            text=self.text,
+            icon=ft.Icons.LINK,
+            on_click=handle_click,
+        )
+
 
 @dataclass
 class TextInput(UiBlock):
@@ -597,37 +756,9 @@ class TextInput(UiBlock):
     value: str = ""
     on_change: Optional[Callable[[str], None]] = None
 
-    def show_cli(self, runner) -> None:
-        # Prompt for input in CLI
-        new_value = input(f"{self.label}: ") or self.value
-        self.value = new_value
-        if self.on_change:
-            self.on_change(new_value)
-
-    def show_gui(self, runner) -> None:
-        import flet as ft
-
-        def handle_change(e):
-            self.value = e.control.value
-            if self.on_change:
-                # Set runner context for callback execution
-                saved_runner = get_current_runner()
-                set_current_runner(runner)
-                try:
-                    self.on_change(e.control.value)
-                finally:
-                    set_current_runner(saved_runner)
-
-        textfield = ft.TextField(
-            label=self.label,
-            value=self.value,
-            on_change=handle_change,
-        )
-        runner.add_to_output(textfield)
-
-        # Store reference for later access if needed
-        if hasattr(runner, "register_control"):
-            runner.register_control(self, textfield)
+    def __post_init__(self):
+        """Initialize parent class after dataclass fields."""
+        UiBlock.__init__(self)
 
     def to_dict(self) -> dict:
         return {
@@ -635,6 +766,50 @@ class TextInput(UiBlock):
             "label": self.label,
             "value": self.value,
         }
+
+    def build_cli(self, ctx) -> Any:
+        """Build TextInput for CLI (returns Rich Text - prompts for input).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Text renderable with input result
+        """
+        from rich.text import Text as RichText
+        # Note: In CLI mode, this would typically use input() during show_cli
+        # For build_cli, we just return the current state
+        return RichText(f"{self.label}: {self.value}")
+
+    def build_gui(self, ctx) -> Any:
+        """Build TextInput for GUI (returns Flet TextField).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet TextField control
+        """
+        import flet as ft
+
+        def handle_change(e):
+            self.value = e.control.value
+            if self.on_change:
+                # Set runner context for callback execution
+                saved_runner = get_current_runner()
+                runner = getattr(ctx, 'runner', None)
+                if runner:
+                    set_current_runner(runner)
+                try:
+                    self.on_change(e.control.value)
+                finally:
+                    set_current_runner(saved_runner)
+
+        return ft.TextField(
+            label=self.label,
+            value=self.value,
+            on_change=handle_change,
+        )
 
 
 # ============================================================================
@@ -675,100 +850,11 @@ class Tabs(UiBlock):
 
     def __post_init__(self):
         """Validate tabs configuration."""
+        UiBlock.__init__(self)
         if not self.tabs:
             raise ValueError("Tabs must contain at least one tab")
         if not all(isinstance(tab, Tab) for tab in self.tabs):
             raise ValueError("All items must be Tab objects")
-
-    def show_cli(self, runner) -> None:
-        """Render tabs sequentially with separators in CLI."""
-        # Save current runner context
-        saved_runner = get_current_runner()
-
-        # Detect if this is a MockRunner (used during to_text() conversion)
-        # MockRunner only has 'channel' attribute, not 'show' method
-        is_mock_runner = not hasattr(runner, "show")
-
-        # Only set runner context if it's a real runner
-        if not is_mock_runner:
-            set_current_runner(runner)
-
-        try:
-            for i, tab in enumerate(self.tabs):
-                # Add spacing between tabs
-                if i > 0:
-                    print()
-
-                # Print tab header
-                separator = "=" * len(tab.label)
-                print(f"\n{separator}")
-                print(tab.label)
-                print(f"{separator}\n")
-
-                # Render tab content
-                if callable(tab.content):
-                    # Execute callable - it will use ui() to render content
-                    # Skip callable execution if this is a MockRunner (during to_text())
-                    # since callable would fail without a proper runner context
-                    if not is_mock_runner:
-                        tab.content()
-                    else:
-                        # During to_text(), show a placeholder for callable content
-                        print("[Dynamic content]")
-                else:
-                    # Render UiBlock directly
-                    tab.content.show_cli(runner)
-        finally:
-            # Restore original runner context only if we changed it
-            if not is_mock_runner:
-                set_current_runner(saved_runner)
-
-    def show_gui(self, runner) -> None:
-        """Render tabs as Flet Tabs widget."""
-        import flet as ft
-
-        flet_tabs = []
-
-        for tab in self.tabs:
-            # Create content for this tab
-            if callable(tab.content):
-                # For callable content, we need to capture ui() calls
-                # Create a container to hold the content
-                content_column = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
-
-                # Execute the callable in a context that captures output
-                runner._execute_tab_content(tab.content, content_column)
-                tab_content = content_column
-            else:
-                # For UiBlock content, render it into a container
-                content_column = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
-
-                # Get current view and temporarily redirect output to this container
-                current_view = runner._get_current_view()
-                if current_view:
-                    saved_output_view = current_view.output_view
-                    current_view.output_view = content_column
-                    try:
-                        tab.content.show_gui(runner)
-                    finally:
-                        current_view.output_view = saved_output_view
-
-                tab_content = content_column
-
-            # Create Flet Tab
-            flet_tab = ft.Tab(
-                text=tab.label,
-                content=ft.Container(
-                    content=tab_content,
-                    padding=10,
-                ),
-            )
-            flet_tabs.append(flet_tab)
-
-        # Create Tabs widget
-        tabs_widget = ft.Tabs(tabs=flet_tabs, animation_duration=300, height=100)
-
-        runner.add_to_output(tabs_widget)
 
     def to_dict(self) -> dict:
         return {
@@ -785,6 +871,63 @@ class Tabs(UiBlock):
                 for tab in self.tabs
             ],
         }
+
+    def build_cli(self, ctx) -> Any:
+        """Build Tabs for CLI (returns Rich Group - sequential rendering).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Group renderable
+        """
+        from rich.console import Group
+        from rich.text import Text as RichText
+        from rich.rule import Rule
+
+        renderables = []
+        for i, tab in enumerate(self.tabs):
+            # Add spacing between tabs
+            if i > 0:
+                renderables.append(RichText(""))
+
+            # Tab header
+            renderables.append(Rule(tab.label))
+
+            # Tab content - use ctx.build_child to handle all content types
+            content = ctx.build_child(self, tab.content)
+            renderables.append(content)
+
+        return Group(*renderables)
+
+    def build_gui(self, ctx) -> Any:
+        """Build Tabs for GUI (returns Flet Tabs).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet Tabs control
+        """
+        import flet as ft
+
+        flet_tabs = []
+        for tab in self.tabs:
+            # Use ctx.build_child to handle all content types (string/callable/UIBlock)
+            tab_content = ctx.build_child(self, tab.content)
+
+            # Create Flet Tab
+            flet_tab = ft.Tab(
+                text=tab.label,
+                content=ft.Container(
+                    content=tab_content,
+                    padding=10,
+                ),
+            )
+            flet_tabs.append(flet_tab)
+
+        # Create Tabs widget
+        return ft.Tabs(tabs=flet_tabs, animation_duration=300)
 
 
 # ============================================================================
@@ -926,196 +1069,6 @@ class DataTable(Container):
 
         return f"Page {current_page} of {total_pages} (showing {start}-{end} of {self._total_count})"
 
-    def show_cli(self, runner) -> None:
-        """Render as ASCII table with pagination and filter info."""
-        lines = []
-
-        # Title
-        if self.title:
-            lines.append("")
-            lines.append(self.title)
-            lines.append("=" * len(self.title))
-
-        # Filter info
-        if self._filter_text:
-            lines.append(f"Filter: {self._filter_text}")
-
-        # Pagination info
-        lines.append(self._get_pagination_info())
-        lines.append("")
-
-        # Calculate column widths
-        col_widths = [len(h) for h in self.cols]
-        for row in self._data_cache:
-            for i, cell in enumerate(row):
-                if i < len(col_widths):
-                    col_widths[i] = max(col_widths[i], len(str(cell)))
-
-        # Header
-        header_line = " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(self.cols))
-        lines.append(header_line)
-        lines.append("-" * len(header_line))
-
-        # Data rows
-        for row in self._data_cache:
-            row_line = " | ".join(
-                str(cell).ljust(col_widths[i]) if i < len(col_widths) else str(cell)
-                for i, cell in enumerate(row)
-            )
-            lines.append(row_line)
-
-        # Sort indicator
-        if self._sort_column:
-            direction = "ASC" if self._sort_ascending else "DESC"
-            lines.append("")
-            lines.append(f"Sorted by: {self._sort_column} ({direction})")
-
-        # Navigation hint
-        lines.append("")
-        lines.append("[<< prev | next >>]")
-
-        print("\n".join(lines))
-
-    def show_gui(self, runner) -> None:
-        """Render with Flet DataTable and interactive controls."""
-        import flet as ft
-
-        # First render - create all controls
-        if self.flet_control is None:
-            # Create filter field
-            def handle_filter_change(e):
-                self.set_filter(e.control.value)
-
-            self.flet_filter_field = ft.TextField(
-                label="Search",
-                prefix_icon=ft.Icons.SEARCH,
-                on_change=handle_filter_change,
-                dense=True,
-            )
-
-            # Create sortable columns
-            columns = []
-            for col_name in self.cols:
-
-                def make_sort_handler(column):
-                    def handle_sort(e):
-                        self.sort_by(column)
-
-                    return handle_sort
-
-                # Create column header with sort indicator
-                header_text = col_name
-                if self._sort_column == col_name:
-                    header_text += " ↑" if self._sort_ascending else " ↓"
-
-                columns.append(
-                    ft.DataColumn(
-                        ft.TextButton(
-                            text=header_text,
-                            on_click=make_sort_handler(col_name),
-                        )
-                    )
-                )
-
-            # Create DataTable
-            self.flet_control = ft.DataTable(
-                columns=columns,
-                rows=[],
-                border=ft.border.all(1, ft.Colors.GREY_400),
-                border_radius=10,
-                horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_300),
-            )
-
-            # Create pagination controls
-            def handle_prev(e):
-                self.prev_page()
-
-            def handle_next(e):
-                self.next_page()
-
-            self.flet_pagination_prev = ft.IconButton(
-                icon=ft.Icons.NAVIGATE_BEFORE,
-                on_click=handle_prev,
-                tooltip="Previous page",
-            )
-
-            self.flet_pagination_next = ft.IconButton(
-                icon=ft.Icons.NAVIGATE_NEXT,
-                on_click=handle_next,
-                tooltip="Next page",
-            )
-
-            self.flet_pagination_info = ft.Text(
-                value=self._get_pagination_info(),
-                size=12,
-            )
-
-            pagination_row = ft.Row(
-                controls=[
-                    self.flet_pagination_prev,
-                    self.flet_pagination_info,
-                    self.flet_pagination_next,
-                ],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=10,
-            )
-
-            # Build complete layout
-            container = ft.Column(
-                controls=[
-                    self.flet_filter_field,
-                    ft.Container(
-                        content=self.flet_control,
-                        border=ft.border.all(1, ft.Colors.GREY_400),
-                        border_radius=10,
-                        padding=10,
-                    ),
-                    pagination_row,
-                ],
-                spacing=10,
-            )
-
-            # Wrap with title if provided
-            if self.title:
-                final_control = ft.Column(
-                    controls=[
-                        ft.Text(self.title, size=16, weight=ft.FontWeight.BOLD),
-                        container,
-                    ],
-                    spacing=10,
-                )
-            else:
-                final_control = container
-
-            runner.add_to_output(final_control, component=self)
-
-        # Update data rows
-        self.flet_control.rows = [
-            ft.DataRow(cells=[ft.DataCell(ft.Text(str(cell))) for cell in row])
-            for row in self._data_cache
-        ]
-
-        # Update column headers with sort indicators
-        for i, col_name in enumerate(self.cols):
-            header_text = col_name
-            if self._sort_column == col_name:
-                header_text += " ↑" if self._sort_ascending else " ↓"
-            self.flet_control.columns[i].label.text = header_text
-
-        # Update pagination info
-        self.flet_pagination_info.value = self._get_pagination_info()
-
-        # Update button states
-        self.flet_pagination_prev.disabled = self._current_page == 0
-        max_page = (
-            (self._total_count - 1) // self.page_size if self._total_count > 0 else 0
-        )
-        self.flet_pagination_next.disabled = self._current_page >= max_page
-
-        # Refresh page
-        if runner.page:
-            runner.page.update()
-
     def to_dict(self) -> dict:
         return {
             "type": "data_table",
@@ -1129,3 +1082,100 @@ class DataTable(Container):
             "total_count": self._total_count,
             "data": self._data_cache,
         }
+
+    def build_cli(self, ctx) -> Any:
+        """Build DataTable for CLI (returns Rich Table with pagination info).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Group with table and pagination info
+        """
+        from rich.table import Table as RichTable
+        from rich.console import Group
+        from rich.text import Text as RichText
+
+        # Build table
+        table = RichTable(show_header=True, header_style="bold magenta", title=self.title)
+
+        # Add columns
+        for col in self.cols:
+            table.add_column(col, style="cyan")
+
+        # Add rows from current page
+        for row in self._data_cache:
+            cells = [str(cell) for cell in row]
+            table.add_row(*cells)
+
+        # Add pagination info
+        total_pages = (self._total_count + self.page_size - 1) // self.page_size
+        pagination_info = RichText(
+            f"Page {self._current_page + 1} of {total_pages} | "
+            f"Total: {self._total_count} rows"
+        )
+
+        if self._filter_text:
+            filter_info = RichText(f"Filter: {self._filter_text}", style="italic")
+            return Group(table, pagination_info, filter_info)
+
+        return Group(table, pagination_info)
+
+    def build_gui(self, ctx) -> Any:
+        """Build DataTable for GUI (returns Flet Column with table and controls).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet Column containing table, filter, and pagination controls
+        """
+        import flet as ft
+
+        # Create table columns
+        columns = [
+            ft.DataColumn(ft.Text(col, weight=ft.FontWeight.BOLD))
+            for col in self.cols
+        ]
+
+        # Create data rows
+        rows = [
+            ft.DataRow(cells=[ft.DataCell(ft.Text(str(cell))) for cell in row])
+            for row in self._data_cache
+        ]
+
+        # Create table
+        data_table = ft.DataTable(
+            columns=columns,
+            rows=rows,
+            border=ft.border.all(1, ft.Colors.GREY_400),
+            border_radius=10,
+            horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_300),
+        )
+
+        # Store reference
+        self._flet_control = data_table
+
+        # Calculate pagination
+        total_pages = (self._total_count + self.page_size - 1) // self.page_size
+
+        # Create pagination controls
+        pagination = ft.Row(
+            [
+                ft.Text(f"Page {self._current_page + 1} of {total_pages}"),
+                ft.Text(f"| Total: {self._total_count} rows"),
+            ],
+            spacing=10,
+        )
+
+        # Build container
+        controls = []
+        if self.title:
+            controls.append(ft.Text(self.title, size=18, weight=ft.FontWeight.BOLD))
+
+        controls.extend([
+            data_table,
+            pagination,
+        ])
+
+        return ft.Column(controls=controls, spacing=10)

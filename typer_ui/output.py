@@ -12,20 +12,116 @@ from dataclasses import dataclass
 from .ui_blocks import UiBlock, Text, Md, Column, get_current_runner, set_current_runner
 
 
-@dataclass
-class DynamicBlock:
+class DynamicBlock(UiBlock):
     """Wrapper for dynamic/reactive UI content.
 
     Created by dx() function. When passed to ui(), renders
     content that auto-updates when dependencies change.
     """
-    renderer: Callable
-    dependencies: tuple
+
+    def __init__(self, renderer: Callable, dependencies: tuple):
+        """Initialize DynamicBlock.
+
+        Args:
+            renderer: Function that builds the UI content
+            dependencies: State objects to observe for changes
+        """
+        super().__init__()
+        self.renderer = renderer
+        self.dependencies = dependencies
+        self._container = None
 
     def __repr__(self):
         deps = ', '.join(str(d) for d in self.dependencies)
         renderer_name = getattr(self.renderer, '__name__', repr(self.renderer))
         return f"DynamicBlock(renderer={renderer_name}, deps=[{deps}])"
+
+    def build_cli(self, ctx) -> Any:
+        """Build DynamicBlock for CLI (returns Rich Group).
+
+        Args:
+            ctx: CLI runner context
+
+        Returns:
+            Rich Group renderable
+        """
+        from rich.console import Group
+
+        # Execute renderer with new UI stack context
+        with ctx._new_ui_stack() as ui_stack:
+            result = self.renderer()
+            if result is not None:
+                ui_stack.append(result)
+
+        # Build renderables from stack
+        renderables = [ctx.build_child(self, item) for item in ui_stack]
+
+        # Set up observers for re-rendering
+        def on_state_change():
+            # Re-render with new stack context
+            with ctx._new_ui_stack() as new_stack:
+                result = self.renderer()
+                if result is not None:
+                    new_stack.append(result)
+
+            # Print new output
+            for item in new_stack:
+                renderable = ctx.build_child(self, item)
+                ctx.console.print(renderable)
+
+        from .state import State
+        for dep in self.dependencies:
+            if isinstance(dep, State):
+                dep.add_observer(on_state_change)
+
+        return Group(*renderables) if renderables else ""
+
+    def build_gui(self, ctx) -> Any:
+        """Build DynamicBlock for GUI (returns Flet Column).
+
+        Args:
+            ctx: GUI runner context
+
+        Returns:
+            Flet Column control
+        """
+        import flet as ft
+
+        # Create container for dynamic content
+        self._container = ft.Column(controls=[], spacing=10)
+        self._flet_control = self._container
+
+        def render():
+            """Re-render on state change."""
+            # Clear container
+            self._container.controls.clear()
+
+            # Execute renderer with new UI stack context
+            with ctx._new_ui_stack() as ui_stack:
+                result = self.renderer()
+                if result is not None:
+                    ui_stack.append(result)
+
+            # Build controls from stack
+            controls = [ctx.build_child(self, item) for item in ui_stack]
+
+            # Add to container
+            self._container.controls.extend(controls)
+
+            # Update display
+            if ctx.page:
+                ctx.page.update()
+
+        # Initial render
+        render()
+
+        # Register observers
+        from .state import State
+        for dep in self.dependencies:
+            if isinstance(dep, State):
+                dep.add_observer(render)
+
+        return self._container
 
 
 def dx(renderer: Callable, *dependencies) -> DynamicBlock:
@@ -60,46 +156,26 @@ def dx(renderer: Callable, *dependencies) -> DynamicBlock:
     return DynamicBlock(renderer=renderer, dependencies=dependencies)
 
 
-def _render_dynamic_block(dyn_block: DynamicBlock, runner) -> Column:
-    """Internal: Render a dynamic block with reactive updates."""
-    from .state import State
-
-    container = Column([])
-
-    # Execute renderer in reactive mode
-    _, flet_control = runner.execute_in_reactive_mode(container, dyn_block.renderer)
-
-    # Store control for updates (GUI mode)
-    if flet_control is not None:
-        runner._reactive_components[id(container)] = flet_control
-        runner.add_to_output(flet_control, component=container)
-
-    # Register observer callbacks
-    def on_state_change():
-        runner.update_reactive_container(container, dyn_block.renderer)
-
-    for dep in dyn_block.dependencies:
-        if isinstance(dep, State):
-            dep.add_observer(on_state_change)
-
-    return container
-
-
-def ui(component_or_value: Any = None) -> UiBlock:
+def ui(component_or_value: Any = None) -> Any:
     """Present a UI component or value.
 
-    Automatic conversions:
+    Uses the new stack-based architecture. Simply appends the value to the
+    current UI stack. Conversion from strings/values to UI components happens
+    later in build_child().
+
+    Automatic conversions (handled by build_child):
     - None → Text("") (empty line)
     - str → Md(str) (markdown - default behavior)
     - int/float/etc → Text(str(value))
     - UiBlock → unchanged
     - DynamicBlock → setup reactive rendering
+    - Callable → captured and rendered
 
     Args:
-        component_or_value: Component or value to display
+        component_or_value: Component, string, callable, or value to display
 
     Returns:
-        The displayed component (for chaining/context manager)
+        The input value (for chaining/context manager support)
 
     Raises:
         RuntimeError: If called outside command execution context
@@ -112,41 +188,18 @@ def ui(component_or_value: Any = None) -> UiBlock:
         >>> ui(dx(lambda: "...", state))  # Dynamic content
         >>> print("plain text")  # Use print() for plain text
     """
-    runner = get_current_runner()
-    if not runner:
+    from .context import UIRunnerCtx
+
+    # Get current context
+    ctx = UIRunnerCtx.instance()
+    if ctx is None:
         raise RuntimeError("ui() can only be called during command execution.")
 
-    # Handle None (empty line)
-    if component_or_value is None:
-        component = Text("")
+    # Simply append to stack - all conversion logic is in build_child()
+    ctx.ui(component_or_value)
 
-    # Handle DynamicBlock (reactive content)
-    elif isinstance(component_or_value, DynamicBlock):
-        return _render_dynamic_block(component_or_value, runner)
-
-    # Handle strings (convert to Markdown)
-    elif isinstance(component_or_value, str):
-        component = Md(component_or_value)
-
-    # Handle other values (convert to Text)
-    elif not isinstance(component_or_value, UiBlock):
-        component = Text(str(component_or_value))
-
-    # Already a UiBlock
-    else:
-        component = component_or_value
-
-    # Check if in reactive mode
-    if runner.is_reactive_mode():
-        runner.add_to_reactive_container(component)
-    else:
-        runner.show(component)
-
-    # Mark component as presented for auto-updates
-    if hasattr(component, '_mark_presented'):
-        component._mark_presented(runner)
-
-    return component
+    # Return the component for context manager support
+    return component_or_value
 
 
 def text(value: Any = "") -> Text:

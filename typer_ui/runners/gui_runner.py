@@ -13,6 +13,7 @@ from typing import Any, Optional, List
 import flet as ft
 
 from .base import Runner
+from .gui_context import GUIRunnerCtx
 from ..specs import AppSpec, CommandSpec, ParamType
 from ..ui_blocks import Text, set_current_runner
 
@@ -72,6 +73,9 @@ class GUIRunner(Runner):
         self.channel = "gui"
         self.ui = ui
 
+        # New architecture: GUIRunnerCtx instance (will be initialized when page is ready)
+        self.ctx: Optional[GUIRunnerCtx] = None
+
         # Per-command views (lazy initialized)
         self.command_views: dict[str, _CommandView] = {}
 
@@ -102,65 +106,6 @@ class GUIRunner(Runner):
         """Start the Flet GUI application."""
         # Flet app will be started via ft.app() externally
         pass
-
-    def show(self, component) -> None:
-        """Show component in GUI by calling its show_gui method.
-
-        Args:
-            component: UiBlock component to display
-        """
-        component.show_gui(self)
-
-    def update(self, component) -> None:
-        """Update existing component (for progressive rendering in context managers).
-
-        Args:
-            component: UiBlock component to update
-        """
-        from ..ui_blocks import Table, DataTable  # Avoid circular import
-
-        # --- Smarter update for Table component ---
-        if isinstance(component, Table) and component.flet_control:
-            # Helper function to convert cell to Flet control
-            def cell_to_control(cell):
-                from ..ui_blocks import UiBlock
-                if isinstance(cell, UiBlock):
-                    # Render UI component to Flet control
-                    control = self.render_to_control(cell)
-                    return control if control else ft.Text("")
-                else:
-                    # Convert to text
-                    return ft.Text(str(cell))
-
-            # Re-create data rows
-            component.flet_control.rows = [
-                ft.DataRow(
-                    cells=[ft.DataCell(cell_to_control(cell)) for cell in row]
-                )
-                for row in component.data
-            ]
-            if self.page:
-                self.page.update()
-            return  # Smart update complete
-
-        # --- Smarter update for DataTable component ---
-        if isinstance(component, DataTable) and component.flet_control:
-            # DataTable handles its own updates in show_gui()
-            # Just call show_gui() which will update rows, pagination, sort indicators, etc.
-            component.show_gui(self)
-            return  # Smart update complete
-
-        # --- Fallback to old logic for other components ---
-        # Check in current command's component refs
-        view = self._get_current_view()
-        if view:
-            comp_id = id(component)
-            if comp_id in view.component_refs:
-                component.show_gui(self)
-            else:
-                component.show_gui(self)
-        else:
-            component.show_gui(self)
 
     def _get_current_view(self) -> Optional[_CommandView]:
         """Get the current command's view.
@@ -205,34 +150,6 @@ class GUIRunner(Runner):
                     self._reactive_components[component._reactive_id] = control
             if self.page:
                 self.page.update()
-
-    def render_to_control(self, component) -> Optional[ft.Control]:
-        """Render component and return Flet control (for nesting).
-
-        Args:
-            component: UiBlock component to render
-
-        Returns:
-            Flet control
-        """
-        # Temporarily capture the control instead of adding to output
-        captured_control = None
-
-        def capture_add(control, component=None):
-            nonlocal captured_control
-            captured_control = control
-
-        # Temporarily replace add_to_output
-        original_add = self.add_to_output
-        self.add_to_output = capture_add
-
-        try:
-            component.show_gui(self)
-        finally:
-            # Restore
-            self.add_to_output = original_add
-
-        return captured_control
 
     def register_control(self, component: Any, control: ft.Control) -> None:
         """Register a control for later access.
@@ -326,14 +243,18 @@ class GUIRunner(Runner):
         if not context:
             raise RuntimeError("Not in reactive mode")
 
-        # Render component to Flet control
-        control = self.render_to_control(component)
-        if control:
-            # Add to Flet control
-            context.flet_control.controls.append(control)
+        # Build component using ctx (new architecture)
+        if self.ctx:
+            from ..ui_blocks import Text
+            root = Text("")  # Dummy root
+            control = self.ctx.build_child(root, component)
+            if control:
+                # Add to Flet control
+                context.flet_control.controls.append(control)
 
-            # Add to UiBlock container (for tracking)
-            context.container.children.append(component)
+                # Add to UiBlock container (for tracking)
+                if isinstance(component, UiBlock):
+                    context.container.children.append(component)
 
     def update_reactive_container(self, container, renderer):
         """Update reactive container by re-executing renderer.
@@ -400,21 +321,21 @@ class GUIRunner(Runner):
 
         # Find the old control in the output view
         old_control = self._reactive_components.get(component_id)
-        if not old_control:
-            # First time seeing this component, just show it
-            self.show(new_component)
+        if not old_control or not self.ctx:
+            # No old control or no context
             return
 
         # Find the index of the old control in the output view
         try:
             index = view.output_view.controls.index(old_control)
         except ValueError:
-            # Control not found, just show the new one
-            self.show(new_component)
+            # Control not found in view
             return
 
-        # Render new component to get the new Flet control
-        new_control = self.render_to_control(new_component)
+        # Build new component using ctx (new architecture)
+        from ..ui_blocks import Text
+        root = Text("")  # Dummy root
+        new_control = self.ctx.build_child(root, new_component)
         if not new_control:
             return
 
@@ -435,6 +356,12 @@ class GUIRunner(Runner):
             page: Flet page instance
         """
         self.page = page
+
+        # Initialize new architecture context
+        self.ctx = GUIRunnerCtx(page)
+        self.ctx.runner = self  # Store reference back to runner for callbacks
+        GUIRunnerCtx._instance = self.ctx  # Set as global instance
+
         page.title = self.app_spec.title or "Typer GUI"
         page.window_width = 1000
         page.window_height = 700
@@ -776,11 +703,16 @@ class GUIRunner(Runner):
             )
         elif param.param_type == ParamType.ENUM:
             if param.enum_choices:
+                # Get default value - for enums, use .value attribute
+                default_value = None
+                if param.default is not None:
+                    default_value = param.default.value if hasattr(param.default, 'value') else str(param.default)
+
                 control = ft.Dropdown(
                     label=label,
                     hint_text=hint_text,
                     options=[ft.dropdown.Option(c) for c in param.enum_choices],
-                    value=str(param.default) if param.default is not None else None,
+                    value=default_value,
                     width=400,
                 )
 
@@ -857,7 +789,15 @@ class GUIRunner(Runner):
 
             if param.python_type and param.param_type == ParamType.ENUM:
                 try:
-                    return param.python_type(value)
+                    # Convert string value to enum member
+                    # Use _value2member_map_ for efficient lookup
+                    if hasattr(param.python_type, '_value2member_map_'):
+                        return param.python_type._value2member_map_.get(value, value)
+                    # Fallback: iterate through members
+                    for member in param.python_type:
+                        if member.value == value:
+                            return member
+                    return value
                 except Exception:
                     return value
 
@@ -923,39 +863,54 @@ class GUIRunner(Runner):
         if self.ui:
             self.ui.current_command = command_spec
 
+        # Set context as current instance
+        from ..context import UIRunnerCtx
+        UIRunnerCtx._current_instance = self.ctx
+
+        # Create root component for build_child() hierarchy
+        from ..ui_blocks import Column
+        root = Column([])
+
         result = None
         exception = None
         output_lines = []  # Capture text output
-
-        # Temporarily replace show method to capture and display output
-        original_show = self.show
-
-        def capturing_show(component):
-            """Capture text representation while showing."""
-            text_repr = self._component_to_text(component)
-            if text_repr:
-                output_lines.append(text_repr)
-            # Show in GUI immediately
-            original_show(component)
-
-        self.show = capturing_show
 
         # Create real-time writer for print() statements
         # This displays print() output immediately while also capturing it
         def display_print_line(line: str):
             """Display and capture a line from print()."""
             output_lines.append(line)
-            Text(line).show_gui(self)
+            # Convert to control and add to output
+            if self.ctx:
+                control = self.ctx.build_child(root, line)
+                self.add_to_output(control)
 
         stdout_writer = _RealTimeWriter(display_print_line)
         stderr_capture = io.StringIO()
 
         try:
-            with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
-                result = command_spec.callback(**params)
+            # Execute command with UI stack context
+            with self.ctx._new_ui_stack() as ui_stack:
+                with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
+                    result = command_spec.callback(**params)
 
-                # Flush any remaining buffered output
-                stdout_writer.flush()
+                    # Flush any remaining buffered output
+                    stdout_writer.flush()
+
+                # If command returns a value, add it to stack
+                if result is not None:
+                    ui_stack.append(result)
+
+            # Process UI stack - build and add each item to output
+            for item in ui_stack:
+                # Build control from item
+                control = self.ctx.build_child(root, item)
+                self.add_to_output(control)
+
+                # Capture text representation for output (from original item)
+                text_repr = self._component_to_text(item)
+                if text_repr:
+                    output_lines.append(text_repr)
 
             stderr_text = stderr_capture.getvalue()
 
@@ -970,15 +925,6 @@ class GUIRunner(Runner):
             output_lines.append(error_text)
             self._append_text(error_text)
             self._append_text(traceback.format_exc())
-
-        # Handle return value - auto-display if it's a UiBlock
-        if result is not None:
-            from ..ui_blocks import UiBlock
-            if isinstance(result, UiBlock):
-                self.show(result)
-
-        # Restore original show method
-        self.show = original_show
 
         # Restore previous runner
         set_current_runner(saved_runner)
@@ -1008,33 +954,44 @@ class GUIRunner(Runner):
         # This ensures output goes to THIS command's view even if user switches commands
         token = self._async_context.set(command_spec)
 
-        # Temporarily replace show method to capture output
-        original_show = self.show
+        # Set context as current instance
+        from ..context import UIRunnerCtx
+        UIRunnerCtx._current_instance = self.ctx
 
-        def capturing_show(component):
-            """Capture text representation while showing."""
-            text_repr = self._component_to_text(component)
-            if text_repr:
-                output_lines.append(text_repr)
-            # Still show in GUI
-            original_show(component)
-
-        self.show = capturing_show
+        # Create root component for build_child() hierarchy
+        from ..ui_blocks import Column
+        root = Column([])
 
         try:
-            # Get the actual async function (may be wrapped)
-            async_func = getattr(command_spec.callback, '_original_async_func', None)
-            if async_func is None:
-                async_func = command_spec.callback
+            # Execute async command with UI stack context
+            with self.ctx._new_ui_stack() as ui_stack:
+                # Register observer for real-time updates during async execution
+                def on_append(item):
+                    """Build and display item immediately."""
+                    control = self.ctx.build_child(root, item)
+                    self.add_to_output(control)
+                    if self.page:
+                        self.page.update()
 
-            # Execute async command and await it
-            result = await async_func(**params)
+                    # Also capture for text output
+                    text_repr = self._component_to_text(item)
+                    if text_repr:
+                        output_lines.append(text_repr)
 
-            # Handle return value - auto-display if it's a UiBlock
-            if result is not None:
-                from ..ui_blocks import UiBlock
-                if isinstance(result, UiBlock):
-                    self.show(result)
+                ui_stack.register_observer(on_append)
+
+                # Get the actual async function (may be wrapped)
+                async_func = getattr(command_spec.callback, '_original_async_func', None)
+                if async_func is None:
+                    async_func = command_spec.callback
+
+                # Execute async command and await it
+                result = await async_func(**params)
+
+                # If command returns a value, add it to stack
+                # (This will trigger on_append immediately)
+                if result is not None:
+                    ui_stack.append(result)
 
         except Exception as e:
             exception = e
@@ -1044,9 +1001,6 @@ class GUIRunner(Runner):
             self._append_text(traceback.format_exc())
 
         finally:
-            # Restore original show method
-            self.show = original_show
-
             # Reset async context
             self._async_context.reset(token)
 
@@ -1080,6 +1034,14 @@ class GUIRunner(Runner):
             if self.ui:
                 self.ui.current_command = command_spec
 
+            # Set context as current instance
+            from ..context import UIRunnerCtx
+            UIRunnerCtx._current_instance = self.ctx
+
+            # Create root component for build_child() hierarchy
+            from ..ui_blocks import Column
+            root = Column([])
+
             # Real-time streaming with thread-safe page updates
             def append_with_update(text):
                 output_lines.append(text)
@@ -1091,11 +1053,33 @@ class GUIRunner(Runner):
             )
 
             try:
-                with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
-                    result = command_spec.callback(**params)
+                # Execute command with UI stack context
+                with self.ctx._new_ui_stack() as ui_stack:
+                    # Register observer for real-time updates during thread execution
+                    def on_append(item):
+                        """Build and display item immediately (thread-safe)."""
+                        control = self.ctx.build_child(root, item)
+                        self.add_to_output(control)
+                        if self.page:
+                            self.page.update()
 
-                stdout_writer.flush()
-                stderr_writer.flush()
+                        # Also capture for text output
+                        text_repr = self._component_to_text(item)
+                        if text_repr:
+                            output_lines.append(text_repr)
+
+                    ui_stack.register_observer(on_append)
+
+                    with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
+                        result = command_spec.callback(**params)
+
+                    stdout_writer.flush()
+                    stderr_writer.flush()
+
+                    # If command returns a value, add it to stack
+                    # (This will trigger on_append immediately)
+                    if result is not None:
+                        ui_stack.append(result)
 
             except Exception as e:
                 exception = e
@@ -1105,12 +1089,6 @@ class GUIRunner(Runner):
                 output_lines.append(error_text)
                 self._append_text(error_text)
                 self._append_text(traceback.format_exc())
-
-            # Handle return value
-            if result is not None:
-                from ..ui_blocks import UiBlock
-                if isinstance(result, UiBlock):
-                    self.show(result)
 
             # Restore runner
             set_current_runner(saved_runner)

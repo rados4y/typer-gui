@@ -8,6 +8,7 @@ from contextlib import redirect_stdout, redirect_stderr
 from typing import Any, Optional, Callable
 
 from .base import Runner
+from .cli_context import CLIRunnerCtx
 from ..specs import AppSpec, CommandSpec
 from ..ui_blocks import Text, set_current_runner
 
@@ -67,31 +68,18 @@ class CLIRunner(Runner):
         self._verbose = False
         self.channel = "cli"
         self.ui = ui
+
+        # New architecture: CLIRunnerCtx instance
+        self.ctx = CLIRunnerCtx()
+        from ..context import UIRunnerCtx
+        UIRunnerCtx._current_instance = self.ctx  # Set as global instance
+
         # Reactive components (for compatibility with GUI runner)
         self._reactive_components = {}
 
     def start(self) -> None:
         """Start CLI runner (no-op for CLI, execution is synchronous)."""
         pass
-
-    def show(self, component) -> None:
-        """Show component in CLI by calling its show_cli method.
-
-        Args:
-            component: UiBlock component to display
-        """
-        component.show_cli(self)
-
-    def update(self, component) -> None:
-        """Update component (for progressive rendering in context managers).
-
-        Args:
-            component: UiBlock component to update
-        """
-        # In CLI, we can't really update in place, so just clear and re-show
-        # Could use terminal control codes for better UX in the future
-        print()  # Add newline for separation
-        component.show_cli(self)
 
     def update_reactive_component(self, component_id: int, new_component) -> None:
         """Update a reactive component (no-op in CLI mode).
@@ -113,58 +101,6 @@ class CLIRunner(Runner):
             False - CLI doesn't support reactive containers
         """
         return False
-
-    def add_to_reactive_container(self, component) -> None:
-        """Add to reactive container (no-op in CLI mode).
-
-        Args:
-            component: Component to add
-        """
-        # No-op for CLI
-        pass
-
-    def execute_in_reactive_mode(self, container, renderer):
-        """Execute renderer in reactive mode (simplified for CLI).
-
-        In CLI mode, we don't need containers. Just execute the renderer
-        and return the container unchanged.
-
-        Supports two patterns:
-        1. Renderer calls ui() internally (ui pattern)
-        2. Renderer returns a UiBlock (return pattern)
-
-        Args:
-            container: Container (ignored in CLI)
-            renderer: Function to execute
-
-        Returns:
-            Tuple of (container, None) for compatibility
-        """
-        # Execute the renderer - it will call ui() which will print
-        result = renderer()
-
-        # If renderer returns something, convert and show it
-        if result is not None:
-            from ..ui_blocks import to_component
-            component = to_component(result)
-            self.show(component)
-
-        # Return container and None (no flet_control in CLI)
-        return container, None
-
-    def update_reactive_container(self, container, renderer):
-        """Update reactive container (no-op in CLI mode).
-
-        In CLI mode, reactive updates aren't displayed since output is static.
-        This method exists for compatibility with the reactive state system.
-
-        Args:
-            container: Container to update
-            renderer: Function to re-execute
-        """
-        # No-op for CLI - reactive updates only make sense in GUI
-        # State changes don't trigger re-rendering in CLI mode
-        pass
 
     def execute_command(
         self,
@@ -202,26 +138,16 @@ class CLIRunner(Runner):
         if self.ui:
             self.ui.current_command = command_spec
 
+        # Set context as current instance
+        from ..context import UIRunnerCtx
+        UIRunnerCtx._current_instance = self.ctx
+
+        # Create root component for build_child() hierarchy
+        from ..ui_blocks import Column
+        root = Column([])
+
         # Capture output lines for cmd.output property
         output_lines = []  # Capture rendered text output
-
-        # Temporarily replace show method to capture and display output
-        original_show = self.show
-
-        def capturing_show(component):
-            """Capture text representation while showing."""
-            # Capture the text output
-            text_capture = StringIO()
-            with redirect_stdout(text_capture):
-                # Call the component's show_cli directly
-                component.show_cli(self)
-            captured = text_capture.getvalue()
-            if captured:
-                output_lines.append(captured.rstrip('\n'))
-                # Display immediately by printing directly (avoid double-capture)
-                print(captured.rstrip('\n'), file=sys.__stdout__)
-
-        self.show = capturing_show
 
         # Create pass-through writer for print() statements
         # This displays print() output immediately while also capturing it
@@ -238,35 +164,42 @@ class CLIRunner(Runner):
         exception = None
 
         try:
-            with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
-                # Call the command callback directly
-                # Async commands are already wrapped by def_command decorator
-                result = command_spec.callback(**params)
+            # Execute command with UI stack context
+            with self.ctx._new_ui_stack() as ui_stack:
+                with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
+                    # Call the command callback directly
+                    # Async commands are already wrapped by def_command decorator
+                    result = command_spec.callback(**params)
 
-                # Flush any remaining buffered output
-                stdout_writer.flush()
+                    # Flush any remaining buffered output
+                    stdout_writer.flush()
+
+                # If command returns a value, add it to stack
+                if result is not None:
+                    ui_stack.append(result)
+
+            # Process UI stack - build and print each item
+            for item in ui_stack:
+                # Capture the rendered output
+                text_capture = StringIO()
+                with redirect_stdout(text_capture):
+                    # Build renderable from item
+                    renderable = self.ctx.build_child(root, item)
+                    # Print using Rich console
+                    self.ctx.console.print(renderable)
+
+                captured = text_capture.getvalue()
+                if captured:
+                    output_lines.append(captured.rstrip('\n'))
+                    # Also print to stdout
+                    print(captured.rstrip('\n'), file=sys.__stdout__)
 
         except Exception as e:
             exception = e
-        finally:
-            # Restore original show method
-            self.show = original_show
 
         stderr_text = stderr_capture.getvalue()
         if stderr_text:
             print(stderr_text, file=sys.stderr, end='')
-
-        # Handle return value - auto-display if it's a UiBlock
-        if result is not None:
-            from ..ui_blocks import UiBlock
-            if isinstance(result, UiBlock):
-                # Capture output from returned UiBlock
-                text_capture = StringIO()
-                with redirect_stdout(text_capture):
-                    result.show_cli(self)
-                captured = text_capture.getvalue()
-                if captured:
-                    output_lines.append(captured.rstrip('\n'))
 
         # Restore previous runner (for nested execution support)
         set_current_runner(saved_runner)

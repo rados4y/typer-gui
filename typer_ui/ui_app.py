@@ -175,21 +175,43 @@ class UICommand:
             >>> # Execute inline and get result
             >>> result = app.command("process").include().result
         """
-        # Save current command
-        saved_command = self.ui_app.current_command
+        # Execute via runner if available (ensures proper stack context)
+        if self.ui_app.runner:
+            # Use runner's execution mechanism with stack context
+            from .context import _current_stack_var
 
-        try:
-            # Temporarily set this as current
-            self.ui_app.current_command = self.command_spec
+            # Get the runner's context
+            if hasattr(self.ui_app.runner, 'ctx'):
+                ctx = self.ui_app.runner.ctx
 
-            # Execute directly (output goes to current context)
+                # Execute with new stack context
+                with ctx._new_ui_stack() as ui_stack:
+                    # Execute callback - ui() calls will append to this stack
+                    if self.command_spec.callback:
+                        result = self.command_spec.callback(**kwargs)
+                        self.result = result
+                        if result is not None:
+                            ui_stack.append(result)
+
+                # Build and display output inline
+                from .ui_blocks import Column
+                root = Column([])
+                for item in ui_stack:
+                    control = ctx.build_child(root, item)
+                    self.ui_app.runner.add_to_output(control)
+
+                # Update display
+                if hasattr(ctx, 'page') and ctx.page:
+                    ctx.page.update()
+            else:
+                # Fallback: direct execution
+                result = self.command_spec.callback(**kwargs)
+                self.result = result
+        else:
+            # No runner available - direct execution fallback
             if self.command_spec.callback:
                 result = self.command_spec.callback(**kwargs)
                 self.result = result
-                # Note: output is shown inline, not captured separately
-        finally:
-            # Restore previous command
-            self.ui_app.current_command = saved_command
 
         return self  # Return self for chaining
 
@@ -270,9 +292,12 @@ class UiApp:
             # GUI mode - copy to clipboard via Flet
             if hasattr(runner, 'page') and runner.page:
                 runner.page.set_clipboard(text)
-                # Show feedback
-                from .ui_blocks import Text
-                Text(f"✓ Copied to clipboard").show_gui(runner)
+                # Show feedback using new architecture
+                if hasattr(runner, 'ctx') and runner.ctx:
+                    from .ui_blocks import Text
+                    root = Text("")  # Dummy root
+                    control = runner.ctx.build_child(root, "✓ Copied to clipboard")
+                    runner.add_to_output(control)
         else:
             # CLI mode - print with indicator
             print(f"[CLIPBOARD] {text}")

@@ -29,16 +29,7 @@ class Runner(ABC):
         pass
 
     @abstractmethod
-    def show(self, component) -> None:
-        """Show a component by calling its appropriate show method.
-
-        Args:
-            component: UiBlock component to display
-        """
-        pass
-
-    @abstractmethod
-    async def execute_command(
+    def execute_command(
         self,
         command_name: str,
         params: dict[str, Any]
@@ -52,5 +43,7 @@ class Runner(ABC):
         Returns:
             Tuple of (result, exception, output_text). Exception is None if successful.
             output_text contains the rendered text output from the command.
+
+        Note: This can be async or sync depending on the runner implementation.
         """
         pass
