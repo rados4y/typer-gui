@@ -164,8 +164,8 @@ def main():
     print(f"[OK] Git tag created: {tag_name}")
     print(f"[OK] Pushed to GitHub")
     print(f"[OK] Published to PyPI")
-    print(f"\nCheck: https://pypi.org/project/typer-ui/")
-    print(f"GitHub Release: https://github.com/rados4y/typer-ui/releases/tag/{tag_name}")
+    print(f"\nCheck: https://pypi.org/project/typer2ui/")
+    print(f"GitHub Release: https://github.com/rados4y/typer2ui/releases/tag/{tag_name}")
 
 
 if __name__ == "__main__":

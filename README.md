@@ -1,10 +1,10 @@
-# Typer-UI
+# Typer2UI
 
 Automatically generate desktop GUIs for existing [Typer](https://typer.tiangolo.com/) CLI applications using [Flet](https://flet.dev/).
 
 ## Overview
 
-**Typer-UI** is a Python library that bridges the gap between command-line interfaces and graphical user interfaces. If you have a Typer-based CLI application, you can instantly create a desktop GUI for it with just a few lines of code.
+**Typer2UI** is a Python library that bridges the gap between command-line interfaces and graphical user interfaces. If you have a Typer-based CLI application, you can instantly create a desktop GUI for it with just a few lines of code.
 
 ### Key Features
 
@@ -23,7 +23,7 @@ Automatically generate desktop GUIs for existing [Typer](https://typer.tiangolo.
 ### Using pip
 
 ```bash
-pip install typer-ui
+pip install typer2ui
 ```
 
 This will automatically install `typer` and `flet` as dependencies if they're not already present.
@@ -32,8 +32,8 @@ This will automatically install `typer` and `flet` as dependencies if they're no
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/typer-ui.git
-cd typer-ui
+git clone https://github.com/rados4y/typer2ui.git
+cd typer2ui
 
 # Create a virtual environment
 python -m venv .venv
@@ -69,7 +69,7 @@ def greet(name: str, excited: bool = False):
 
     # Use ui() to output components
     ui(tg.Md(f"# Hello {name}{punctuation}"))
-    ui(tg.Text("Thanks for using Typer-UI!"))
+    ui(tg.Text("Thanks for using Typer2UI!"))
 
 @app.command()
 def add(a: int, b: int):
@@ -100,7 +100,7 @@ That's it! Your CLI app now has a fully functional GUI.
 
 ### Universal Output: `ui(component)`
 
-Instead of multiple output methods, Typer-UI has one simple pattern:
+Instead of multiple output methods, Typer2UI has one simple pattern:
 
 ```python
 # Output any component
@@ -172,7 +172,7 @@ ui(tg.TextInput(
 
 ### Auto-Update Components
 
-One of Typer-UI's most powerful features: **components automatically update when modified**!
+One of Typer2UI's most powerful features: **components automatically update when modified**!
 
 ```python
 @app.command()
@@ -309,7 +309,7 @@ if __name__ == "__main__":
 
 ## Supported Parameter Types
 
-Typer-UI automatically maps Python types to appropriate GUI controls:
+Typer2UI automatically maps Python types to appropriate GUI controls:
 
 | Python Type | GUI Control | Notes |
 |-------------|-------------|-------|
@@ -342,7 +342,7 @@ In the GUI, the `level` parameter will appear as a dropdown with all enum values
 
 ### `Ui` Class
 
-The main entry point for Typer-UI.
+The main entry point for Typer2UI.
 
 **Constructor:**
 ```python

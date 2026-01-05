@@ -271,7 +271,7 @@ python examples/03_ui_blocks.py
 
 - Python 3.10+ required
 - Dependencies: `typer>=0.9.0`, `flet>=0.20.0`
-- Package name: `typer-ui` (note: hyphen in package name, underscore in import)
+- Package name: `typer2ui` (note: no hyphens in package name, but import uses underscore: `typer_ui`)
 - Import pattern (dual import):
   ```python
   import typer_ui as tu              # For components: tu.Table, tu.Row, etc.
