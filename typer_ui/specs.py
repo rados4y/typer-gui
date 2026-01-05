@@ -69,6 +69,9 @@ class CommandUiSpec:
     auto_scroll: bool = True
     """Automatically scroll to the end of output after command execution"""
 
+    modal: bool = False
+    """Display command parameters and results in a modal dialog (GUI only)"""
+
 
 @dataclass(frozen=True)
 class CommandSpec:

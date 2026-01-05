@@ -3,6 +3,7 @@
 This example demonstrates:
 - Handling different parameter types (str, int, bool, enum).
 - Displaying various output components (Text, Markdown, Table).
+- Modal dialogs for parameter input and output display (GUI only).
 - Long-running commands with real-time updates.
 - Asynchronous command execution (CLI mode only).
 - Auto-executing commands for welcome screens or dashboards.
@@ -76,7 +77,49 @@ def basic_parameters(
 
 
 @typer_app.command()
-@app.def_command(view=True)
+@app.def_command(button=True, modal=True)
+def create_task(
+    title: str,
+    priority: Priority = Priority.MEDIUM,
+    estimated_hours: int = 1,
+):
+    """Demonstrates a modal dialog with form inputs and output display.
+
+    In GUI mode, parameters and output are shown in a popup dialog.
+    In CLI mode, works the same as any other command.
+    """
+    # Shortcut: ui(str) renders as Markdown
+    ui("# Task Created Successfully")
+    ui()
+
+    ui(f"**Title:** {title}")
+    ui(f"**Priority:** {priority.value.upper()}")
+    ui(f"**Estimated Hours:** {estimated_hours}")
+
+    # Simulate task creation
+    task_id = 12345
+    ui()
+    ui(f"Task ID: `{task_id}`")
+
+    # Show task details in a table
+    ui(
+        tu.Table(
+            cols=["Field", "Value"],
+            data=[
+                ["Title", title],
+                ["Priority", priority.value],
+                ["Estimated Hours", str(estimated_hours)],
+                ["Task ID", str(task_id)],
+            ],
+            title="Task Details",
+        )
+    )
+
+    return {"id": task_id, "title": title, "priority": priority.value}
+
+
+@typer_app.command()
+@app.def_command(view=True, modal=True)
 def output_types():
     """Demonstrates shortcuts and different output methods."""
     # Shortcut: ui(str) renders as Markdown
@@ -167,6 +210,7 @@ CLI Examples:
 -------------
 python examples/02_arguments_and_output.py --cli welcome-screen
 python examples/02_arguments_and_output.py --cli basic-parameters "Alice" --times 3 --excited --priority urgent
+python examples/02_arguments_and_output.py --cli create-task "Implement feature X" --priority high --estimated-hours 8
 python examples/02_arguments_and_output.py --cli output-types
 python examples/02_arguments_and_output.py --cli long-running-task --steps 3
 python examples/02_arguments_and_output.py --cli async-task --delay 1.5

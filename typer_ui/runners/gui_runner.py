@@ -501,6 +501,11 @@ class GUIRunner(Runner):
             except Exception as e:
                 print(f"Warning: on_select callback failed: {e}")
 
+        # Handle modal commands differently
+        if command.ui_spec.modal:
+            await self._show_modal_command(command)
+            return
+
         # Lazy initialize command view if it doesn't exist
         if command.name not in self.command_views:
             await self._create_command_view(command)
@@ -529,6 +534,173 @@ class GUIRunner(Runner):
         if command.ui_spec.auto and selected_view.output_view:
             if not selected_view.output_view.controls:
                 await self._run_command()
+
+    async def _show_modal_command(self, command: CommandSpec) -> None:
+        """Show command in a modal dialog.
+
+        Args:
+            command: Command to show in modal
+        """
+        if not self.page:
+            return
+
+        # Build parameter form
+        form_controls = []
+        form_control_refs = {}
+
+        # Title and description (controlled by header flag)
+        if command.ui_spec.header:
+            form_controls.append(
+                ft.Text(
+                    command.name.upper(),
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
+                )
+            )
+
+            # Description
+            if command.help_text:
+                form_controls.append(
+                    ft.Text(command.help_text, size=14, color=ft.Colors.GREY_700)
+                )
+
+            form_controls.append(ft.Divider())
+
+        # Parameter inputs
+        for param in command.params:
+            control = self._create_param_control(param)
+            form_control_refs[param.name] = control
+            form_controls.append(control)
+
+        # Output area (initially empty)
+        output_view = ft.ListView(
+            controls=[],
+            auto_scroll=command.ui_spec.auto_scroll,
+            expand=True,
+        )
+
+        # Close button (always enabled - allow closing without execution)
+        close_button = ft.TextButton(
+            "Close",
+            disabled=False,
+        )
+
+        # Submit button
+        async def on_submit(e):
+            # Parse parameters
+            kwargs = {}
+            for param in command.params:
+                control = form_control_refs.get(param.name)
+                if not control:
+                    continue
+
+                value = self._extract_value(control, param)
+
+                if param.required and value is None:
+                    output_view.controls.append(
+                        ft.Text(
+                            f"ERROR: Required parameter '{param.name}' is missing.",
+                            color=ft.Colors.RED,
+                        )
+                    )
+                    self.page.update()
+                    return
+
+                if value is not None:
+                    kwargs[param.name] = value
+
+            # Clear previous output
+            output_view.controls.clear()
+
+            # Execute command
+            try:
+                # Create temporary command view for modal output
+                saved_view = self.command_views.get(command.name)
+
+                # Create a minimal view that redirects output to modal
+                modal_view = _CommandView()
+                modal_view.output_view = output_view
+                self.command_views[command.name] = modal_view
+
+                result, error, output = await self.execute_command(command.name, kwargs)
+
+                # Restore previous view (or remove if there wasn't one)
+                if saved_view:
+                    self.command_views[command.name] = saved_view
+                else:
+                    del self.command_views[command.name]
+
+                if error:
+                    output_view.controls.append(
+                        ft.Text(f"ERROR: {error}", color=ft.Colors.RED)
+                    )
+            except Exception as e:
+                output_view.controls.append(
+                    ft.Text(f"ERROR: {e}", color=ft.Colors.RED)
+                )
+            finally:
+                # Update display
+                self.page.update()
+
+        # Submit button (hide if auto-executing)
+        submit_button = ft.ElevatedButton(
+            command.ui_spec.submit_name,
+            on_click=on_submit,
+            visible=not command.ui_spec.auto,
+        )
+
+        # Build content controls
+        content_controls = []
+
+        # Add form controls (if any)
+        if form_controls:
+            content_controls.extend(form_controls)
+            content_controls.append(ft.Divider())
+
+        # Add output section
+        content_controls.append(ft.Text("Output:", weight=ft.FontWeight.BOLD))
+        content_controls.append(
+            ft.Container(
+                content=output_view,
+                border=ft.border.all(1, ft.Colors.GREY_400),
+                border_radius=5,
+                padding=10,
+                expand=True,
+            )
+        )
+
+        # Create dialog with increased height (80% of typical screen)
+        dialog = ft.AlertDialog(
+            title=ft.Text(f"{command.name}") if command.ui_spec.header else None,
+            content=ft.Column(
+                controls=content_controls,
+                scroll=ft.ScrollMode.AUTO,
+                width=700,
+                height=700,
+                expand=True,
+            ),
+            actions=[
+                submit_button,
+                close_button,
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        # Close button handler
+        def on_close(e):
+            dialog.open = False
+            self.page.update()
+
+        close_button.on_click = on_close
+
+        # Show dialog
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
+        # Auto-execute if auto flag is set
+        if command.ui_spec.auto:
+            await on_submit(None)
 
     async def _create_command_view(self, command: CommandSpec) -> None:
         """Create UI view for a command (lazy initialization).
@@ -656,12 +828,12 @@ class GUIRunner(Runner):
         # Store view
         self.command_views[command.name] = view
 
-    def _create_param_control(self, param, view: _CommandView) -> Optional[ft.Control]:
+    def _create_param_control(self, param, view: Optional[_CommandView] = None) -> Optional[ft.Control]:
         """Create Flet control for parameter.
 
         Args:
             param: ParamSpec instance
-            view: CommandView to store the control in
+            view: CommandView to store the control in (optional, for modals)
 
         Returns:
             Flet control or None
@@ -717,7 +889,7 @@ class GUIRunner(Runner):
                     width=400,
                 )
 
-        if control:
+        if control and view:
             view.form_controls[param.name] = control
 
         return control

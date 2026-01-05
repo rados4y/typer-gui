@@ -365,6 +365,7 @@ class UiApp:
         on_select: Optional[Callable] = None,
         auto_scroll: bool = True,
         view: bool = False,
+        modal: bool = False,
     ):
         """Decorator to add GUI-specific options to a Typer command.
 
@@ -381,6 +382,7 @@ class UiApp:
             auto_scroll: Automatically scroll to end of output (default: True)
             view: Convenience flag - sets auto=True, auto_scroll=False, header=False
                   (useful for dashboard/info screens)
+            modal: Display parameters and results in a modal dialog (GUI only)
 
         Example:
             >>> @typer_app.command()
@@ -427,6 +429,7 @@ class UiApp:
                     submit_name=submit_name,
                     on_select=on_select,
                     auto_scroll=final_auto_scroll,
+                    modal=modal,
                 ),
             )
 

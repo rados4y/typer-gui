@@ -104,6 +104,7 @@ This allows the same `ui(tu.Text("Hello"))` call to work in both modes.
   - `header=True`: Show command name and description (default: True)
   - `auto_scroll=True`: Automatically scroll to end of output after execution (default: True)
   - `view=True`: Convenience flag - sets `auto=True, auto_scroll=False, header=False` (useful for dashboards)
+  - `modal=True`: Display parameters and results in a modal dialog (GUI only). All flags (long, auto, header, auto_scroll, view) are supported in modals. Close button is always enabled, allowing users to close the dialog at any time.
 
 ### Standalone Functions (`typer_ui/output.py`)
 - `ui(component_or_value)`: Universal output function for displaying components. **When passed a string, it renders as markdown** (e.g., `ui("# Hello")` renders markdown, not plain text)
