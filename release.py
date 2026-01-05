@@ -20,12 +20,12 @@ def run_command(cmd, description, check=True):
             capture_output=True
         )
         if result.returncode == 0:
-            print(f"✓ {description} completed successfully")
+            print(f"[OK] {description} completed successfully")
         if result.stdout:
             print(result.stdout)
         return result.returncode == 0, result.stdout
     except subprocess.CalledProcessError as e:
-        print(f"✗ ERROR: {description} failed!")
+        print(f"[ERROR] {description} failed!")
         print(f"  Exit code: {e.returncode}")
         if e.stdout:
             print(e.stdout)
@@ -43,7 +43,7 @@ def get_current_version():
     if match:
         return match.group(1)
 
-    print("✗ ERROR: Could not find version in pyproject.toml")
+    print("[ERROR] Could not find version in pyproject.toml")
     sys.exit(1)
 
 
@@ -51,7 +51,7 @@ def bump_minor_version(version):
     """Bump the minor version number."""
     parts = version.split(".")
     if len(parts) != 3:
-        print(f"✗ ERROR: Invalid version format: {version}")
+        print(f"[ERROR] Invalid version format: {version}")
         sys.exit(1)
 
     major, minor, patch = parts
@@ -99,7 +99,7 @@ def main():
     print("\n[3/8] Updating version in files...")
     update_version_in_file("pyproject.toml", current_version, new_version)
     update_version_in_file("typer_ui/__init__.py", current_version, new_version)
-    print("✓ Version updated in all files")
+    print("[OK] Version updated in all files")
 
     # Step 4: Commit version bump
     print("\n[4/8] Committing version bump...")
@@ -109,7 +109,7 @@ def main():
         "Committing version bump"
     )
     if not success:
-        print("✗ ERROR: Failed to commit version bump")
+        print("[ERROR] Failed to commit version bump")
         sys.exit(1)
 
     # Step 5: Create git tag
@@ -120,7 +120,7 @@ def main():
         f"Creating tag {tag_name}"
     )
     if not success:
-        print("✗ ERROR: Failed to create git tag")
+        print("[ERROR] Failed to create git tag")
         sys.exit(1)
 
     # Step 6: Push to remote
@@ -130,7 +130,7 @@ def main():
         "Pushing commit and tag to remote"
     )
     if not success:
-        print("✗ ERROR: Failed to push to remote")
+        print("[ERROR] Failed to push to remote")
         sys.exit(1)
 
     # Step 7: Clean and build package
@@ -138,7 +138,7 @@ def main():
     if dist_dir.exists():
         print("\n[7/8] Cleaning previous builds...")
         shutil.rmtree(dist_dir)
-        print("✓ Previous builds cleaned")
+        print("[OK] Previous builds cleaned")
 
     success, _ = run_command("python -m build", "Building package")
     if not success:
@@ -160,10 +160,10 @@ def main():
     print("\n" + "=" * 60)
     print(f"  Release v{new_version} completed successfully!")
     print("=" * 60)
-    print(f"\n✓ Version bumped: {current_version} → {new_version}")
-    print(f"✓ Git tag created: {tag_name}")
-    print(f"✓ Pushed to GitHub")
-    print(f"✓ Published to PyPI")
+    print(f"\n[OK] Version bumped: {current_version} -> {new_version}")
+    print(f"[OK] Git tag created: {tag_name}")
+    print(f"[OK] Pushed to GitHub")
+    print(f"[OK] Published to PyPI")
     print(f"\nCheck: https://pypi.org/project/typer-ui/")
     print(f"GitHub Release: https://github.com/rados4y/typer-ui/releases/tag/{tag_name}")
 
