@@ -1,5 +1,10 @@
 TODO:
-def_command(view=True, auto_scroll=True)
+[x] why \_new_ui_stack is private?
+[-] not working - def_command(view=True, auto_scroll=True)
+[-] paging not working
+[] logger UI
+[] popup result
+[] multi module app
 prepare proposition of console(CLIRunnerCtx) and get_JSON() methods in UIBlock
 refactor modules
 

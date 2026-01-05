@@ -48,7 +48,7 @@ class DynamicBlock(UiBlock):
         from rich.console import Group
 
         # Execute renderer with new UI stack context
-        with ctx._new_ui_stack() as ui_stack:
+        with ctx.new_ui_stack() as ui_stack:
             result = self.renderer()
             if result is not None:
                 ui_stack.append(result)
@@ -59,7 +59,7 @@ class DynamicBlock(UiBlock):
         # Set up observers for re-rendering
         def on_state_change():
             # Re-render with new stack context
-            with ctx._new_ui_stack() as new_stack:
+            with ctx.new_ui_stack() as new_stack:
                 result = self.renderer()
                 if result is not None:
                     new_stack.append(result)
@@ -97,7 +97,7 @@ class DynamicBlock(UiBlock):
             self._container.controls.clear()
 
             # Execute renderer with new UI stack context
-            with ctx._new_ui_stack() as ui_stack:
+            with ctx.new_ui_stack() as ui_stack:
                 result = self.renderer()
                 if result is not None:
                     ui_stack.append(result)

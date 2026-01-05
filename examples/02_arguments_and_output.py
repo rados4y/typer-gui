@@ -34,7 +34,7 @@ class Priority(str, Enum):
 
 
 @typer_app.command()
-@app.def_command(auto=True)
+@app.def_command(view=True)
 def welcome_screen():
     """
     Demonstrates a command that runs automatically when selected in the GUI.
@@ -45,7 +45,7 @@ def welcome_screen():
         """
 # Welcome!
 
-This command runs **automatically** when selected because `auto=True`.
+This command runs **automatically** when selected because `view=True`.
 
 It's a great way to present initial information or a dashboard without requiring user interaction to click a "Run" button.
 """
@@ -76,6 +76,7 @@ def basic_parameters(
 
 
 @typer_app.command()
+@app.def_command(view=True)
 def output_types():
     """Demonstrates shortcuts and different output methods."""
     # Shortcut: ui(str) renders as Markdown

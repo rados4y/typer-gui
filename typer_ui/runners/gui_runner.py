@@ -624,9 +624,10 @@ class GUIRunner(Runner):
         )
 
         # Create output view
+        # Set auto_scroll based on command's ui_spec
         view.output_view = ft.ListView(
             controls=[],
-            auto_scroll=True,
+            auto_scroll=command.ui_spec.auto_scroll,
             expand=True,
             spacing=0,
         )
@@ -890,7 +891,7 @@ class GUIRunner(Runner):
 
         try:
             # Execute command with UI stack context
-            with self.ctx._new_ui_stack() as ui_stack:
+            with self.ctx.new_ui_stack() as ui_stack:
                 with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
                     result = command_spec.callback(**params)
 
@@ -964,7 +965,7 @@ class GUIRunner(Runner):
 
         try:
             # Execute async command with UI stack context
-            with self.ctx._new_ui_stack() as ui_stack:
+            with self.ctx.new_ui_stack() as ui_stack:
                 # Register observer for real-time updates during async execution
                 def on_append(item):
                     """Build and display item immediately."""
@@ -1054,7 +1055,7 @@ class GUIRunner(Runner):
 
             try:
                 # Execute command with UI stack context
-                with self.ctx._new_ui_stack() as ui_stack:
+                with self.ctx.new_ui_stack() as ui_stack:
                     # Register observer for real-time updates during thread execution
                     def on_append(item):
                         """Build and display item immediately (thread-safe)."""

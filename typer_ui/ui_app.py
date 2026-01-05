@@ -139,18 +139,45 @@ class UICommand:
             ...         app.command("fetch").run(source="api").out
             ...     )))
         """
+        import asyncio
+        import inspect
+
         # Select command first (in GUI mode, this updates the form)
         self.select()
 
         # Execute via runner if available
         if self.ui_app.runner:
-            result, error, output = self.ui_app.runner.execute_command(
+            # Check if execute_command is async (GUI mode) or sync (CLI mode)
+            exec_result = self.ui_app.runner.execute_command(
                 self.command_spec.name, kwargs
             )
-            self.result = result
-            self._output = output
-            if error:
-                raise error
+
+            # Handle async execution (GUI mode)
+            if inspect.iscoroutine(exec_result):
+                # In GUI mode, schedule async execution
+                runner = self.ui_app.runner
+                if hasattr(runner, 'page') and runner.page:
+                    async def do_run():
+                        result, error, output = await exec_result
+                        self.result = result
+                        self._output = output
+                        if error:
+                            raise error
+                    runner.page.run_task(do_run)
+                else:
+                    # Fallback: run async in new event loop (shouldn't happen)
+                    result, error, output = asyncio.run(exec_result)
+                    self.result = result
+                    self._output = output
+                    if error:
+                        raise error
+            else:
+                # Sync execution (CLI mode)
+                result, error, output = exec_result
+                self.result = result
+                self._output = output
+                if error:
+                    raise error
         else:
             # Direct execution fallback
             result = self.command_spec.callback(**kwargs)
@@ -185,7 +212,7 @@ class UICommand:
                 ctx = self.ui_app.runner.ctx
 
                 # Execute with new stack context
-                with ctx._new_ui_stack() as ui_stack:
+                with ctx.new_ui_stack() as ui_stack:
                     # Execute callback - ui() calls will append to this stack
                     if self.command_spec.callback:
                         result = self.command_spec.callback(**kwargs)
@@ -336,6 +363,8 @@ class UiApp:
         header: bool = True,
         submit_name: str = "Run Command",
         on_select: Optional[Callable] = None,
+        auto_scroll: bool = True,
+        view: bool = False,
     ):
         """Decorator to add GUI-specific options to a Typer command.
 
@@ -349,6 +378,9 @@ class UiApp:
             header: Show command name and description (default: True)
             submit_name: Text for the submit button (default: "Run Command")
             on_select: Callback function called when command is selected
+            auto_scroll: Automatically scroll to end of output (default: True)
+            view: Convenience flag - sets auto=True, auto_scroll=False, header=False
+                  (useful for dashboard/info screens)
 
         Example:
             >>> @typer_app.command()
@@ -359,14 +391,29 @@ class UiApp:
             >>>         time.sleep(1)
             >>>
             >>> @typer_app.command()
-            >>> @app.def_command(auto=True, header=False)
+            >>> @app.def_command(view=True)
             >>> def dashboard():
-            >>>     ui("# Dashboard")  # Only output shown, no command header
+            >>>     ui("# Dashboard")  # Auto-executes, no header, no auto-scroll
+            >>>
+            >>> @typer_app.command()
+            >>> @app.def_command(auto=True, header=False, auto_scroll=False)
+            >>> def status():
+            >>>     ui("# Status")  # Equivalent to view=True
         """
 
         def decorator(func: Callable) -> Callable:
             import asyncio
             import inspect
+
+            # Handle view flag - overrides auto, header, and auto_scroll
+            final_auto = auto
+            final_header = header
+            final_auto_scroll = auto_scroll
+
+            if view:
+                final_auto = True
+                final_header = False
+                final_auto_scroll = False
 
             # Store GUI options on the function
             setattr(
@@ -375,10 +422,11 @@ class UiApp:
                 CommandUiSpec(
                     button=button,
                     long=long,
-                    auto=auto,
-                    header=header,
+                    auto=final_auto,
+                    header=final_header,
                     submit_name=submit_name,
                     on_select=on_select,
+                    auto_scroll=final_auto_scroll,
                 ),
             )
 

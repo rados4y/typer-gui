@@ -32,6 +32,7 @@ def fetch_data(source: str = "database"):
 
 
 @typer_app.command()
+@app.def_command(view=True)
 def generate_report():
     """Generate a final report."""
     ui("### Final Report")
@@ -55,7 +56,7 @@ def generate_report():
 
 
 @typer_app.command()
-@app.def_command(auto=True)
+@app.def_command(view=True)
 def control_demo():
     """Interactive demo of run(), include(), and select()."""
     ui("# Command Control Demo")

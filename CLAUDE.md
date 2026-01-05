@@ -98,6 +98,12 @@ This allows the same `ui(tu.Text("Hello"))` call to work in both modes.
 - `app.command(name)`: Returns UICommand wrapper for programmatic control
 - `app.state(value)`: Creates reactive state objects
 - `app.def_command()`: Decorator for GUI-specific options
+  - `button=True`: Display as button in left panel
+  - `long=True`: Enable real-time output streaming for long-running commands
+  - `auto=True`: Execute automatically when selected, hide submit button
+  - `header=True`: Show command name and description (default: True)
+  - `auto_scroll=True`: Automatically scroll to end of output after execution (default: True)
+  - `view=True`: Convenience flag - sets `auto=True, auto_scroll=False, header=False` (useful for dashboards)
 
 ### Standalone Functions (`typer_ui/output.py`)
 - `ui(component_or_value)`: Universal output function for displaying components. **When passed a string, it renders as markdown** (e.g., `ui("# Hello")` renders markdown, not plain text)
@@ -305,6 +311,13 @@ def my_command():
     # Reactive UI with dx()
     counter = app.state(0)
     ui(dx(lambda: f"Count: {counter.value}", counter))
+
+# Dashboard/view command (auto-executes, no header, no scroll)
+@typer_app.command()
+@app.def_command(view=True)
+def dashboard():
+    ui("# Dashboard")
+    ui(tu.Table(cols=["Metric", "Value"], data=[...]))
 
 # Launch app
 if __name__ == "__main__":

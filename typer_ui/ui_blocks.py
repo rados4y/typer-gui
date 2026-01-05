@@ -1159,13 +1159,37 @@ class DataTable(Container):
         # Calculate pagination
         total_pages = (self._total_count + self.page_size - 1) // self.page_size
 
+        # Create pagination buttons
+        prev_button = ft.IconButton(
+            icon=ft.Icons.ARROW_BACK,
+            on_click=lambda e: self.prev_page(),
+            disabled=(self._current_page == 0),
+            tooltip="Previous page"
+        )
+
+        next_button = ft.IconButton(
+            icon=ft.Icons.ARROW_FORWARD,
+            on_click=lambda e: self.next_page(),
+            disabled=(self._current_page >= total_pages - 1),
+            tooltip="Next page"
+        )
+
+        # Store references for updates
+        self.flet_pagination_prev = prev_button
+        self.flet_pagination_next = next_button
+        self.flet_pagination_info = ft.Text(
+            f"Page {self._current_page + 1} of {total_pages} | Total: {self._total_count} rows"
+        )
+
         # Create pagination controls
         pagination = ft.Row(
             [
-                ft.Text(f"Page {self._current_page + 1} of {total_pages}"),
-                ft.Text(f"| Total: {self._total_count} rows"),
+                prev_button,
+                self.flet_pagination_info,
+                next_button,
             ],
             spacing=10,
+            alignment=ft.MainAxisAlignment.CENTER,
         )
 
         # Build container
@@ -1179,3 +1203,41 @@ class DataTable(Container):
         ])
 
         return ft.Column(controls=controls, spacing=10)
+
+    def _update(self) -> None:
+        """Update GUI controls when data changes (pagination, sorting, filtering).
+
+        Overrides Container._update() to refresh table rows, pagination info,
+        and button states.
+        """
+        # Only update if in GUI mode and controls exist
+        if not self._flet_control:
+            return
+
+        import flet as ft
+
+        # Update table rows
+        new_rows = [
+            ft.DataRow(cells=[ft.DataCell(ft.Text(str(cell))) for cell in row])
+            for row in self._data_cache
+        ]
+        self._flet_control.rows = new_rows
+
+        # Update pagination info
+        total_pages = (self._total_count + self.page_size - 1) // self.page_size
+        if self.flet_pagination_info:
+            self.flet_pagination_info.value = (
+                f"Page {self._current_page + 1} of {total_pages} | "
+                f"Total: {self._total_count} rows"
+            )
+
+        # Update button states
+        if self.flet_pagination_prev:
+            self.flet_pagination_prev.disabled = (self._current_page == 0)
+
+        if self.flet_pagination_next:
+            self.flet_pagination_next.disabled = (self._current_page >= total_pages - 1)
+
+        # Trigger page update
+        if self._ctx and hasattr(self._ctx, 'page') and self._ctx.page:
+            self._ctx.page.update()

@@ -23,6 +23,7 @@ app = tu.UiApp(
 
 
 @typer_app.command()
+@app.def_command(view=True)
 def ui_text_md():
     """Text and Markdown components - simple text display and rich formatting."""
     # Plain text
@@ -42,6 +43,7 @@ You can use **bold**, *italic*, and `code` formatting.
 
 
 @typer_app.command()
+@app.def_command(view=True)
 def ui_table():
     """Table component - display tabular data."""
     ui(tu.Table(
@@ -70,6 +72,7 @@ def ui_table_progressive():
 
 
 @typer_app.command()
+@app.def_command(view=True)
 def ui_row_column():
     """Row and Column layout - arrange components horizontally and vertically."""
     ui("# Layout Components")
@@ -92,6 +95,7 @@ def ui_row_column():
 
 
 @typer_app.command()
+@app.def_command(view=True)
 def ui_button_link():
     """Button and Link components - interactive elements (GUI only)."""
     ui("# Interactive Components")
@@ -114,6 +118,7 @@ def ui_button_link():
 
 
 @typer_app.command()
+@app.def_command(view=True)
 def ui_tabs():
     """Tabs component - organize content in tabbed interface."""
     ui("# Tabs Component")
@@ -229,6 +234,7 @@ Configure your preferences here.
 
 
 @typer_app.command()
+@app.def_command(view=True)
 def ui_nested():
     """Nested components - combining multiple components in a hierarchy."""
     ui("# Dashboard")

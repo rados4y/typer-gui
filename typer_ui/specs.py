@@ -66,6 +66,9 @@ class CommandUiSpec:
     on_select: Optional[Callable] = None
     """Callback function called when command is selected in GUI"""
 
+    auto_scroll: bool = True
+    """Automatically scroll to the end of output after command execution"""
+
 
 @dataclass(frozen=True)
 class CommandSpec:

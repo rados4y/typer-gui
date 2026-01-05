@@ -115,7 +115,7 @@ class UIRunnerCtx(ABC):
         )
 
     @contextmanager
-    def _new_ui_stack(self):
+    def new_ui_stack(self):
         """Context manager for stack management using context variables.
 
         Creates a new UI stack and sets it in the context variable.
@@ -123,6 +123,9 @@ class UIRunnerCtx(ABC):
 
         This supports nested callables - each callable gets its own stack,
         and when it completes (or raises an error), the previous stack is restored.
+
+        Public API for extensibility - use this when creating custom components
+        that need to capture UI output in isolation.
 
         Yields:
             UiStack: The new UI stack for capturing ui() calls.

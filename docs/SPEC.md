@@ -42,7 +42,7 @@ The library is divided into four distinct layers. The public-facing API, `typer_
         - **Key Methods**:
             - `ui(component)`: Simply appends UIBlockType to current stack (lazy evaluation).
             - `build_child(parent, child)`: Handles all complexity of building different content types.
-            - `_new_ui_stack()`: Context manager for save/restore stack pattern.
+            - `new_ui_stack()`: Context manager for save/restore stack pattern (public API for extensibility).
     - **`typer_ui.runners.cli_context.CLIRunnerCtx`**: CLI-specific context using Rich library.
     - **`typer_ui.runners.gui_context.GUIRunnerCtx`**: GUI-specific context using Flet library.
     - **`typer_ui.runners.gui_runner.GUIRunner`**: Orchestrates GUI execution and manages Flet page.

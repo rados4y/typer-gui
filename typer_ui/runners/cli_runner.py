@@ -165,7 +165,7 @@ class CLIRunner(Runner):
 
         try:
             # Execute command with UI stack context
-            with self.ctx._new_ui_stack() as ui_stack:
+            with self.ctx.new_ui_stack() as ui_stack:
                 with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
                     # Call the command callback directly
                     # Async commands are already wrapped by def_command decorator

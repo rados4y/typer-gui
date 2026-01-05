@@ -130,7 +130,7 @@ class GUIRunnerCtx(UIRunnerCtx):
             self._current_stack.append(component)
 
     @contextmanager
-    def _new_ui_stack(self):
+    def new_ui_stack(self):
         """Context manager for stack management with save/restore pattern."""
         # Save current stack reference
         previous_stack = self._current_stack
@@ -164,7 +164,7 @@ class GUIRunnerCtx(UIRunnerCtx):
         # Case 3: Dynamic callable (can receive ui() calls after execution)
         if callable(child) and getattr(child, '__typer_ui_is_dynamic__', False):
             # Capture initial UI
-            with self._new_ui_stack() as ui_stack:
+            with self.new_ui_stack() as ui_stack:
                 child()
 
             # Build ListView from captured stack
@@ -183,7 +183,7 @@ class GUIRunnerCtx(UIRunnerCtx):
 
         # Case 4: Regular callable → Capture ui() calls
         if callable(child):
-            with self._new_ui_stack() as ui_stack:
+            with self.new_ui_stack() as ui_stack:
                 child()
 
             # Build controls from captured stack
@@ -308,7 +308,7 @@ class CLIRunnerCtx(UIRunnerCtx):
             child._ctx = self
             return child.build_cli(self)
         if callable(child):
-            with self._new_ui_stack() as ui_stack:
+            with self.new_ui_stack() as ui_stack:
                 child()
             renderables = [self.build_child(parent, item) for item in ui_stack]
             return Group(*renderables) if len(renderables) > 1 else renderables[0]
@@ -579,7 +579,7 @@ class CLIRunnerCtx(UIRunnerCtx):
         from rich.console import Group
 
         # Create new stack with save/restore pattern
-        with self._new_ui_stack() as ui_stack:
+        with self.new_ui_stack() as ui_stack:
             # Execute callable - may call ui() multiple times
             result = callback()
 
@@ -617,7 +617,7 @@ class GUIRunner:
 
         try:
             # Create new stack with save/restore pattern
-            with self.ctx._new_ui_stack() as ui_stack:
+            with self.ctx.new_ui_stack() as ui_stack:
                 # Execute command - all ui() calls append to ui_stack
                 result = command_spec.callback(**params)
                 if result is not None:
@@ -640,7 +640,7 @@ class GUIRunner:
 ```
 Command Execution:
 1. Runner sets current context instance
-2. Runner creates ui_stack with _new_ui_stack()
+2. Runner creates ui_stack with new_ui_stack()
    ├─ Saves previous_stack = None
    ├─ Creates new UiStack()
    └─ Sets ctx._current_stack = ui_stack
@@ -660,7 +660,7 @@ Command Execution:
 Nested Callable (e.g., Tab content):
 1. Tabs.build_gui() calls ctx.build_child(tab.content)
 2. build_child() detects callable
-3. build_child() calls ctx._new_ui_stack()
+3. build_child() calls ctx.new_ui_stack()
    ├─ Saves previous_stack (main command stack)
    ├─ Creates new UiStack()
    └─ Sets ctx._current_stack = new stack
@@ -837,7 +837,7 @@ class UIRunnerCtx(ABC):
         current_stack.append(component)  # Just append, don't build yet!
 
     @contextmanager
-    def _new_ui_stack(self):
+    def new_ui_stack(self):
         """Context manager for stack management."""
         ui_stack = []
         self._ui_stack.append(ui_stack)
@@ -864,7 +864,7 @@ class UIRunnerCtx(ABC):
         # Case 3: Dynamic callable (can receive ui() calls after execution)
         if callable(child) and getattr(child, '__typer_ui_is_dynamic__', False):
             # Capture initial UI
-            with self._new_ui_stack() as ui_stack:
+            with self.new_ui_stack() as ui_stack:
                 child()
 
             # Build ListView from captured stack
@@ -883,7 +883,7 @@ class UIRunnerCtx(ABC):
 
         # Case 4: Regular callable → Capture ui() calls
         if callable(child):
-            with self._new_ui_stack() as ui_stack:
+            with self.new_ui_stack() as ui_stack:
                 child()
 
             # Build controls from captured stack
@@ -927,7 +927,7 @@ def ui(component: UIBlockType) -> None:
 - Allows lazy evaluation
 
 **4. Context manager for clean stack management**
-- `with self._new_ui_stack() as ui_stack:`
+- `with self.new_ui_stack() as ui_stack:`
 - Automatic push/pop
 - No manual stack management
 
@@ -1011,7 +1011,7 @@ class CLIRunnerCtx(UIRunnerCtx):
 
         # Dynamic callable for CLI
         if callable(child) and getattr(child, '__typer_ui_is_dynamic__', False):
-            with self._new_ui_stack() as ui_stack:
+            with self.new_ui_stack() as ui_stack:
                 child()
 
             # Print captured output

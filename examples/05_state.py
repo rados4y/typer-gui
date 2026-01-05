@@ -22,7 +22,7 @@ class Order:
 
 
 @typer_app.command()
-@app.def_command(auto=True, header=False)
+@app.def_command(view=True)
 def state_demo():
     """Demonstrates reactive UI components tied to state."""
     counter = app.state(0)
@@ -47,7 +47,7 @@ def state_demo():
 
 
 @typer_app.command()
-@app.def_command(auto=True, header=False)
+@app.def_command(view=True)
 def orders_demo():
     """Demonstrates a master-detail view using state."""
 

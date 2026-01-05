@@ -149,7 +149,7 @@ def _execute_sync(self, command_spec, params):
         # ═══════════════════════════════════════════════════
         # Create NEW ui_stack with context manager
         # ═══════════════════════════════════════════════════
-        with self.ctx._new_ui_stack() as ui_stack:
+        with self.ctx.new_ui_stack() as ui_stack:
             # Execute command callback
             result = command_spec.callback(**params)  # ← Calls hello()
 
@@ -167,11 +167,11 @@ def _execute_sync(self, command_spec, params):
             self.add_to_output(control)
 ```
 
-**File:** `typer_ui/context.py:110` (`UIRunnerCtx._new_ui_stack`)
+**File:** `typer_ui/context.py:110` (`UIRunnerCtx.new_ui_stack`)
 
 ```python
 @contextmanager
-def _new_ui_stack(self):
+def new_ui_stack(self):
     ui_stack = UiStack()  # Create new UiStack
     self._ui_stack.append(ui_stack)  # Push onto stack
     try:
@@ -213,7 +213,7 @@ def ui(component_or_value: UIBlockType) -> UIBlockType:
 
 ```python
 def ui(self, component: UIBlockType):
-    # Get current stack (from _new_ui_stack context manager)
+    # Get current stack (from new_ui_stack context manager)
     current_stack = self._ui_stack[-1] if self._ui_stack else None
 
     if current_stack is None:
@@ -393,7 +393,7 @@ def execute_command(self, command_name: str, params: dict):
 
     try:
         # Execute command with UI stack context
-        with self.ctx._new_ui_stack() as ui_stack:
+        with self.ctx.new_ui_stack() as ui_stack:
             result = command_spec.callback(**params)  # ← Calls hello()
 
             if result is not None:
@@ -472,7 +472,7 @@ self.ctx.console.print(renderable)  # ← Outputs to terminal
 | **UIRunnerCtx._ui_stack** | `List[List[UIBlockType]]` | `List[UiStack]` (extends list) | ✅ |
 | **ui() simplicity** | Just append to stack | `current_stack.append(component)` | ✅ |
 | **Lazy evaluation** | Build deferred until needed | Builds in stack processing loop | ✅ |
-| **Context manager** | `_new_ui_stack()` with yield | Implemented with push/pop | ✅ |
+| **Context manager** | `new_ui_stack()` with yield | Implemented with push/pop | ✅ |
 | **build_child() cases** | 5 cases (str/UIBlock/dynamic/regular/fallback) | All 5 implemented | ✅ |
 | **Parent-child hierarchy** | `parent.add_child(child)` | Called in build_child Case 2 | ✅ |
 | **Store context** | `child._ctx = self` | Set in build_child | ✅ |
@@ -511,7 +511,7 @@ _ui_stack = []  ← Stack popped
 
 **Long-running command:**
 ```python
-with self.ctx._new_ui_stack() as ui_stack:
+with self.ctx.new_ui_stack() as ui_stack:
     # Register observer for real-time updates
     def on_append(item):
         control = self.ctx.build_child(root, item)

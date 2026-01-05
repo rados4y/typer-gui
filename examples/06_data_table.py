@@ -162,7 +162,7 @@ class UserDataSource(tu.DataSource):
 
 
 @typer_app.command()
-@app.def_command(button=True, auto=True, header=False)
+@app.def_command(button=True, view=True)
 def browse_users():
     """Browse users with pagination, sorting, and filtering.
 
@@ -190,7 +190,7 @@ def browse_users():
 
 
 @typer_app.command()
-@app.def_command(button=True, auto=True, header=False)
+@app.def_command(button=True, view=True)
 def large_dataset():
     """Browse a larger dataset (500 records) with smaller page size.
 
@@ -216,7 +216,7 @@ def large_dataset():
 
 
 @typer_app.command()
-@app.def_command(button=True, auto=True, header=False)
+@app.def_command(button=True, view=True)
 def admin_only():
     """View only admin users (pre-filtered data source).
 

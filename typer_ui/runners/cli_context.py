@@ -72,7 +72,7 @@ class CLIRunnerCtx(UIRunnerCtx):
         # Case 3: Dynamic callable (can receive ui() calls after execution)
         if callable(child) and getattr(child, '__typer_ui_is_dynamic__', False):
             # Capture initial UI
-            with self._new_ui_stack() as ui_stack:
+            with self.new_ui_stack() as ui_stack:
                 child()
 
             # Print captured output immediately
@@ -90,7 +90,7 @@ class CLIRunnerCtx(UIRunnerCtx):
 
         # Case 4: Regular callable → Capture ui() calls
         if callable(child):
-            with self._new_ui_stack() as ui_stack:
+            with self.new_ui_stack() as ui_stack:
                 result = child()
 
                 # If callable returns a value, add it to stack
