@@ -742,7 +742,7 @@ class Link(UiBlock):
                 set_current_runner(saved_runner)
 
         return ft.TextButton(
-            text=self.text,
+            self.text,
             icon=ft.Icons.LINK,
             on_click=handle_click,
         )

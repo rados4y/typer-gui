@@ -476,7 +476,7 @@ class GUIRunner(Runner):
                 )
             else:
                 btn = ft.TextButton(
-                    text=cmd.name,
+                    cmd.name,
                     on_click=handle_click,
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=5),
