@@ -775,7 +775,7 @@ class GUIRunner(Runner):
                     await self._run_command()
 
                 clear_button = ft.OutlinedButton(
-                    text="Clear & Re-run",
+                    "Clear & Re-run",
                     icon=ft.Icons.REFRESH,
                     on_click=handle_clear,
                 )
