@@ -230,8 +230,11 @@ class Container(UiBlock, ABC):
         # New architecture: use _ctx if available
         if self._ctx and hasattr(self._ctx, 'page'):
             # Component's Flet control is already in the page
-            # Just trigger a page refresh to show updates
-            if self._ctx.page:
+            # Use runner's thread-safe update for Flet 0.80+
+            if hasattr(self._ctx, 'runner') and self._ctx.runner:
+                self._ctx.runner._safe_page_update()
+            elif self._ctx.page:
+                # Fallback to direct update if runner not available
                 self._ctx.page.update()
 
 
@@ -1238,6 +1241,9 @@ class DataTable(Container):
         if self.flet_pagination_next:
             self.flet_pagination_next.disabled = (self._current_page >= total_pages - 1)
 
-        # Trigger page update
-        if self._ctx and hasattr(self._ctx, 'page') and self._ctx.page:
-            self._ctx.page.update()
+        # Trigger thread-safe page update for Flet 0.80+
+        if self._ctx:
+            if hasattr(self._ctx, 'runner') and self._ctx.runner:
+                self._ctx.runner._safe_page_update()
+            elif hasattr(self._ctx, 'page') and self._ctx.page:
+                self._ctx.page.update()
