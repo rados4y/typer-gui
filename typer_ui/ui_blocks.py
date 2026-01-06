@@ -64,8 +64,8 @@ class UiBlock(ABC):
     def __init__(self):
         """Initialize the UI block with hierarchy support."""
         # Parent-child hierarchy (for new architecture)
-        self._parent: Optional['UiBlock'] = None
-        self._children: List['UiBlock'] = []
+        self._parent: Optional["UiBlock"] = None
+        self._children: List["UiBlock"] = []
 
         # Context and control references (for new architecture)
         self._ctx: Optional[Any] = None  # UIRunnerCtx instance
@@ -120,6 +120,7 @@ class UiBlock(ABC):
 
         # Use CLIRunnerCtx to build the component
         from .runners.cli_context import CLIRunnerCtx
+
         ctx = CLIRunnerCtx()
         ctx.console = console
 
@@ -135,21 +136,21 @@ class UiBlock(ABC):
 
     # Hierarchy management methods (for new architecture)
     @property
-    def parent(self) -> Optional['UiBlock']:
+    def parent(self) -> Optional["UiBlock"]:
         """Get parent component."""
         return self._parent
 
     @property
-    def children(self) -> List['UiBlock']:
+    def children(self) -> List["UiBlock"]:
         """Get child components."""
         return self._children
 
     @children.setter
-    def children(self, value: List['UiBlock']) -> None:
+    def children(self, value: List["UiBlock"]) -> None:
         """Set child components."""
         self._children = value
 
-    def add_child(self, child: 'UiBlock') -> None:
+    def add_child(self, child: "UiBlock") -> None:
         """Add child and establish parent-child relationship.
 
         Args:
@@ -159,7 +160,7 @@ class UiBlock(ABC):
         if child not in self._children:
             self._children.append(child)
 
-    def get_root(self) -> 'UiBlock':
+    def get_root(self) -> "UiBlock":
         """Get root component by walking up the hierarchy.
 
         Returns:
@@ -228,10 +229,10 @@ class Container(UiBlock, ABC):
         so we just need to refresh it.
         """
         # New architecture: use _ctx if available
-        if self._ctx and hasattr(self._ctx, 'page'):
+        if self._ctx and hasattr(self._ctx, "page"):
             # Component's Flet control is already in the page
             # Use runner's thread-safe update for Flet 0.80+
-            if hasattr(self._ctx, 'runner') and self._ctx.runner:
+            if hasattr(self._ctx, "runner") and self._ctx.runner:
                 self._ctx.runner._safe_page_update()
             elif self._ctx.page:
                 # Fallback to direct update if runner not available
@@ -266,6 +267,7 @@ class Text(UiBlock):
             Rich Text renderable
         """
         from rich.text import Text as RichText
+
         return RichText(self.content)
 
     def build_gui(self, ctx) -> Any:
@@ -278,6 +280,7 @@ class Text(UiBlock):
             Flet Text control
         """
         import flet as ft
+
         return ft.Text(self.content, selectable=True)
 
 
@@ -304,6 +307,7 @@ class Md(UiBlock):
             Rich Markdown renderable
         """
         from rich.markdown import Markdown
+
         return Markdown(self.content)
 
     def build_gui(self, ctx) -> Any:
@@ -316,6 +320,7 @@ class Md(UiBlock):
             Flet Markdown control
         """
         import flet as ft
+
         return ft.Markdown(
             self.content,
             selectable=True,
@@ -409,7 +414,9 @@ class Table(Container):
         """
         from rich.table import Table as RichTable
 
-        table = RichTable(show_header=True, header_style="bold magenta", title=self.title)
+        table = RichTable(
+            show_header=True, header_style="bold magenta", title=self.title
+        )
 
         # Add columns
         for col in self.cols:
@@ -493,7 +500,7 @@ class Row(Container):
         """Initialize Container attributes after dataclass init."""
         # Store the children list from dataclass field before calling super().__init__()
         # because dataclass sets self.children directly, bypassing the property setter
-        children_from_dataclass = self.children if hasattr(self, 'children') else []
+        children_from_dataclass = self.children if hasattr(self, "children") else []
 
         # Only call super().__init__() if not already initialized
         if not hasattr(self, "_context_active"):
@@ -537,6 +544,7 @@ class Row(Container):
                 renderables.append(renderable)
             elif not isinstance(child, UiBlock):
                 from rich.text import Text as RichText
+
                 renderables.append(RichText(str(child)))
 
         return Group(*renderables) if renderables else ""
@@ -566,7 +574,7 @@ class Column(Container):
         """Initialize Container attributes after dataclass init."""
         # Store the children list from dataclass field before calling super().__init__()
         # because dataclass sets self.children directly, bypassing the property setter
-        children_from_dataclass = self.children if hasattr(self, 'children') else []
+        children_from_dataclass = self.children if hasattr(self, "children") else []
 
         # Only call super().__init__() if not already initialized
         if not hasattr(self, "_context_active"):
@@ -675,7 +683,7 @@ class Button(UiBlock):
             # Set runner context for callback execution
             saved_runner = get_current_runner()
             # Try to get runner from ctx if available
-            runner = getattr(ctx, 'runner', None)
+            runner = getattr(ctx, "runner", None)
             if runner:
                 set_current_runner(runner)
             try:
@@ -736,7 +744,7 @@ class Link(UiBlock):
         def handle_click(e):
             # Set runner context for callback execution
             saved_runner = get_current_runner()
-            runner = getattr(ctx, 'runner', None)
+            runner = getattr(ctx, "runner", None)
             if runner:
                 set_current_runner(runner)
             try:
@@ -780,6 +788,7 @@ class TextInput(UiBlock):
             Rich Text renderable with input result
         """
         from rich.text import Text as RichText
+
         # Note: In CLI mode, this would typically use input() during show_cli
         # For build_cli, we just return the current state
         return RichText(f"{self.label}: {self.value}")
@@ -800,7 +809,7 @@ class TextInput(UiBlock):
             if self.on_change:
                 # Set runner context for callback execution
                 saved_runner = get_current_runner()
-                runner = getattr(ctx, 'runner', None)
+                runner = getattr(ctx, "runner", None)
                 if runner:
                     set_current_runner(runner)
                 try:
@@ -1021,7 +1030,9 @@ class DataTable(Container):
 
     def next_page(self) -> None:
         """Navigate to the next page if available."""
-        max_page = (self._total_count - 1) // self.page_size if self._total_count > 0 else 0
+        max_page = (
+            (self._total_count - 1) // self.page_size if self._total_count > 0 else 0
+        )
         if self._current_page < max_page:
             self._current_page += 1
             self._load_data()
@@ -1100,7 +1111,9 @@ class DataTable(Container):
         from rich.text import Text as RichText
 
         # Build table
-        table = RichTable(show_header=True, header_style="bold magenta", title=self.title)
+        table = RichTable(
+            show_header=True, header_style="bold magenta", title=self.title
+        )
 
         # Add columns
         for col in self.cols:
@@ -1137,8 +1150,7 @@ class DataTable(Container):
 
         # Create table columns
         columns = [
-            ft.DataColumn(ft.Text(col, weight=ft.FontWeight.BOLD))
-            for col in self.cols
+            ft.DataColumn(ft.Text(col, weight=ft.FontWeight.BOLD)) for col in self.cols
         ]
 
         # Create data rows
@@ -1156,8 +1168,9 @@ class DataTable(Container):
             horizontal_lines=ft.BorderSide(1, ft.Colors.GREY_300),
         )
 
-        # Store reference
-        self._flet_control = data_table
+        # Store separate reference to the actual DataTable control
+        # (Note: _flet_control will be overwritten with the Column by the caller)
+        self._data_table_control = data_table
 
         # Calculate pagination
         total_pages = (self._total_count + self.page_size - 1) // self.page_size
@@ -1167,14 +1180,14 @@ class DataTable(Container):
             icon=ft.Icons.ARROW_BACK,
             on_click=lambda e: self.prev_page(),
             disabled=(self._current_page == 0),
-            tooltip="Previous page"
+            tooltip="Previous page",
         )
 
         next_button = ft.IconButton(
             icon=ft.Icons.ARROW_FORWARD,
             on_click=lambda e: self.next_page(),
             disabled=(self._current_page >= total_pages - 1),
-            tooltip="Next page"
+            tooltip="Next page",
         )
 
         # Store references for updates
@@ -1200,10 +1213,12 @@ class DataTable(Container):
         if self.title:
             controls.append(ft.Text(self.title, size=18, weight=ft.FontWeight.BOLD))
 
-        controls.extend([
-            data_table,
-            pagination,
-        ])
+        controls.extend(
+            [
+                data_table,
+                pagination,
+            ]
+        )
 
         return ft.Column(controls=controls, spacing=10)
 
@@ -1213,8 +1228,8 @@ class DataTable(Container):
         Overrides Container._update() to refresh table rows, pagination info,
         and button states.
         """
-        # Only update if in GUI mode and controls exist
-        if not self._flet_control:
+        # Only update if in GUI mode and data table control exists
+        if not hasattr(self, '_data_table_control') or not self._data_table_control:
             return
 
         import flet as ft
@@ -1224,7 +1239,7 @@ class DataTable(Container):
             ft.DataRow(cells=[ft.DataCell(ft.Text(str(cell))) for cell in row])
             for row in self._data_cache
         ]
-        self._flet_control.rows = new_rows
+        self._data_table_control.rows = new_rows
 
         # Update pagination info
         total_pages = (self._total_count + self.page_size - 1) // self.page_size
