@@ -149,7 +149,8 @@ class GUIRunner(Runner):
                 if hasattr(component, '_reactive_id'):
                     self._reactive_components[component._reactive_id] = control
             if self.page:
-                self.page.update()
+                # Thread-safe update for Flet 0.80+
+                self._safe_page_update()
 
     def register_control(self, component: Any, control: ft.Control) -> None:
         """Register a control for later access.
@@ -163,6 +164,26 @@ class GUIRunner(Runner):
     def refresh(self) -> None:
         """Refresh the page."""
         if self.page:
+            self.page.update()
+
+    def _safe_page_update(self) -> None:
+        """Thread-safe page update for Flet 0.80+.
+
+        In Flet 0.80+, page.update() must be called from the main thread.
+        This method uses page.run_task() to ensure thread-safe updates.
+        """
+        if not self.page:
+            return
+
+        # Use page.run_task for thread-safe async execution
+        async def do_update():
+            self.page.update()
+
+        try:
+            self.page.run_task(do_update)
+        except Exception:
+            # Fallback to direct update if run_task fails
+            # (e.g., if already in main thread)
             self.page.update()
 
     @property
@@ -1233,8 +1254,7 @@ class GUIRunner(Runner):
                         """Build and display item immediately (thread-safe)."""
                         control = self.ctx.build_child(root, item)
                         self.add_to_output(control)
-                        if self.page:
-                            self.page.update()
+                        # Note: add_to_output already calls _safe_page_update()
 
                         # Also capture for text output
                         text_repr = self._component_to_text(item)
@@ -1358,7 +1378,8 @@ class GUIRunner(Runner):
                     )
                 )
             if self.page:
-                self.page.update()
+                # Thread-safe update for Flet 0.80+
+                self._safe_page_update()
 
 
 def create_flet_app(app_spec: AppSpec, ui: Optional[Any] = None):
