@@ -270,7 +270,7 @@ python examples/03_ui_blocks.py
 ## Package Notes
 
 - Python 3.10+ required
-- Dependencies: `typer>=0.9.0`, `flet>=0.20.0`
+- Dependencies: `typer>=0.9.0`, `flet>=0.80.1`
 - Package name: `typer2ui` (note: no hyphens in package name, but import uses underscore: `typer_ui`)
 - Import pattern (dual import):
   ```python
