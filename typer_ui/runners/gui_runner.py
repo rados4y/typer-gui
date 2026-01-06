@@ -662,7 +662,7 @@ class GUIRunner(Runner):
         content_controls.append(
             ft.Container(
                 content=output_view,
-                border=ft.border.all(1, ft.Colors.GREY_400),
+                border=ft.Border.all(1, ft.Colors.GREY_400),
                 border_radius=5,
                 padding=10,
                 expand=True,
@@ -784,7 +784,7 @@ class GUIRunner(Runner):
             form_controls.append(
                 ft.Container(
                     content=ft.Row(buttons, spacing=10),
-                    margin=ft.margin.only(top=20)
+                    margin=ft.Margin(left=0, right=0, top=20, bottom=0)
                 )
             )
 
@@ -813,7 +813,7 @@ class GUIRunner(Runner):
                 ),
                 ft.Container(
                     content=view.output_view,
-                    padding=ft.padding.only(left=20, right=20, bottom=20),
+                    padding=ft.Padding(left=20, right=20, bottom=20, top=0),
                     expand=True,
                 ),
             ],

@@ -458,9 +458,9 @@ class Table(Container):
         self._flet_control = ft.DataTable(
             columns=columns,
             rows=data_rows,
-            border=ft.border.all(1, ft.Colors.GREY_400),
+            border=ft.Border.all(1, ft.Colors.GREY_400),
             border_radius=10,
-            horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_300),
+            horizontal_lines=ft.BorderSide(1, ft.Colors.GREY_300),
         )
 
         if self.title:
@@ -1148,9 +1148,9 @@ class DataTable(Container):
         data_table = ft.DataTable(
             columns=columns,
             rows=rows,
-            border=ft.border.all(1, ft.Colors.GREY_400),
+            border=ft.Border.all(1, ft.Colors.GREY_400),
             border_radius=10,
-            horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_300),
+            horizontal_lines=ft.BorderSide(1, ft.Colors.GREY_300),
         )
 
         # Store reference
