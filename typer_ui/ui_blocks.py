@@ -681,7 +681,7 @@ class Button(UiBlock):
                 set_current_runner(saved_runner)
 
         return ft.ElevatedButton(
-            text=self.text,
+            self.text,
             icon=icon_obj,
             on_click=handle_click,
         )

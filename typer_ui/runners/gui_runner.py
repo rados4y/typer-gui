@@ -466,7 +466,7 @@ class GUIRunner(Runner):
 
             if cmd.ui_spec.button:
                 btn = ft.ElevatedButton(
-                    text=cmd.name,
+                    cmd.name,
                     on_click=handle_click,
                     bgcolor=ft.Colors.BLUE_600,
                     color=ft.Colors.WHITE,
@@ -755,7 +755,7 @@ class GUIRunner(Runner):
                 await self._run_command()
 
             run_button = ft.ElevatedButton(
-                text=command.ui_spec.submit_name,
+                command.ui_spec.submit_name,
                 icon=ft.Icons.PLAY_ARROW,
                 on_click=handle_run,
                 bgcolor=ft.Colors.BLUE_700,
