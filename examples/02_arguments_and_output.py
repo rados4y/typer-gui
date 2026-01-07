@@ -14,12 +14,12 @@ import time
 from enum import Enum
 
 import typer
-import typer_ui as tu
-from typer_ui import ui, text, dx
+import typer2ui as tu
+from typer2ui import ui, text, dx
 
-typer_app = typer.Typer()
-app = tu.UiApp(
-    typer_app,
+tapp = typer.Typer()
+upp = tu.UiApp(
+    tapp,
     title="Parameters & Outputs",
     description="Demonstrates arguments, UI components, and async commands.",
 )
@@ -34,8 +34,8 @@ class Priority(str, Enum):
     URGENT = "urgent"
 
 
-@typer_app.command()
-@app.def_command(view=True)
+@tapp.command()
+@upp.def_command(view=True)
 def welcome_screen():
     """
     Demonstrates a command that runs automatically when selected in the GUI.
@@ -53,8 +53,8 @@ It's a great way to present initial information or a dashboard without requiring
     )
 
 
-@typer_app.command()
-@app.def_command(button=True)
+@tapp.command()
+@upp.def_command(button=True)
 def basic_parameters(
     name: str,
     times: int = 1,
@@ -76,8 +76,8 @@ def basic_parameters(
     ui(f"Task priority set to: {priority.value}")
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True)
+@tapp.command()
+@upp.def_command(button=True, modal=True)
 def create_task(
     title: str,
     priority: Priority = Priority.MEDIUM,
@@ -118,8 +118,8 @@ def create_task(
     return {"id": task_id, "title": title, "priority": priority.value}
 
 
-@typer_app.command()
-@app.def_command(view=True, modal=True)
+@tapp.command()
+@upp.def_command(view=True, modal=True)
 def output_types():
     """Demonstrates shortcuts and different output methods."""
     # Shortcut: ui(str) renders as Markdown
@@ -162,8 +162,8 @@ You can use **bold**, *italic*, and `code` formatting.
     )
 
 
-@typer_app.command()
-@app.def_command(long=True)
+@tapp.command()
+@upp.def_command(long=True)
 def long_running_task(steps: int = 5):
     """Demonstrates a long-running task with real-time table updates."""
     # Shortcut: ui(str) renders as Markdown
@@ -179,8 +179,8 @@ def long_running_task(steps: int = 5):
     ui("[OK] **All steps completed!**")
 
 
-@typer_app.command()
-@app.def_command(long=True)
+@tapp.command()
+@upp.def_command(long=True)
 async def async_task(delay: float = 1.0):
     """
     Demonstrates an async command.
@@ -202,7 +202,7 @@ async def async_task(delay: float = 1.0):
 
 
 if __name__ == "__main__":
-    app()
+    upp()
 
 
 """

@@ -2,12 +2,12 @@
 
 from dataclasses import dataclass
 import typer
-import typer_ui as tu
-from typer_ui import ui, text, dx
+import typer2ui as tu
+from typer2ui import ui, text, dx
 
-typer_app = typer.Typer()
-app = tu.UiApp(
-    typer_app,
+tapp = typer.Typer()
+upp = tu.UiApp(
+    tapp,
     title="State Management Demo",
     description="Demonstrates reactive UI based on application state.",
 )
@@ -21,11 +21,11 @@ class Order:
     total: float
 
 
-@typer_app.command()
-@app.def_command(view=True)
+@tapp.command()
+@upp.def_command(view=True)
 def state_demo():
     """Demonstrates reactive UI components tied to state."""
-    counter = app.state(0)
+    counter = upp.state(0)
     # --- Counter Example ---
     ui("## 🔢 Counter")
     # Reactive shortcut: lambda returns string → auto-converted to Markdown
@@ -46,8 +46,8 @@ def state_demo():
     )
 
 
-@typer_app.command()
-@app.def_command(view=True)
+@tapp.command()
+@upp.def_command(view=True)
 def orders_demo():
     """Demonstrates a master-detail view using state."""
 
@@ -59,7 +59,7 @@ def orders_demo():
     ]
 
     # The ID of the currently selected order is the only state we need
-    selected_order_id = app.state(None)
+    selected_order_id = upp.state(None)
 
     # --- Display List of Orders ---
     ui("## 📦 Orders")
@@ -107,4 +107,4 @@ def orders_demo():
 
 
 if __name__ == "__main__":
-    app()
+    upp()

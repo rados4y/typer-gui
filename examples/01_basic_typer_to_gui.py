@@ -5,19 +5,19 @@ Typer CLI application. The application works in both GUI and CLI modes.
 """
 
 import typer
-import typer_ui as tu
+import typer2ui as tu
 
 # Step 1: Create your Typer app as usual
-typer_app = typer.Typer()
+tapp = typer.Typer()
 
 # Step 2: Create a UiApp instance with optional title and description
-app = tu.UiApp(
-    typer_app, title="My First GUI App", description="A simple calculator with GUI"
+upp = tu.UiApp(
+    tapp, title="My First GUI App", description="A simple calculator with GUI"
 )
 
 
 # Step 3: Define your commands with standard Typer decorators
-@typer_app.command()
+@tapp.command()
 def add(a: int, b: int):
     """Add two numbers together."""
     result = a + b
@@ -25,7 +25,7 @@ def add(a: int, b: int):
     return result
 
 
-@typer_app.command()
+@tapp.command()
 def subtract(a: int, b: int):
     """Subtract b from a."""
     result = a - b
@@ -33,7 +33,7 @@ def subtract(a: int, b: int):
     return result
 
 
-@typer_app.command()
+@tapp.command()
 def multiply(a: int, b: int):
     """Multiply two numbers."""
     result = a * b
@@ -41,7 +41,7 @@ def multiply(a: int, b: int):
     return result
 
 
-@typer_app.command()
+@tapp.command()
 def divide(a: float, b: float):
     """Divide a by b."""
     if b == 0:
@@ -56,7 +56,7 @@ def divide(a: float, b: float):
 if __name__ == "__main__":
     # GUI mode: python 01_basic_typer_to_gui.py
     # CLI mode: python 01_basic_typer_to_gui.py --cli add 5 3
-    app()
+    upp()
 
 
 """

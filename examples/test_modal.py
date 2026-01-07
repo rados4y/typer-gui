@@ -1,12 +1,12 @@
 """Test modal command functionality."""
 import typer
-import typer_ui as tu
-from typer_ui import ui
+import typer2ui as tu
+from typer2ui import ui
 from enum import Enum
 
-typer_app = typer.Typer()
-app = tu.UiApp(
-    typer_app,
+tapp = typer.Typer()
+upp = tu.UiApp(
+    tapp,
     title="Modal Commands Test",
     description="Testing modal dialog functionality"
 )
@@ -19,8 +19,8 @@ class Priority(str, Enum):
     HIGH = "high"
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True)
+@tapp.command()
+@upp.def_command(button=True, modal=True)
 def create_user(name: str, email: str, role: str = "User"):
     """Create a new user (shown in modal dialog)."""
     ui("# User Created")
@@ -41,8 +41,8 @@ def create_user(name: str, email: str, role: str = "User"):
     return {"name": name, "email": email, "role": role}
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True)
+@tapp.command()
+@upp.def_command(button=True, modal=True)
 def delete_item(item_id: int, confirm: bool = False):
     """Delete an item (with confirmation in modal)."""
     if not confirm:
@@ -59,8 +59,8 @@ def delete_item(item_id: int, confirm: bool = False):
     return {"deleted": item_id}
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True, submit_name="Create Task")
+@tapp.command()
+@upp.def_command(button=True, modal=True, submit_name="Create Task")
 def create_task(
     title: str,
     priority: Priority = Priority.MEDIUM,
@@ -81,8 +81,8 @@ def create_task(
     return {"id": task_id, "title": title, "priority": priority.value}
 
 
-@typer_app.command()
-@app.def_command(view=True)
+@tapp.command()
+@upp.def_command(view=True)
 def dashboard():
     """Main dashboard (not modal)."""
     ui("# Dashboard")
@@ -95,4 +95,4 @@ def dashboard():
 
 
 if __name__ == "__main__":
-    app()
+    upp()

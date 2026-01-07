@@ -251,8 +251,8 @@ class UiApp:
 
     Example:
         >>> import typer
-        >>> import typer_ui as tu
-        >>> from typer_ui import ui, md, dx
+        >>> import typer2ui as tu
+        >>> from typer2ui import ui, md, dx
         >>>
         >>> typer_app = typer.Typer()
         >>> app = tu.UiApp(

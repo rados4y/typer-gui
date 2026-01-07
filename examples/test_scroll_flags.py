@@ -1,18 +1,18 @@
 """Test auto_scroll and view flags."""
 import typer
-import typer_ui as tu
-from typer_ui import ui
+import typer2ui as tu
+from typer2ui import ui
 
-typer_app = typer.Typer()
-app = tu.UiApp(
-    typer_app,
+tapp = typer.Typer()
+upp = tu.UiApp(
+    tapp,
     title="Scroll Flags Test",
     description="Testing auto_scroll and view flags"
 )
 
 
-@typer_app.command()
-@app.def_command(button=True)
+@tapp.command()
+@upp.def_command(button=True)
 def with_auto_scroll():
     """Command with auto_scroll=True (default)."""
     ui("# With Auto Scroll (Default)")
@@ -21,8 +21,8 @@ def with_auto_scroll():
         ui(f"Line {i + 1}")
 
 
-@typer_app.command()
-@app.def_command(button=True, auto_scroll=False)
+@tapp.command()
+@upp.def_command(button=True, auto_scroll=False)
 def without_auto_scroll():
     """Command with auto_scroll=False."""
     ui("# Without Auto Scroll")
@@ -31,8 +31,8 @@ def without_auto_scroll():
         ui(f"Line {i + 1}")
 
 
-@typer_app.command()
-@app.def_command(view=True)
+@tapp.command()
+@upp.def_command(view=True)
 def dashboard_view():
     """Command with view=True (auto + no header + no auto_scroll)."""
     ui("# Dashboard View")
@@ -52,8 +52,8 @@ def dashboard_view():
         ui(f"Detail line {i + 1}")
 
 
-@typer_app.command()
-@app.def_command(auto=True, header=False, auto_scroll=False)
+@tapp.command()
+@upp.def_command(auto=True, header=False, auto_scroll=False)
 def equivalent_to_view():
     """Equivalent to view=True using individual flags."""
     ui("# Equivalent to View")
@@ -65,4 +65,4 @@ def equivalent_to_view():
 
 
 if __name__ == "__main__":
-    app()
+    upp()

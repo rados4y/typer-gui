@@ -48,7 +48,7 @@ The typer-ui codebase demonstrates good architectural understanding in some area
 
 ### Current Structure
 ```
-typer_ui/
+typer2ui/
 ├── ui_app.py          (UiApp, UICommand - 517 lines)
 ├── output.py          (ui, md, dx functions - 169 lines)
 ├── ui_blocks.py       (UI components - 765 lines) ⚠️ GOD OBJECT
@@ -99,7 +99,7 @@ class Tabs(Container):  # Component 10
 
 **Recommendation:**
 ```
-typer_ui/
+typer2ui/
 ├── context.py              # Runner context management
 ├── ui_blocks/
 │   ├── __init__.py

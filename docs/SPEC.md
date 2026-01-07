@@ -9,14 +9,14 @@ This document provides a concise overview of the Typer-GUI library's architectur
 
 ## 2. Architecture Layers & Key Code
 
-The library is divided into four distinct layers. The public-facing API, `typer_ui.ui.Ui`, acts as a facade that coordinates these layers.
+The library is divided into four distinct layers. The public-facing API, `typer2ui.ui.Ui`, acts as a facade that coordinates these layers.
 
 ### Layer 1: Definition (The "What")
 
 - **Description**: A static, serializable representation of the Typer application, generated at startup. It contains no execution logic.
 - **Key Modules & Classes**:
-    - **`typer_ui.spec_builder`**: Introspects the `typer.Typer` app to create the `AppSpec`.
-    - **`typer_ui.specs`**: Contains the dataclasses for this layer.
+    - **`typer2ui.spec_builder`**: Introspects the `typer.Typer` app to create the `AppSpec`.
+    - **`typer2ui.specs`**: Contains the dataclasses for this layer.
         - `AppSpec`: Holds the entire application structure.
         - `CommandSpec`: Defines a single command, its parameters, and callback.
         - `ParamSpec`: Defines a single parameter's type, default, and help text.
@@ -25,7 +25,7 @@ The library is divided into four distinct layers. The public-facing API, `typer_
 
 - **Description**: Manages the application's session state and orchestrates command execution. It is presentation-agnostic and has no knowledge of the final UI framework being used.
 - **Key Modules & Classes**:
-    - **`typer_ui.ui_app`**:
+    - **`typer2ui.ui_app`**:
         - `UIApp`: The central controller. It owns the `AppSpec` and tracks the current command.
         - **Key Methods**:
             - `select_command(name)`: Sets the active command.
@@ -36,23 +36,23 @@ The library is divided into four distinct layers. The public-facing API, `typer_
 
 - **Description**: Provides environment-specific context for rendering UI components. Uses stack-based architecture for lazy evaluation and observer pattern for real-time updates.
 - **Key Modules & Classes**:
-    - **`typer_ui.context`**:
+    - **`typer2ui.context`**:
         - `UIRunnerCtx`: Abstract base class with stack-based architecture.
         - `UiStack`: List subclass with internal observer pattern for append notifications.
         - **Key Methods**:
             - `ui(component)`: Simply appends UIBlockType to current stack (lazy evaluation).
             - `build_child(parent, child)`: Handles all complexity of building different content types.
             - `new_ui_stack()`: Context manager for save/restore stack pattern (public API for extensibility).
-    - **`typer_ui.runners.cli_context.CLIRunnerCtx`**: CLI-specific context using Rich library.
-    - **`typer_ui.runners.gui_context.GUIRunnerCtx`**: GUI-specific context using Flet library.
-    - **`typer_ui.runners.gui_runner.GUIRunner`**: Orchestrates GUI execution and manages Flet page.
-    - **`typer_ui.runners.cli_runner.CLIRunner`**: Orchestrates CLI execution with stdout/stderr capture.
+    - **`typer2ui.runners.cli_context.CLIRunnerCtx`**: CLI-specific context using Rich library.
+    - **`typer2ui.runners.gui_context.GUIRunnerCtx`**: GUI-specific context using Flet library.
+    - **`typer2ui.runners.gui_runner.GUIRunner`**: Orchestrates GUI execution and manages Flet page.
+    - **`typer2ui.runners.cli_runner.CLIRunner`**: Orchestrates CLI execution with stdout/stderr capture.
 
 ### Layer 4: Component (The "View")
 
 - **Description**: Self-contained UI elements that know how to build themselves for different channels (CLI, GUI). Components maintain parent-child hierarchy and context references.
 - **Key Modules & Classes**:
-    - **`typer_ui.ui_blocks`**: Contains all standard UI component classes.
+    - **`typer2ui.ui_blocks`**: Contains all standard UI component classes.
         - `UiBlock`: The abstract base class for all components.
         - **Key Methods**:
             - `build_cli(ctx)`: Build and return Rich renderable for CLI.
@@ -115,7 +115,7 @@ This flow handles in-place updates for components that have already been rendere
 
 ### Adding a New UI Component
 
-1.  Create a new class in `typer_ui/ui_blocks.py` that inherits from `UiBlock`.
+1.  Create a new class in `typer2ui/ui_blocks.py` that inherits from `UiBlock`.
 2.  Define its data fields using `@dataclass`.
 3.  Implement `build_cli(self, ctx) -> RenderableType` to build Rich renderable for terminal.
 4.  Implement `build_gui(self, ctx) -> ft.Control` to build Flet control for GUI.

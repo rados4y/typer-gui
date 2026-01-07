@@ -913,33 +913,47 @@ class Tabs(UiBlock):
         return Group(*renderables)
 
     def build_gui(self, ctx) -> Any:
-        """Build Tabs for GUI (returns Flet Tabs).
+        """Build Tabs for GUI (returns Flet Tabs with TabBar + TabBarView).
 
         Args:
             ctx: GUI runner context
 
         Returns:
-            Flet Tabs control
+            Flet Tabs control containing TabBar and TabBarView
         """
         import flet as ft
 
-        flet_tabs = []
+        # Create tab labels (for TabBar)
+        tab_controls = [ft.Tab(tab.label) for tab in self.tabs]
+
+        # Create tab content (for TabBarView)
+        content_controls = []
         for tab in self.tabs:
             # Use ctx.build_child to handle all content types (string/callable/UIBlock)
             tab_content = ctx.build_child(self, tab.content)
 
-            # Create Flet Tab
-            flet_tab = ft.Tab(
-                text=tab.label,
-                content=ft.Container(
-                    content=tab_content,
-                    padding=10,
-                ),
+            # Wrap in Container for padding
+            wrapped_content = ft.Container(
+                content=tab_content,
+                padding=10,
             )
-            flet_tabs.append(flet_tab)
+            content_controls.append(wrapped_content)
 
-        # Create Tabs widget
-        return ft.Tabs(tabs=flet_tabs, animation_duration=300)
+        # Create TabBar and TabBarView (Flet 0.80+ API)
+        tab_bar = ft.TabBar(tabs=tab_controls)
+        tab_view = ft.TabBarView(
+            controls=content_controls,
+            expand=True,  # Required: TabBarView needs bounded height
+        )
+
+        # Wrap in Tabs control (required coordinator in Flet 0.80+)
+        return ft.Tabs(
+            content=ft.Column(
+                controls=[tab_bar, tab_view],
+                spacing=0,
+            ),
+            length=len(self.tabs),
+        )
 
 
 # ============================================================================

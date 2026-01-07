@@ -1,21 +1,26 @@
-TODO:
-[] change package to typer2ui
+ONGOING:
+[-] change package to typer2ui
+[-] change bootstrap convention to app and upp
+[] button "Clear & Re-run" change to clear
 [] add proper python typing
-[] extract AppShell?
-tapp = typer2ui.Typer()
-@app
 
-[x] why \_new_ui_stack is private?
-[-] not working - def_command(view=True, auto_scroll=True)
-[-] paging not working, when i change pages - it does not change data
+[] release
+
+[] prepare seperate file per ui_block
+[] extract AppShell?
+
+TODO
+
 [] logger UI
 [] popup result
 [] multi module app
 [] argument based exceptions
 [] density
-[] button "Clear & Re-run" change to clear
+
 prepare proposition of console(CLIRunnerCtx) and get_JSON() methods in UIBlock
 refactor modules
+
+DONE
 
 # UIBlock interface clarification together with UIRunner
 

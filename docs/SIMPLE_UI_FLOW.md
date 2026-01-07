@@ -10,8 +10,8 @@ This document traces the complete execution flow of a simple `ui(tu.Md("# Hello"
 
 ```python
 import typer
-import typer_ui as tu
-from typer_ui import ui
+import typer2ui as tu
+from typer2ui import ui
 
 typer_app = typer.Typer()
 app = tu.UiApp(typer_app, title="Simple Test")
@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
 ### Phase 1: Application Launch
 
-**File:** `typer_ui/ui_app.py:123` (`UiApp.__call__`)
+**File:** `typer2ui/ui_app.py:123` (`UiApp.__call__`)
 
 ```python
 def __call__(self):
@@ -47,7 +47,7 @@ def __call__(self):
 
 ### Phase 2: GUI Initialization
 
-**File:** `typer_ui/ui_app.py:140` (`_gui_main`)
+**File:** `typer2ui/ui_app.py:140` (`_gui_main`)
 
 ```python
 def _gui_main(self, page: ft.Page):
@@ -58,7 +58,7 @@ def _gui_main(self, page: ft.Page):
     # Creates GUIRunnerCtx
 ```
 
-**File:** `typer_ui/runners/gui_runner.py:352` (`GUIRunner.build`)
+**File:** `typer2ui/runners/gui_runner.py:352` (`GUIRunner.build`)
 
 ```python
 def build(self, page: ft.Page):
@@ -71,7 +71,7 @@ def build(self, page: ft.Page):
     GUIRunnerCtx._instance = self.ctx  # Set as global instance
 ```
 
-**File:** `typer_ui/runners/gui_context.py:84` (`GUIRunnerCtx.__init__`)
+**File:** `typer2ui/runners/gui_context.py:84` (`GUIRunnerCtx.__init__`)
 
 ```python
 def __init__(self, page: ft.Page):
@@ -79,7 +79,7 @@ def __init__(self, page: ft.Page):
     self.page = page
 ```
 
-**File:** `typer_ui/context.py:63` (`UIRunnerCtx.__init__`)
+**File:** `typer2ui/context.py:63` (`UIRunnerCtx.__init__`)
 
 ```python
 def __init__(self):
@@ -94,7 +94,7 @@ def __init__(self):
 
 ### Phase 3: User Clicks "Run" Button
 
-**File:** `typer_ui/runners/gui_runner.py:720` (`_run_current_command_async`)
+**File:** `typer2ui/runners/gui_runner.py:720` (`_run_current_command_async`)
 
 ```python
 async def _run_current_command_async(self):
@@ -105,7 +105,7 @@ async def _run_current_command_async(self):
     result, error, output = await self.execute_command("hello", kwargs)
 ```
 
-**File:** `typer_ui/runners/gui_runner.py:795` (`execute_command`)
+**File:** `typer2ui/runners/gui_runner.py:795` (`execute_command`)
 
 ```python
 async def execute_command(self, command_name: str, params: dict):
@@ -128,7 +128,7 @@ async def execute_command(self, command_name: str, params: dict):
 
 ### Phase 4: Sync Command Execution
 
-**File:** `typer_ui/runners/gui_runner.py:838` (`_execute_sync`)
+**File:** `typer2ui/runners/gui_runner.py:838` (`_execute_sync`)
 
 ```python
 def _execute_sync(self, command_spec, params):
@@ -167,7 +167,7 @@ def _execute_sync(self, command_spec, params):
             self.add_to_output(control)
 ```
 
-**File:** `typer_ui/context.py:110` (`UIRunnerCtx.new_ui_stack`)
+**File:** `typer2ui/context.py:110` (`UIRunnerCtx.new_ui_stack`)
 
 ```python
 @contextmanager
@@ -191,7 +191,7 @@ def new_ui_stack(self):
 
 **User code executes:** `ui(tu.Md("# Hello World"))`
 
-**File:** `typer_ui/output.py:188` (`ui` function)
+**File:** `typer2ui/output.py:188` (`ui` function)
 
 ```python
 def ui(component_or_value: UIBlockType) -> UIBlockType:
@@ -209,7 +209,7 @@ def ui(component_or_value: UIBlockType) -> UIBlockType:
     return component_or_value
 ```
 
-**File:** `typer_ui/context.py:76` (`UIRunnerCtx.ui`)
+**File:** `typer2ui/context.py:76` (`UIRunnerCtx.ui`)
 
 ```python
 def ui(self, component: UIBlockType):
@@ -227,7 +227,7 @@ def ui(self, component: UIBlockType):
         # ↑ This is a UiStack, so if observers registered, they fire here
 ```
 
-**File:** `typer_ui/context.py:41` (`UiStack.append`)
+**File:** `typer2ui/context.py:41` (`UiStack.append`)
 
 ```python
 def append(self, item: Any):
@@ -252,7 +252,7 @@ def append(self, item: Any):
 
 ### Phase 6: Command Completes - Stack Processing
 
-**Back in:** `typer_ui/runners/gui_runner.py:891` (`_execute_sync`)
+**Back in:** `typer2ui/runners/gui_runner.py:891` (`_execute_sync`)
 
 ```python
         # Command finished, stack context exits
@@ -268,7 +268,7 @@ def append(self, item: Any):
             self.add_to_output(control)
 ```
 
-**File:** `typer_ui/runners/gui_context.py:102` (`GUIRunnerCtx.build_child`)
+**File:** `typer2ui/runners/gui_context.py:102` (`GUIRunnerCtx.build_child`)
 
 ```python
 def build_child(self, parent: UiBlock, child: UIBlockType) -> ft.Control:
@@ -307,7 +307,7 @@ def build_child(self, parent: UiBlock, child: UIBlockType) -> ft.Control:
 
 ### Phase 7: Md.build_gui() Called
 
-**File:** `typer_ui/ui_blocks.py:294` (`Md.build_gui`)
+**File:** `typer2ui/ui_blocks.py:294` (`Md.build_gui`)
 
 ```python
 def build_gui(self, ctx) -> Any:
@@ -342,14 +342,14 @@ def build_gui(self, ctx) -> Any:
 
 ### Phase 8: Add to Output View
 
-**Back in:** `typer_ui/runners/gui_runner.py:895`
+**Back in:** `typer2ui/runners/gui_runner.py:895`
 
 ```python
             # control = ft.Markdown(...)
             self.add_to_output(control)
 ```
 
-**File:** `typer_ui/runners/gui_runner.py:165` (`add_to_output`)
+**File:** `typer2ui/runners/gui_runner.py:165` (`add_to_output`)
 
 ```python
 def add_to_output(self, control: Optional[ft.Control]):
@@ -379,7 +379,7 @@ def add_to_output(self, control: Optional[ft.Control]):
 
 **Phase 4:** Uses `CLIRunner.execute_command` instead
 
-**File:** `typer_ui/runners/cli_runner.py:105` (`CLIRunner.execute_command`)
+**File:** `typer2ui/runners/cli_runner.py:105` (`CLIRunner.execute_command`)
 
 ```python
 def execute_command(self, command_name: str, params: dict):
@@ -413,7 +413,7 @@ def execute_command(self, command_name: str, params: dict):
 
 **Phase 6:** CLI version of `build_child`
 
-**File:** `typer_ui/runners/cli_context.py:45` (`CLIRunnerCtx.build_child`)
+**File:** `typer2ui/runners/cli_context.py:45` (`CLIRunnerCtx.build_child`)
 
 ```python
 def build_child(self, parent: UiBlock, child: UIBlockType) -> RenderableType:
@@ -435,7 +435,7 @@ def build_child(self, parent: UiBlock, child: UIBlockType) -> RenderableType:
 
 **Phase 7:** `Md.build_cli()` called
 
-**File:** `typer_ui/ui_blocks.py:294` (`Md.build_cli`)
+**File:** `typer2ui/ui_blocks.py:294` (`Md.build_cli`)
 
 ```python
 def build_cli(self, ctx) -> Any:

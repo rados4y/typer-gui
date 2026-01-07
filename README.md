@@ -50,13 +50,13 @@ Here's a minimal example to get you started:
 ```python
 # my_app.py
 import typer
-import typer_ui as tg
+import typer2ui as tu
 
 # Create the Typer app
 app = typer.Typer()
 
 # Create the UI wrapper
-ui = tg.Ui(
+ui = tu.Ui(
     app,
     title="My App",
     description="A graphical interface for my CLI app"
@@ -68,8 +68,8 @@ def greet(name: str, excited: bool = False):
     punctuation = "!" if excited else "."
 
     # Use ui() to output components
-    ui(tg.Md(f"# Hello {name}{punctuation}"))
-    ui(tg.Text("Thanks for using Typer2UI!"))
+    ui(tu.Md(f"# Hello {name}{punctuation}"))
+    ui(tu.Text("Thanks for using Typer2UI!"))
 
 @app.command()
 def add(a: int, b: int):
@@ -104,23 +104,23 @@ Instead of multiple output methods, Typer2UI has one simple pattern:
 
 ```python
 # Output any component
-ui(tg.Text("Hello"))
-ui(tg.Md("# Header"))
-ui(tg.Table(cols=["Name"], data=[["Alice"]]))
+ui(tu.Text("Hello"))
+ui(tu.Md("# Header"))
+ui(tu.Table(cols=["Name"], data=[["Alice"]]))
 
 # Or return a component (auto-displayed)
 @app.command()
 def get_data():
-    return tg.Table(cols=["Name"], data=[["Bob"]])
+    return tu.Table(cols=["Name"], data=[["Bob"]])
 ```
 
 ### Available Components
 
 #### Text & Markdown
 ```python
-ui(tg.Text("Plain text"))
-ui(tg.Md("**Bold** and *italic* with markdown"))
-ui(tg.Md("""
+ui(tu.Text("Plain text"))
+ui(tu.Md("**Bold** and *italic* with markdown"))
+ui(tu.Md("""
 # Report
 - Item 1
 - Item 2
@@ -129,7 +129,7 @@ ui(tg.Md("""
 
 #### Tables
 ```python
-ui(tg.Table(
+ui(tu.Table(
     cols=["Name", "Age", "City"],
     data=[
         ["Alice", 30, "NYC"],
@@ -142,28 +142,28 @@ ui(tg.Table(
 #### Layout Components
 ```python
 # Horizontal layout
-ui(tg.Row([
-    tg.Button("Save", on_click=save_data),
-    tg.Button("Cancel", on_click=cancel),
+ui(tu.Row([
+    tu.Button("Save", on_click=save_data),
+    tu.Button("Cancel", on_click=cancel),
 ]))
 
 # Vertical layout
-ui(tg.Column([
-    tg.Md("# Dashboard"),
-    tg.Table(cols=["Metric", "Value"], data=get_metrics()),
+ui(tu.Column([
+    tu.Md("# Dashboard"),
+    tu.Table(cols=["Metric", "Value"], data=get_metrics()),
 ]))
 ```
 
 #### Interactive Components
 ```python
 # Buttons (GUI only)
-ui(tg.Button("Click me", on_click=lambda: print("Clicked!")))
+ui(tu.Button("Click me", on_click=lambda: print("Clicked!")))
 
 # Links (GUI only)
-ui(tg.Link("Learn more", on_click=open_docs))
+ui(tu.Link("Learn more", on_click=open_docs))
 
 # Text input (GUI only)
-ui(tg.TextInput(
+ui(tu.TextInput(
     label="Name",
     value="",
     on_change=lambda text: print(f"Changed to: {text}")
@@ -178,7 +178,7 @@ One of Typer2UI's most powerful features: **components automatically update when
 @app.command()
 def process_items():
     # Create and present a table
-    table = tg.Table(cols=["Item", "Status"], data=[])
+    table = tu.Table(cols=["Item", "Status"], data=[])
     ui(table)  # Present it
 
     # Add rows - table auto-updates in real-time!
@@ -186,7 +186,7 @@ def process_items():
         table.add_row([f"Item {i}", "Processing..."])
         time.sleep(0.5)
 
-    ui(tg.Md("✓ Complete!"))
+    ui(tu.Md("✓ Complete!"))
 ```
 
 ### Progressive Rendering with Context Managers
@@ -198,7 +198,7 @@ For even cleaner code, use context managers:
 @ui.command(is_long=True)
 def analyze_data():
     # Present and update in one flow
-    with ui(tg.Table(cols=["Step", "Progress"], data=[])) as table:
+    with ui(tu.Table(cols=["Step", "Progress"], data=[])) as table:
         table.add_row(["Loading", "0%"])
         time.sleep(1)
 
@@ -217,7 +217,7 @@ Use the `@ui.command()` decorator to customize command behavior:
 @ui.command(is_button=True, is_long=True)
 def process():
     """Long-running process with button styling."""
-    with ui(tg.Table(cols=["Step", "Status"], data=[])) as t:
+    with ui(tu.Table(cols=["Step", "Status"], data=[])) as t:
         for i in range(10):
             t.add_row([f"Step {i+1}", "Running..."])
             time.sleep(1)
@@ -233,23 +233,23 @@ def process():
 
 ```python
 import typer
-import typer_ui as tg
+import typer2ui as tu
 import time
 
 app = typer.Typer()
-ui = tg.Ui(app, title="Data Processor", description="Process and analyze data")
+ui = tu.Ui(app, title="Data Processor", description="Process and analyze data")
 
 @app.command()
 def show_report():
     """Display a formatted report."""
-    ui(tg.Md("""
+    ui(tu.Md("""
 # System Report
 
 ## Summary
 All systems operational.
     """))
 
-    ui(tg.Table(
+    ui(tu.Table(
         cols=["Component", "Status", "Usage"],
         data=[
             ["CPU", "✓", "45%"],
@@ -263,25 +263,25 @@ All systems operational.
 @ui.command(is_button=True, is_long=True)
 def process_files(count: int = 5):
     """Process multiple files with progress updates."""
-    ui(tg.Md(f"# Processing {count} files"))
+    ui(tu.Md(f"# Processing {count} files"))
 
-    with ui(tg.Table(cols=["File", "Status"], data=[])) as table:
+    with ui(tu.Table(cols=["File", "Status"], data=[])) as table:
         for i in range(count):
             table.add_row([f"file_{i}.txt", "Processing..."])
             time.sleep(0.5)
 
-    ui(tg.Md("✓ **All files processed!**"))
+    ui(tu.Md("✓ **All files processed!**"))
 
 @app.command()
 def dashboard():
     """Show interactive dashboard."""
-    ui(tg.Column([
-        tg.Md("# Dashboard"),
-        tg.Row([
-            tg.Button("Refresh", on_click=lambda: print("Refreshing...")),
-            tg.Button("Export", on_click=lambda: print("Exporting...")),
+    ui(tu.Column([
+        tu.Md("# Dashboard"),
+        tu.Row([
+            tu.Button("Refresh", on_click=lambda: print("Refreshing...")),
+            tu.Button("Export", on_click=lambda: print("Exporting...")),
         ]),
-        tg.Table(
+        tu.Table(
             cols=["Metric", "Value"],
             data=[
                 ["Users", "1,234"],
@@ -294,7 +294,7 @@ def dashboard():
 @app.command()
 def analyze():
     """Return data for automatic display."""
-    return tg.Table(
+    return tu.Table(
         cols=["Analysis", "Result"],
         data=[
             ["Mean", "42.5"],
@@ -362,15 +362,15 @@ Output any UI component. Returns the component for chaining/context managers.
 
 ```python
 # Simple output
-ui(tg.Text("Hello"))
+ui(tu.Text("Hello"))
 
 # Store reference for updates
-table = tg.Table(cols=["Name"], data=[])
+table = tu.Table(cols=["Name"], data=[])
 ui(table)
 table.add_row(["Alice"])  # Auto-updates!
 
 # Context manager
-with ui(tg.Table(cols=["Name"], data=[])) as t:
+with ui(tu.Table(cols=["Name"], data=[])) as t:
     t.add_row(["Bob"])
 ```
 
@@ -396,30 +396,30 @@ python my_app.py --cli hello  # Run CLI
 
 ### UI Components
 
-All components are in the `typer_ui` module:
+All components are in the `typer2ui` module:
 
 ```python
-import typer_ui as tg
+import typer2ui as tu
 
 # Simple components
-tg.Text("content")           # Plain text
-tg.Md("# markdown")          # Markdown
+tu.Text("content")           # Plain text
+tu.Md("# markdown")          # Markdown
 
 # Data display
-tg.Table(
+tu.Table(
     cols=["A", "B"],         # Column headers
     data=[["1", "2"]],       # Row data
     title="Table Title"      # Optional title
 )
 
 # Layout
-tg.Row([comp1, comp2])       # Horizontal
-tg.Column([comp1, comp2])    # Vertical
+tu.Row([comp1, comp2])       # Horizontal
+tu.Column([comp1, comp2])    # Vertical
 
 # Interactive (GUI only)
-tg.Button("text", on_click=callback)
-tg.Link("text", on_click=callback)
-tg.TextInput("label", value="", on_change=callback)
+tu.Button("text", on_click=callback)
+tu.Link("text", on_click=callback)
+tu.TextInput("label", value="", on_change=callback)
 ```
 
 ## Examples

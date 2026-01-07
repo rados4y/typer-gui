@@ -2,7 +2,7 @@
 import sys
 import traceback
 import typer
-import typer_ui as tg
+import typer2ui as tg
 
 app = typer.Typer()
 ui = tg.Ui(app, title='Debug Tabs Error')

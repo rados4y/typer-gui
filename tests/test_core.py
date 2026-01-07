@@ -4,8 +4,8 @@ from enum import Enum
 
 import typer
 
-from typer_ui.spec_builder import build_app_spec
-from typer_ui.specs import ParamType
+from typer2ui.spec_builder import build_app_spec
+from typer2ui.specs import ParamType
 
 
 class TestColor(str, Enum):

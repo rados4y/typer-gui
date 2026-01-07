@@ -11,16 +11,16 @@ Run in GUI mode: python examples/06_data_table.py
 """
 
 import typer
-import typer_ui as tu
-from typer_ui import ui
+import typer2ui as tu
+from typer2ui import ui
 from typing import List, Tuple, Optional, Any
 
 # Create Typer app
-typer_app = typer.Typer()
+tapp = typer.Typer()
 
 # Create UiApp wrapper
-app = tu.UiApp(
-    typer_app,
+upp = tu.UiApp(
+    tapp,
     title="DataTable Demo",
     description="Demonstrates dynamic data loading with pagination, sorting, and filtering",
 )
@@ -161,8 +161,8 @@ class UserDataSource(tu.DataSource):
 # ============================================================================
 
 
-@typer_app.command()
-@app.def_command(button=True, view=True)
+@tapp.command()
+@upp.def_command(button=True, view=True)
 def browse_users():
     """Browse users with pagination, sorting, and filtering.
 
@@ -189,8 +189,8 @@ def browse_users():
     ui(table)
 
 
-@typer_app.command()
-@app.def_command(button=True, view=True)
+@tapp.command()
+@upp.def_command(button=True, view=True)
 def large_dataset():
     """Browse a larger dataset (500 records) with smaller page size.
 
@@ -215,8 +215,8 @@ def large_dataset():
     ui(table)
 
 
-@typer_app.command()
-@app.def_command(button=True, view=True)
+@tapp.command()
+@upp.def_command(button=True, view=True)
 def admin_only():
     """View only admin users (pre-filtered data source).
 
@@ -258,4 +258,4 @@ def admin_only():
 # ============================================================================
 
 if __name__ == "__main__":
-    app()
+    upp()

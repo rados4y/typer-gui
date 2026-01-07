@@ -162,7 +162,7 @@ class GUIRunnerCtx(UIRunnerCtx):
             return control
 
         # Case 3: Dynamic callable (can receive ui() calls after execution)
-        if callable(child) and getattr(child, '__typer_ui_is_dynamic__', False):
+        if callable(child) and getattr(child, '__typer2ui_is_dynamic__', False):
             # Capture initial UI
             with self.new_ui_stack() as ui_stack:
                 child()
@@ -269,7 +269,7 @@ async def fetch_data():
         ui("# Starting fetch...")
 
     # Mark as dynamic
-    dynamic_output.__typer_ui_is_dynamic__ = True
+    dynamic_output.__typer2ui_is_dynamic__ = True
 
     # Show dynamic output
     ui(dynamic_output)
@@ -862,7 +862,7 @@ class UIRunnerCtx(ABC):
             return control
 
         # Case 3: Dynamic callable (can receive ui() calls after execution)
-        if callable(child) and getattr(child, '__typer_ui_is_dynamic__', False):
+        if callable(child) and getattr(child, '__typer2ui_is_dynamic__', False):
             # Capture initial UI
             with self.new_ui_stack() as ui_stack:
                 child()
@@ -917,7 +917,7 @@ def ui(component: UIBlockType) -> None:
 - Fast and predictable
 
 **2. Dynamic callables solve async problem**
-- Mark callable with `__typer_ui_is_dynamic__ = True`
+- Mark callable with `__typer2ui_is_dynamic__ = True`
 - Gets ListView with on_append callback
 - Can receive ui() calls after execution completes
 
@@ -940,7 +940,7 @@ async def fetch_data():
         ui("# Starting fetch...")
 
     # Mark as dynamic
-    dynamic_output.__typer_ui_is_dynamic__ = True
+    dynamic_output.__typer2ui_is_dynamic__ = True
 
     # Show dynamic output
     ui(dynamic_output)
@@ -1010,7 +1010,7 @@ class CLIRunnerCtx(UIRunnerCtx):
         # ... same logic ...
 
         # Dynamic callable for CLI
-        if callable(child) and getattr(child, '__typer_ui_is_dynamic__', False):
+        if callable(child) and getattr(child, '__typer2ui_is_dynamic__', False):
             with self.new_ui_stack() as ui_stack:
                 child()
 

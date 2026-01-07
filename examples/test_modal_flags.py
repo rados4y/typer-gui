@@ -1,19 +1,19 @@
 """Test modal with different flags."""
 import time
 import typer
-import typer_ui as tu
-from typer_ui import ui
+import typer2ui as tu
+from typer2ui import ui
 
-typer_app = typer.Typer()
-app = tu.UiApp(
-    typer_app,
+tapp = typer.Typer()
+upp = tu.UiApp(
+    tapp,
     title="Modal Flags Test",
     description="Testing modal with different command flags"
 )
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True, view=True)
+@tapp.command()
+@upp.def_command(button=True, modal=True, view=True)
 def auto_modal():
     """Modal with auto-execution (view=True).
 
@@ -30,8 +30,8 @@ def auto_modal():
         ui(f"Line {i+1}")
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True, long=True)
+@tapp.command()
+@upp.def_command(button=True, modal=True, long=True)
 def long_modal():
     """Modal with long-running task.
 
@@ -49,8 +49,8 @@ def long_modal():
     ui("**All steps completed!**")
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True, header=False)
+@tapp.command()
+@upp.def_command(button=True, modal=True, header=False)
 def no_header_modal(name: str = "World"):
     """Modal with no header.
 
@@ -60,8 +60,8 @@ def no_header_modal(name: str = "World"):
     ui(f"Hello, {name}!")
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True, auto_scroll=False)
+@tapp.command()
+@upp.def_command(button=True, modal=True, auto_scroll=False)
 def no_scroll_modal():
     """Modal with no auto-scroll.
 
@@ -74,8 +74,8 @@ def no_scroll_modal():
         ui(f"Line {i+1}")
 
 
-@typer_app.command()
-@app.def_command(button=True, modal=True, submit_name="Create Item")
+@tapp.command()
+@upp.def_command(button=True, modal=True, submit_name="Create Item")
 def custom_submit(item_name: str):
     """Modal with custom submit button name."""
     ui("# Item Created")
@@ -83,4 +83,4 @@ def custom_submit(item_name: str):
 
 
 if __name__ == "__main__":
-    app()
+    upp()

@@ -1,20 +1,20 @@
-"""Example 4: Application Control with app.command() API
+"""Example 4: Application Control with upp.command() API
 
 This example demonstrates:
-- app.command("name").run(**kwargs) - Execute with output capture
-- app.command("name").include(**kwargs) - Execute inline
-- app.command("name").select() - Select a command (GUI mode)
+- upp.command("name").run(**kwargs) - Execute with output capture
+- upp.command("name").include(**kwargs) - Execute inline
+- upp.command("name").select() - Select a command (GUI mode)
 """
 
 import typer
-import typer_ui as tu
-from typer_ui import ui, text, dx
+import typer2ui as tu
+from typer2ui import ui, text, dx
 
-typer_app = typer.Typer()
-app = tu.UiApp(
-    typer_app,
+tapp = typer.Typer()
+upp = tu.UiApp(
+    tapp,
     title="App Control Demo",
-    description="Interactive demo of app.command() operations",
+    description="Interactive demo of upp.command() operations",
 )
 
 
@@ -23,7 +23,7 @@ app = tu.UiApp(
 # ============================================================================
 
 
-@typer_app.command()
+@tapp.command()
 def fetch_data(source: str = "database"):
     """Fetch data from a source."""
     ui(f"### Fetching from {source}")
@@ -31,8 +31,8 @@ def fetch_data(source: str = "database"):
     return {"records": 150, "source": source}
 
 
-@typer_app.command()
-@app.def_command(view=True)
+@tapp.command()
+@upp.def_command(view=True)
 def generate_report():
     """Generate a final report."""
     ui("### Final Report")
@@ -55,8 +55,8 @@ def generate_report():
 # ============================================================================
 
 
-@typer_app.command()
-@app.def_command(view=True)
+@tapp.command()
+@upp.def_command(view=True)
 def control_demo():
     """Interactive demo of run(), include(), and select()."""
     ui("# Command Control Demo")
@@ -69,18 +69,18 @@ def control_demo():
             [
                 tu.Button(
                     "Demo .run()",
-                    on_click=lambda: app.command("fetch-data").run(source="api"),
+                    on_click=lambda: upp.command("fetch-data").run(source="api"),
                 ),
                 tu.Button(
                     "Demo .include()",
-                    on_click=lambda: app.command("generate-report").include(),
+                    on_click=lambda: upp.command("generate-report").include(),
                 ),
                 tu.Button(
                     "Demo .clear()",
-                    on_click=lambda: app.command().clear(),
+                    on_click=lambda: upp.command().clear(),
                 ),
                 tu.Button(
-                    "Demo .select()", on_click=lambda: app.command("fetch-data").select()
+                    "Demo .select()", on_click=lambda: upp.command("fetch-data").select()
                 ),
             ]
         )
@@ -93,14 +93,14 @@ def control_demo():
 
 **`.run(**kwargs)`** - Execute and capture output separately
 ```python
-cmd = app.command("fetch-data").run(source="api")
+cmd = upp.command("fetch-data").run(source="api")
 output = cmd.out      # Captured text output
 result = cmd.result   # Return value
 ```
 
 **`.include(**kwargs)`** - Execute inline (output appears in current context)
 ```python
-result = app.command("generate-report").include()
+result = upp.command("generate-report").include()
 ```
 
 **`.select()`** - Select command in GUI (changes form)
@@ -112,7 +112,7 @@ app.command("fetch-data").select()
 
 
 if __name__ == "__main__":
-    app()
+    upp()
 
 
 """

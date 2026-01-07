@@ -98,14 +98,14 @@ def main():
     # Step 3: Update version in files
     print("\n[3/8] Updating version in files...")
     update_version_in_file("pyproject.toml", current_version, new_version)
-    update_version_in_file("typer_ui/__init__.py", current_version, new_version)
+    update_version_in_file("typer2ui/__init__.py", current_version, new_version)
     print("[OK] Version updated in all files")
 
     # Step 4: Commit version bump
     print("\n[4/8] Committing version bump...")
     commit_msg = f"Bump version to {new_version}"
     success, _ = run_command(
-        f'git add pyproject.toml typer_ui/__init__.py && git commit -m "{commit_msg}"',
+        f'git add pyproject.toml typer2ui/__init__.py && git commit -m "{commit_msg}"',
         "Committing version bump"
     )
     if not success:
