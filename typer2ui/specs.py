@@ -12,6 +12,7 @@ class ParamType(Enum):
     FLOAT = "float"
     BOOLEAN = "boolean"
     ENUM = "enum"
+    LIST = "list"
     UNSUPPORTED = "unsupported"
 
 

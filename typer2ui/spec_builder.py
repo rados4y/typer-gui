@@ -47,6 +47,13 @@ def _get_param_type(annotation: Any) -> tuple[ParamType, Optional[type], Optiona
         choices = tuple([e.value for e in annotation])
         return ParamType.ENUM, annotation, choices
 
+    # Handle list types
+    if origin is list:
+        # Get the item type from list[X]
+        args = get_args(annotation)
+        item_type = args[0] if args else str
+        return ParamType.LIST, item_type, None
+
     # Unsupported type
     return ParamType.UNSUPPORTED, annotation, None
 

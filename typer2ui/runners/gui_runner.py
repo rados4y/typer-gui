@@ -909,6 +909,21 @@ class GUIRunner(Runner):
                     value=default_value,
                     width=400,
                 )
+        elif param.param_type == ParamType.LIST:
+            # Multiline text field for list input (one item per line)
+            default_text = ""
+            if param.default is not None and isinstance(param.default, list):
+                default_text = "\n".join(str(item) for item in param.default)
+
+            control = ft.TextField(
+                label=label,
+                hint_text=hint_text or "Enter one value per line",
+                value=default_text,
+                multiline=True,
+                min_lines=3,
+                max_lines=10,
+                width=400,
+            )
 
         if control and view:
             view.form_controls[param.name] = control
@@ -971,6 +986,16 @@ class GUIRunner(Runner):
                 return int(text)
             elif param.param_type == ParamType.FLOAT:
                 return float(text)
+            elif param.param_type == ParamType.LIST:
+                # Split by newlines, filter out empty lines
+                items = [line.strip() for line in text.split('\n') if line.strip()]
+                # Convert items to the target type if specified
+                if param.python_type:
+                    if param.python_type is int:
+                        return [int(item) for item in items]
+                    elif param.python_type is float:
+                        return [float(item) for item in items]
+                return items
             return text
 
         elif isinstance(control, ft.Checkbox):
