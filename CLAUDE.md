@@ -146,7 +146,13 @@ Immutable dataclasses that model the app structure:
 - `build_app_spec()`: Main entry point for reflection
 - Extracts commands from Typer app's `registered_commands`
 - Uses `inspect.signature()` to analyze parameters
-- Maps Python types to ParamType enum (str→STRING, int→INTEGER, bool→BOOLEAN, Enum→ENUM)
+- Maps Python types to ParamType enum:
+  - `str` → STRING
+  - `int` → INTEGER
+  - `float` → FLOAT
+  - `bool` → BOOLEAN
+  - `Enum` → ENUM
+  - `list[T]` → LIST (supports str, int, float item types)
 
 ## Important Patterns
 
@@ -177,10 +183,11 @@ Implementation:
 
 ### Type-to-Control Mapping
 `_get_param_type()` in spec_builder.py maps:
-- `str` → TextField
+- `str` → TextField (single line)
 - `int`, `float` → TextField with numeric validation
 - `bool` → Checkbox
 - `Enum` → Dropdown with enum values
+- `list[str]`, `list[int]`, `list[float]` → Multiline TextField (one item per line)
 - Unsupported types → UNSUPPORTED (error in GUI)
 
 ## Critical Implementation Details
