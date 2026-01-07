@@ -1,6 +1,6 @@
 """Reactive state management - pure observable pattern."""
 
-from typing import Callable, Generic, List, TypeVar
+from typing import Callable, Generic, TypeVar
 
 T = TypeVar('T')
 
@@ -34,7 +34,7 @@ class State(Generic[T]):
             initial_value: Initial state value
         """
         self._value: T = initial_value
-        self._observers: List[Callable[[], None]] = []
+        self._observers: list[Callable[[], None]] = []
 
     @property
     def value(self) -> T:

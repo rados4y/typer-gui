@@ -1,7 +1,7 @@
 """UI Blocks - Simple components with per-channel presentation."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional, List, Callable, Union, TYPE_CHECKING
+from typing import Any, Optional, Callable, Union, TYPE_CHECKING
 from dataclasses import dataclass, field
 import re
 
@@ -13,18 +13,18 @@ if TYPE_CHECKING:
 _current_runner = None
 
 
-def get_current_runner():
+def get_current_runner() -> Optional[Any]:
     """Get the current active runner."""
     return _current_runner
 
 
-def set_current_runner(runner):
+def set_current_runner(runner: Optional[Any]) -> None:
     """Set the current active runner."""
     global _current_runner
     _current_runner = runner
 
 
-def to_component(value):
+def to_component(value: Any) -> 'UiBlock':
     """Convert a value to a UiBlock component.
 
     Handles automatic conversion:
@@ -65,7 +65,7 @@ class UiBlock(ABC):
         """Initialize the UI block with hierarchy support."""
         # Parent-child hierarchy (for new architecture)
         self._parent: Optional["UiBlock"] = None
-        self._children: List["UiBlock"] = []
+        self._children: list["UiBlock"] = []
 
         # Context and control references (for new architecture)
         self._ctx: Optional[Any] = None  # UIRunnerCtx instance
@@ -141,12 +141,12 @@ class UiBlock(ABC):
         return self._parent
 
     @property
-    def children(self) -> List["UiBlock"]:
+    def children(self) -> list["UiBlock"]:
         """Get child components."""
         return self._children
 
     @children.setter
-    def children(self, value: List["UiBlock"]) -> None:
+    def children(self, value: list["UiBlock"]) -> None:
         """Set child components."""
         self._children = value
 
@@ -185,7 +185,7 @@ class Container(UiBlock, ABC):
 
         # Only initialize children if not already set by dataclass
         if not hasattr(self, "children"):
-            self.children: List[UiBlock] = []
+            self.children: list[UiBlock] = []
         self._context_active = False
         self._runner = None
         self._presentation_runner = None
@@ -202,7 +202,7 @@ class Container(UiBlock, ABC):
         self._presented = True
         self._presentation_runner = runner
 
-    def __enter__(self):
+    def __enter__(self) -> 'Container':
         """Enter context manager - start progressive rendering."""
         self._context_active = True
         self._runner = get_current_runner()
@@ -215,7 +215,7 @@ class Container(UiBlock, ABC):
 
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[Any]) -> bool:
         """Exit context manager - finalize rendering."""
         self._context_active = False
         self._runner = None
@@ -341,8 +341,8 @@ class Table(Container):
     Supports progressive row addition via context manager.
     """
 
-    cols: List[str]
-    data: List[List[Any]] = field(default_factory=list)
+    cols: list[str]
+    data: list[list[Any]] = field(default_factory=list)
     title: Optional[str] = None
 
     def __post_init__(self):
@@ -350,7 +350,7 @@ class Table(Container):
         super().__init__()
         self.flet_control: Optional["ft.DataTable"] = None
 
-    def add_row(self, row: Union[List[Any], "Row"]) -> None:
+    def add_row(self, row: Union[list[Any], "Row"]) -> None:
         """Add a row to the table.
 
         Args:
@@ -494,7 +494,7 @@ class Table(Container):
 class Row(Container):
     """Display components horizontally."""
 
-    children: List[Any] = field(default_factory=list)
+    children: list[Any] = field(default_factory=list)
 
     def __post_init__(self):
         """Initialize Container attributes after dataclass init."""
@@ -568,7 +568,7 @@ class Row(Container):
 class Column(Container):
     """Display components vertically."""
 
-    children: List[UiBlock] = field(default_factory=list)
+    children: list[UiBlock] = field(default_factory=list)
 
     def __post_init__(self):
         """Initialize Container attributes after dataclass init."""
@@ -858,7 +858,7 @@ class Tabs(UiBlock):
         tabs: List of Tab objects
     """
 
-    tabs: List[Tab]
+    tabs: list[Tab]
 
     def __post_init__(self):
         """Validate tabs configuration."""
@@ -989,7 +989,7 @@ class DataTable(Container):
         ui(table)
     """
 
-    cols: List[str]
+    cols: list[str]
     page_size: int = 25
     title: Optional[str] = None
     initial_sort_by: Optional[str] = None
@@ -1004,7 +1004,7 @@ class DataTable(Container):
         self._sort_column: Optional[str] = self.initial_sort_by
         self._sort_ascending: bool = not self.initial_sort_desc
         self._filter_text: str = ""
-        self._data_cache: List[List[Any]] = []
+        self._data_cache: list[list[Any]] = []
         self._total_count: int = 0
         self._data_source: Optional["DataSource"] = None
 

@@ -8,7 +8,7 @@ import threading
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
 from dataclasses import dataclass
-from typing import Any, Optional, List
+from typing import Any, Optional
 
 import flet as ft
 
@@ -100,7 +100,7 @@ class GUIRunner(Runner):
 
         # Reactive rendering context stack
         # Supports nested reactive contexts (though rare)
-        self._reactive_contexts: List[ReactiveContext] = []
+        self._reactive_contexts: list[ReactiveContext] = []
 
     def start(self) -> None:
         """Start the Flet GUI application."""

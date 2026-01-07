@@ -3,8 +3,7 @@ ONGOING:
 [-] change bootstrap convention to app and upp
 [] button "Clear & Re-run" change to clear
 [] add proper python typing
-
-[] release
+[] not working def depl(version:str, natco:str, envs:list[str]):
 
 [] prepare seperate file per ui_block
 [] extract AppShell?

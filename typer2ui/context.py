@@ -8,7 +8,7 @@ implementing stack-based lazy evaluation for UI components.
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 if TYPE_CHECKING:
     from .ui_blocks import UiBlock
@@ -31,7 +31,7 @@ class UiStack(list):
     def __init__(self):
         """Initialize empty stack with empty observer list."""
         super().__init__()
-        self._observers: List[Callable[[Any], None]] = []
+        self._observers: list[Callable[[Any], None]] = []
 
     def register_observer(self, callback: Callable[[Any], None]) -> None:
         """Register an observer to be notified on append.

@@ -1,7 +1,7 @@
 """Data source interface for dynamic data loading."""
 
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional, Any
+from typing import Optional, Any
 
 
 class DataSource(ABC):
@@ -47,7 +47,7 @@ class DataSource(ABC):
         sort_by: Optional[str] = None,
         ascending: bool = True,
         filter_text: Optional[str] = None,
-    ) -> Tuple[List[List[Any]], int]:
+    ) -> tuple[list[list[Any]], int]:
         """Fetch a page of data with optional sorting and filtering.
 
         Args:
