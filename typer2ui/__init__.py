@@ -21,7 +21,7 @@ from .ui_blocks import (
     DataTable,
 )
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 __all__ = [
     "build_app_spec",
     "State",
