@@ -59,6 +59,18 @@ def bump_minor_version(version):
     return f"{major}.{new_minor}.0"
 
 
+def bump_patch_version(version):
+    """Bump the patch/bugfix version number."""
+    parts = version.split(".")
+    if len(parts) != 3:
+        print(f"[ERROR] Invalid version format: {version}")
+        sys.exit(1)
+
+    major, minor, patch = parts
+    new_patch = int(patch) + 1
+    return f"{major}.{minor}.{new_patch}"
+
+
 def update_version_in_file(file_path, old_version, new_version):
     """Update version in a file."""
     path = Path(file_path)
@@ -82,14 +94,25 @@ def main():
     current_version = get_current_version()
     print(f"  Current version: {current_version}")
 
-    # Step 2: Bump version
-    print("\n[2/8] Bumping minor version...")
-    new_version = bump_minor_version(current_version)
-    print(f"  New version: {new_version}")
+    # Step 2: Ask if it's a bugfix
+    print("\n[2/8] Determining version bump type...")
+    print("  Is this a bugfix release? (y/n)")
+    print("    y = Patch version (x.y.Z) - for bug fixes")
+    print("    n = Minor version (x.Y.0) - for new features")
+    bugfix_response = input("  Bugfix? [y/N]: ").strip().lower()
+    is_bugfix = bugfix_response == "y"
+
+    if is_bugfix:
+        new_version = bump_patch_version(current_version)
+        print(f"  Bumping patch version: {current_version} -> {new_version}")
+    else:
+        new_version = bump_minor_version(current_version)
+        print(f"  Bumping minor version: {current_version} -> {new_version}")
 
     # Confirm with user
     print("\n" + "=" * 60)
-    response = input(f"Proceed with release v{new_version}? [y/N]: ").strip().lower()
+    release_type = "bugfix" if is_bugfix else "feature"
+    response = input(f"Proceed with {release_type} release v{new_version}? [y/N]: ").strip().lower()
     if response != "y":
         print("Release cancelled.")
         sys.exit(0)

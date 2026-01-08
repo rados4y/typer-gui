@@ -277,6 +277,7 @@ class UiApp:
         *,
         title: Optional[str] = None,
         description: Optional[str] = None,
+        runner: str = "gui",
     ):
         """Initialize the UI wrapper for a Typer app.
 
@@ -284,10 +285,15 @@ class UiApp:
             typer_app: The Typer application instance to extend
             title: Window title for the GUI
             description: Description text shown at the top of the GUI
+            runner: Default runner mode - "gui" (default, use --cli to switch) or "cli" (use --gui to switch)
         """
+        if runner not in ("gui", "cli"):
+            raise ValueError(f"runner must be 'gui' or 'cli', got: {runner}")
+
         self.title = title
         self.description = description
         self._typer_app = typer_app
+        self._runner_mode = runner
         self._cli_mode = False
 
         # Runtime attributes (initialized when app starts)
@@ -515,23 +521,40 @@ class UiApp:
         return [UICommand(self, cmd) for cmd in self.app_spec.commands]
 
     def __call__(self):
-        """Launch the GUI application or CLI based on --cli flag.
+        """Launch the application in GUI or CLI mode based on runner setting and flags.
 
-        This should be called at the end of your script to start the GUI.
-        If --cli flag is present in command line arguments, the GUI is bypassed
-        and the Typer CLI is executed directly.
+        Behavior depends on the runner parameter set in __init__:
+        - runner="gui" (default): Launches GUI by default, use --cli to run CLI mode
+        - runner="cli": Launches CLI by default, use --gui to run GUI mode
 
         Example:
-            >>> if __name__ == "__main__":
-            >>>     app()  # Launches GUI
-            >>>     # Or use: python script.py --cli command arg1 arg2
+            >>> # Default GUI mode
+            >>> app = tu.UiApp(tapp, runner="gui")
+            >>> app()  # Launches GUI
+            >>> # Or use: python script.py --cli command arg1 arg2
+            >>>
+            >>> # Default CLI mode
+            >>> app = tu.UiApp(tapp, runner="cli")
+            >>> app()  # Launches CLI
+            >>> # Or use: python script.py --gui
         """
-        # Check if --cli flag is present
-        if "--cli" in sys.argv:
-            self._cli_mode = True
+        # Determine which mode to run based on runner setting and flags
+        if self._runner_mode == "gui":
+            # Default is GUI, check for --cli flag
+            run_cli = "--cli" in sys.argv
+            flag_to_remove = "--cli" if run_cli else None
+        else:  # runner_mode == "cli"
+            # Default is CLI, check for --gui flag
+            run_cli = "--gui" not in sys.argv
+            flag_to_remove = "--gui" if not run_cli else None
 
-            # Remove --cli flag from arguments
-            sys.argv.remove("--cli")
+        # Remove the flag from argv if present
+        if flag_to_remove and flag_to_remove in sys.argv:
+            sys.argv.remove(flag_to_remove)
+
+        if run_cli:
+            # Run CLI mode
+            self._cli_mode = True
 
             # Build app spec
             self.app_spec = build_app_spec(

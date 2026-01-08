@@ -1,12 +1,25 @@
 ONGOING:
+[] error in printing in case of long command - tekst is not presented immediately - @upp.def_command(long=True)
+def long_running_task(steps: int = 5):
+"""Demonstrates a long-running task with real-time table updates.""" # Shortcut: ui(str) renders as Markdown
+ui(f"## Processing {steps} steps...")
+
+    # Use a context manager for progressive table updates
+    for i in range(5):
+        print(f"Processing step {i + 1}...")
+        time.sleep(0.8)
+
+    ui("[OK] **All steps completed!**")
+
 [-] change package to typer2ui
 [-] change bootstrap convention to app and upp
-[] add list as checkboxes
-[] if there are prints -> currently each of them produces single ft.Text(), i prefer to verify if it was lastly presented add simply new line to previous one.
+[-] add list as checkboxes
+[x] if there are multiple prints one by one -> currently each of them produces single ft.Text(), i prefer to use single ft.Text() and add new line and new text.
+[-] default runner = cli or gui
+[] print should by default push to ui and as well print in cli
 [] fix release - when there is error with release, retry with same version (right now version is increased)
 [] button "Clear & Re-run" change to clear
 [] add proper python typing
-[] not working def depl(version:str, natco:str, envs:list[str]):
 [] add support for sub-applications app = typer.Typer() app.add_typer(users_app, name="users") app.add_typer(orders_app, name="orders") app.add_typer(reports_app, name="reports").
 
 [] prepare seperate file per ui_block

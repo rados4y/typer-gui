@@ -182,11 +182,9 @@ def long_running_task(steps: int = 5):
     ui(f"## Processing {steps} steps...")
 
     # Use a context manager for progressive table updates
-    with ui(tu.Table(cols=["Step", "Status"], data=[])) as table:
-        for i in range(1, steps + 1):
-            table.add_row([f"Step {i}/{steps}", "In Progress..."])
-            time.sleep(0.8)
-            table.update_cell(i - 1, 1, "[OK] Complete")  # Update status to complete
+    for i in range(5):
+        print(f"Processing step {i + 1}...")
+        time.sleep(0.8)
 
     ui("[OK] **All steps completed!**")
 

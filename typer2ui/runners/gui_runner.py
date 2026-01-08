@@ -61,6 +61,8 @@ class _CommandView:
         self.output_view: Optional[ft.ListView] = None
         self.main_container: Optional[ft.Column] = None
         self.component_refs: dict[int, ft.Control] = {}
+        self.text_buffer: list[str] = []  # Buffer for accumulating consecutive text
+        self.current_text_control: Optional[ft.Text] = None  # For live text updates (long commands)
 
 
 class GUIRunner(Runner):
@@ -142,6 +144,13 @@ class GUIRunner(Runner):
         """
         view = self._get_current_view()
         if view and view.output_view:
+            # Flush text buffer before adding a non-text component
+            self._flush_text_buffer(view)
+
+            # Clear current text control (for long commands)
+            # Next print will start a new text block
+            view.current_text_control = None
+
             view.output_view.controls.append(control)
             if component:
                 view.component_refs[id(component)] = control
@@ -1168,10 +1177,8 @@ class GUIRunner(Runner):
         def display_print_line(line: str):
             """Display and capture a line from print()."""
             output_lines.append(line)
-            # Convert to control and add to output
-            if self.ctx:
-                control = self.ctx.build_child(root, line)
-                self.add_to_output(control)
+            # Add to text buffer instead of creating separate controls
+            self._append_text(line)
 
         stdout_writer = _RealTimeWriter(display_print_line)
         stderr_capture = io.StringIO()
@@ -1216,6 +1223,10 @@ class GUIRunner(Runner):
 
         # Restore previous runner
         set_current_runner(saved_runner)
+
+        # Flush any remaining text in buffer
+        view = self._get_current_view()
+        self._flush_text_buffer(view)
 
         # Join all output lines
         output_text = '\n'.join(output_lines)
@@ -1295,6 +1306,10 @@ class GUIRunner(Runner):
         # Restore runner
         set_current_runner(saved_runner)
 
+        # Flush any remaining text in buffer
+        view = self._get_current_view()
+        self._flush_text_buffer(view)
+
         return result, exception, '\n'.join(output_lines)
 
     def _execute_in_thread(
@@ -1333,11 +1348,12 @@ class GUIRunner(Runner):
             # Real-time streaming with thread-safe page updates
             def append_with_update(text):
                 output_lines.append(text)
-                self._append_text(text)
+                # Use live text updates for immediate display
+                self._append_to_live_text(text)
 
             stdout_writer = _RealTimeWriter(append_with_update)
             stderr_writer = _RealTimeWriter(
-                lambda t: self._append_text(f"[ERR] {t}")
+                lambda t: self._append_to_live_text(f"[ERR] {t}")
             )
 
             try:
@@ -1379,6 +1395,12 @@ class GUIRunner(Runner):
 
             # Restore runner
             set_current_runner(saved_runner)
+
+            # Clear live text control (command finished)
+            view = self._get_current_view()
+            if view:
+                view.current_text_control = None
+                self._flush_text_buffer(view)
 
         # Start thread
         thread = threading.Thread(target=thread_target, daemon=True)
@@ -1457,23 +1479,76 @@ class GUIRunner(Runner):
             # For non-UiBlock objects (strings, etc.)
             return str(component)
 
+    def _flush_text_buffer(self, view: Optional[_CommandView] = None) -> None:
+        """Flush accumulated text buffer to a single ft.Text control.
+
+        Args:
+            view: CommandView to flush buffer for (uses current view if None)
+        """
+        if view is None:
+            view = self._get_current_view()
+
+        if not view or not view.output_view or not view.text_buffer:
+            return
+
+        # Join all accumulated text with newlines
+        combined_text = '\n'.join(view.text_buffer)
+
+        # Create single ft.Text control
+        view.output_view.controls.append(
+            ft.Text(
+                combined_text,
+                selectable=True,
+                font_family="Courier New",
+                size=12,
+            )
+        )
+
+        # Clear buffer
+        view.text_buffer.clear()
+
+        if self.page:
+            # Thread-safe update for Flet 0.80+
+            self._safe_page_update()
+
+    def _append_to_live_text(self, text: str) -> None:
+        """Append text with immediate display for long-running commands.
+
+        Creates a single ft.Text control on first call, then appends to it
+        on subsequent calls. This provides real-time updates while keeping
+        consecutive text selectable as one block.
+
+        Args:
+            text: Text to append
+        """
+        view = self._get_current_view()
+        if not view or not view.output_view:
+            return
+
+        if not view.current_text_control:
+            # First text - create new ft.Text control
+            view.current_text_control = ft.Text(
+                text,
+                selectable=True,
+                font_family="Courier New",
+                size=12,
+            )
+            view.output_view.controls.append(view.current_text_control)
+        else:
+            # Subsequent text - append with newline
+            view.current_text_control.value += f"\n{text}"
+
+        if self.page:
+            # Thread-safe update
+            self._safe_page_update()
+
     def _append_text(self, text: str) -> None:
-        """Append plain text to output view."""
+        """Append plain text to buffer for later flushing."""
         view = self._get_current_view()
         if view and view.output_view:
+            # Split text into lines and add to buffer
             lines = text.rstrip('\n').split('\n') if text else []
-            for line in lines:
-                view.output_view.controls.append(
-                    ft.Text(
-                        line,
-                        selectable=True,
-                        font_family="Courier New",
-                        size=12,
-                    )
-                )
-            if self.page:
-                # Thread-safe update for Flet 0.80+
-                self._safe_page_update()
+            view.text_buffer.extend(lines)
 
 
 def create_flet_app(app_spec: AppSpec, ui: Optional[Any] = None):
