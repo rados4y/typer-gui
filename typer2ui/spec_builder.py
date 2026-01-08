@@ -52,6 +52,12 @@ def _get_param_type(annotation: Any) -> tuple[ParamType, Optional[type], Optiona
         # Get the item type from list[X]
         args = get_args(annotation)
         item_type = args[0] if args else str
+
+        # Check if it's list[EnumType]
+        if inspect.isclass(item_type) and issubclass(item_type, PyEnum):
+            choices = tuple([e.value for e in item_type])
+            return ParamType.ENUM_LIST, item_type, choices
+
         return ParamType.LIST, item_type, None
 
     # Unsupported type

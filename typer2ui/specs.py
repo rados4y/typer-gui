@@ -13,6 +13,7 @@ class ParamType(Enum):
     BOOLEAN = "boolean"
     ENUM = "enum"
     LIST = "list"
+    ENUM_LIST = "enum_list"  # list[EnumType] - displayed as checkboxes
     UNSUPPORTED = "unsupported"
 
 

@@ -77,6 +77,18 @@ def basic_parameters(
 
 
 @tapp.command()
+@upp.def_command(button=True)
+def list_parameters(
+    names: list[str],
+    numbers: list[int] = [1, 2, 3],
+    priority: list[Priority] = [Priority.MEDIUM],
+):
+    ui(f"## Greeting for {', '.join(names)}")
+    ui(f"## Numbers: {', '.join(map(str, numbers))}")
+    ui(f"## Priorities: {', '.join([p.value for p in priority])}")
+
+
+@tapp.command()
 @upp.def_command(button=True, modal=True)
 def create_task(
     title: str,

@@ -909,6 +909,40 @@ class GUIRunner(Runner):
                     value=default_value,
                     width=400,
                 )
+        elif param.param_type == ParamType.ENUM_LIST:
+            # Multiple checkboxes for list[Enum]
+            if param.enum_choices:
+                # Determine default selected values
+                default_values = set()
+                if param.default is not None and isinstance(param.default, list):
+                    default_values = {
+                        item.value if hasattr(item, 'value') else str(item)
+                        for item in param.default
+                    }
+
+                # Create a checkbox for each enum value
+                checkboxes = []
+                for choice in param.enum_choices:
+                    cb = ft.Checkbox(
+                        label=str(choice),
+                        value=(choice in default_values),
+                        data=choice,  # Store the enum value
+                    )
+                    checkboxes.append(cb)
+
+                # Wrap in Column with label and horizontal row of checkboxes
+                control = ft.Column(
+                    controls=[
+                        ft.Text(label, weight=ft.FontWeight.BOLD),
+                        ft.Row(
+                            controls=checkboxes,
+                            spacing=10,
+                            wrap=True,  # Wrap to next line if too many
+                        ),
+                    ],
+                    spacing=5,
+                )
+
         elif param.param_type == ParamType.LIST:
             # Multiline text field for list input (one item per line)
             default_text = ""
@@ -1021,6 +1055,41 @@ class GUIRunner(Runner):
                     return value
 
             return value
+
+        elif isinstance(control, ft.Column):
+            # Handle ENUM_LIST (Column with label + Row of checkboxes)
+            if param.param_type == ParamType.ENUM_LIST:
+                selected_values = []
+                # Get the Row containing checkboxes (should be at index 1)
+                if len(control.controls) > 1 and isinstance(control.controls[1], ft.Row):
+                    checkbox_row = control.controls[1]
+                    # Iterate through checkboxes in the row
+                    for ctrl in checkbox_row.controls:
+                        if isinstance(ctrl, ft.Checkbox) and ctrl.value:
+                            # Get the enum value from data attribute
+                            selected_values.append(ctrl.data)
+
+                # Convert string values back to enum members if python_type is available
+                if param.python_type and selected_values:
+                    try:
+                        enum_members = []
+                        for val in selected_values:
+                            # Use _value2member_map_ for efficient lookup
+                            if hasattr(param.python_type, '_value2member_map_'):
+                                member = param.python_type._value2member_map_.get(val)
+                                if member:
+                                    enum_members.append(member)
+                            else:
+                                # Fallback: iterate through members
+                                for member in param.python_type:
+                                    if member.value == val:
+                                        enum_members.append(member)
+                                        break
+                        return enum_members
+                    except Exception:
+                        return selected_values
+
+                return selected_values
 
         return None
 

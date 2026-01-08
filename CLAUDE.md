@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working Preferences
+
+**IMPORTANT: Git Commit Policy**
+- **DO NOT commit changes to git unless explicitly instructed by the user**
+- Wait for the user to say "commit" or "commit changes" before using git commands
+- Only commit when the user explicitly requests it
+
 ## Project Overview
 
 **Typer-UI** is a Python library that automatically generates desktop GUIs for existing Typer CLI applications using Flet. It allows developers to write CLI applications once and run them in both CLI and GUI modes without code duplication.
@@ -152,7 +159,8 @@ Immutable dataclasses that model the app structure:
   - `float` → FLOAT
   - `bool` → BOOLEAN
   - `Enum` → ENUM
-  - `list[T]` → LIST (supports str, int, float item types)
+  - `list[str]`, `list[int]`, `list[float]` → LIST
+  - `list[EnumType]` → ENUM_LIST (checkboxes for multiple enum selection)
 
 ## Important Patterns
 
@@ -188,6 +196,7 @@ Implementation:
 - `bool` → Checkbox
 - `Enum` → Dropdown with enum values
 - `list[str]`, `list[int]`, `list[float]` → Multiline TextField (one item per line)
+- `list[EnumType]` → Column with multiple Checkboxes (one per enum value)
 - Unsupported types → UNSUPPORTED (error in GUI)
 
 ## Critical Implementation Details

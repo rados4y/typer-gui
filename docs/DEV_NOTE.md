@@ -1,9 +1,13 @@
 ONGOING:
 [-] change package to typer2ui
 [-] change bootstrap convention to app and upp
+[] add list as checkboxes
+[] if there are prints -> currently each of them produces single ft.Text(), i prefer to verify if it was lastly presented add simply new line to previous one.
+[] fix release - when there is error with release, retry with same version (right now version is increased)
 [] button "Clear & Re-run" change to clear
 [] add proper python typing
 [] not working def depl(version:str, natco:str, envs:list[str]):
+[] add support for sub-applications app = typer.Typer() app.add_typer(users_app, name="users") app.add_typer(orders_app, name="orders") app.add_typer(reports_app, name="reports").
 
 [] prepare seperate file per ui_block
 [] extract AppShell?
