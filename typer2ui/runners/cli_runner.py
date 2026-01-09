@@ -166,13 +166,20 @@ class CLIRunner(Runner):
         try:
             # Execute command with UI stack context
             with self.ctx.new_ui_stack() as ui_stack:
-                with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
-                    # Call the command callback directly
-                    # Async commands are already wrapped by def_command decorator
-                    result = command_spec.callback(**params)
+                # Conditionally redirect stdout based on print2ui flag
+                if self.ui and self.ui.print2ui:
+                    # Capture print() statements
+                    with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
+                        # Call the command callback directly
+                        # Async commands are already wrapped by def_command decorator
+                        result = command_spec.callback(**params)
 
-                    # Flush any remaining buffered output
-                    stdout_writer.flush()
+                        # Flush any remaining buffered output
+                        stdout_writer.flush()
+                else:
+                    # Don't capture print() - let it go to stdout directly
+                    with redirect_stderr(stderr_capture):
+                        result = command_spec.callback(**params)
 
                 # If command returns a value, add it to stack
                 if result is not None:

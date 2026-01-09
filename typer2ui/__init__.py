@@ -16,6 +16,8 @@ from .ui_blocks import (
     Button,
     Link,
     TextInput,
+    Alert,
+    Confirm,
     Tab,
     Tabs,
     DataTable,
@@ -42,6 +44,8 @@ __all__ = [
     "Button",
     "Link",
     "TextInput",
+    "Alert",
+    "Confirm",
     "Tab",
     "Tabs",
 ]

@@ -16,9 +16,7 @@ import time
 
 tapp = typer.Typer()
 upp = tu.UiApp(
-    tapp,
-    title="UI Components",
-    description="Demonstrations of each UI component"
+    tapp, title="UI Components", description="Demonstrations of each UI component"
 )
 
 
@@ -30,7 +28,8 @@ def ui_text_md():
     text("This is plain text using text()")
 
     # Markdown (use tu.Md() directly or just ui() with string)
-    ui("""
+    ui(
+        """
 # Markdown Component
 
 You can use **bold**, *italic*, and `code` formatting.
@@ -39,26 +38,29 @@ You can use **bold**, *italic*, and `code` formatting.
 - Lists and tables
 - Code blocks
 - Headers and emphasis
-""")
+"""
+    )
 
 
 @tapp.command()
 @upp.def_command(view=True)
 def ui_table():
     """Table component - display tabular data."""
-    ui(tu.Table(
-        cols=["Name", "Email", "Role"],
-        data=[
-            ["Alice Smith", "alice@example.com", "Admin"],
-            ["Bob Johnson", "bob@example.com", "User"],
-            ["Carol White", "carol@example.com", "Manager"],
-        ],
-        title="User Directory"
-    ))
+    ui(
+        tu.Table(
+            cols=["Name", "Email", "Role"],
+            data=[
+                ["Alice Smith", "alice@example.com", "Admin"],
+                ["Bob Johnson", "bob@example.com", "User"],
+                ["Carol White", "carol@example.com", "Manager"],
+            ],
+            title="User Directory",
+        )
+    )
 
 
 @tapp.command()
-@upp.def_command(long=True)
+@upp.def_command(threaded=True)
 def ui_table_progressive():
     """Table with progressive rendering - add rows dynamically with context manager."""
     ui("## Progressive Table")
@@ -79,19 +81,27 @@ def ui_row_column():
 
     # Horizontal layout
     ui("## Row (Horizontal)")
-    ui(tu.Row([
-        tu.Text("Item 1"),
-        tu.Text("Item 2"),
-        tu.Text("Item 3"),
-    ]))
+    ui(
+        tu.Row(
+            [
+                tu.Text("Item 1"),
+                tu.Text("Item 2"),
+                tu.Text("Item 3"),
+            ]
+        )
+    )
 
     # Vertical layout
     ui("## Column (Vertical)")
-    ui(tu.Column([
-        tu.Text("First"),
-        tu.Text("Second"),
-        tu.Text("Third"),
-    ]))
+    ui(
+        tu.Column(
+            [
+                tu.Text("First"),
+                tu.Text("Second"),
+                tu.Text("Third"),
+            ]
+        )
+    )
 
 
 @tapp.command()
@@ -101,18 +111,26 @@ def ui_button_link():
     ui("# Interactive Components")
 
     ui("## Buttons")
-    ui(tu.Row([
-        tu.Button("Save", on_click=lambda: print("Save clicked")),
-        tu.Button("Cancel", on_click=lambda: print("Cancel clicked")),
-        tu.Button("Delete", on_click=lambda: print("Delete clicked")),
-    ]))
+    ui(
+        tu.Row(
+            [
+                tu.Button("Save", on_click=lambda: print("Save clicked")),
+                tu.Button("Cancel", on_click=lambda: print("Cancel clicked")),
+                tu.Button("Delete", on_click=lambda: print("Delete clicked")),
+            ]
+        )
+    )
 
     ui("## Links")
-    ui(tu.Column([
-        tu.Link("Settings", on_click=lambda: print("Settings clicked")),
-        tu.Link("Help", on_click=lambda: print("Help clicked")),
-        tu.Link("About", on_click=lambda: print("About clicked")),
-    ]))
+    ui(
+        tu.Column(
+            [
+                tu.Link("Settings", on_click=lambda: print("Settings clicked")),
+                tu.Link("Help", on_click=lambda: print("Help clicked")),
+                tu.Link("About", on_click=lambda: print("About clicked")),
+            ]
+        )
+    )
 
     ui("*Note: Buttons and Links are GUI-only and won't appear in CLI mode.*")
 
@@ -125,8 +143,12 @@ def ui_tabs():
 
     # Basic tabs with simple content
     ui("## Basic Tabs (Simple Content)")
-    ui(tu.Tabs([
-        tu.Tab("Overview", """
+    ui(
+        tu.Tabs(
+            [
+                tu.Tab(
+                    "Overview",
+                    """
 ### Welcome to the Overview
 
 This is the **first tab** with some markdown content.
@@ -134,26 +156,37 @@ This is the **first tab** with some markdown content.
 - Feature 1
 - Feature 2
 - Feature 3
-        """),
-        tu.Tab("Details", tu.Column([
-            tu.Text("This tab contains multiple components:"),
-            tu.Table(
-                cols=["Property", "Value"],
-                data=[
-                    ["Name", "Sample Project"],
-                    ["Version", "1.0.0"],
-                    ["Status", "Active"],
-                ]
-            ),
-        ])),
-        tu.Tab("Settings", """
+        """,
+                ),
+                tu.Tab(
+                    "Details",
+                    tu.Column(
+                        [
+                            tu.Text("This tab contains multiple components:"),
+                            tu.Table(
+                                cols=["Property", "Value"],
+                                data=[
+                                    ["Name", "Sample Project"],
+                                    ["Version", "1.0.0"],
+                                    ["Status", "Active"],
+                                ],
+                            ),
+                        ]
+                    ),
+                ),
+                tu.Tab(
+                    "Settings",
+                    """
 ### Settings
 
 Configure your preferences here.
 
 **Note:** This is just a demo!
-        """),
-    ]))
+        """,
+                ),
+            ]
+        )
+    )
 
     ui()
     ui("## Tabs with Callable Content (Complex Tabs)")
@@ -163,25 +196,29 @@ Configure your preferences here.
         ui("### Data Analysis")
         ui("Loading data from multiple sources...")
         ui()
-        ui(tu.Table(
-            cols=["Source", "Records", "Status"],
-            data=[
-                ["Database A", "1,234", "OK"],
-                ["Database B", "5,678", "OK"],
-                ["API Feed", "9,012", "OK"],
-            ],
-            title="Data Sources"
-        ))
+        ui(
+            tu.Table(
+                cols=["Source", "Records", "Status"],
+                data=[
+                    ["Database A", "1,234", "OK"],
+                    ["Database B", "5,678", "OK"],
+                    ["API Feed", "9,012", "OK"],
+                ],
+                title="Data Sources",
+            )
+        )
         ui()
         ui("### Processing Results")
-        ui(tu.Table(
-            cols=["Step", "Duration", "Result"],
-            data=[
-                ["Extract", "2.3s", "Success"],
-                ["Transform", "5.1s", "Success"],
-                ["Load", "3.7s", "Success"],
-            ]
-        ))
+        ui(
+            tu.Table(
+                cols=["Step", "Duration", "Result"],
+                data=[
+                    ["Extract", "2.3s", "Success"],
+                    ["Transform", "5.1s", "Success"],
+                    ["Load", "3.7s", "Success"],
+                ],
+            )
+        )
         ui()
         ui("**Analysis complete!** All systems operational.")
 
@@ -197,14 +234,16 @@ Configure your preferences here.
         ui(tu.Link("User Growth", on_click=lambda: print("Opening user growth...")))
         ui()
         ui("**Financial Reports:**")
-        ui(tu.Table(
-            cols=["Report", "Period", "Size"],
-            data=[
-                ["Revenue Summary", "2024-Q4", "2.3 MB"],
-                ["Expense Breakdown", "2024-Q4", "1.8 MB"],
-                ["Profit & Loss", "2024-Q4", "1.2 MB"],
-            ]
-        ))
+        ui(
+            tu.Table(
+                cols=["Report", "Period", "Size"],
+                data=[
+                    ["Revenue Summary", "2024-Q4", "2.3 MB"],
+                    ["Expense Breakdown", "2024-Q4", "1.8 MB"],
+                    ["Profit & Loss", "2024-Q4", "1.2 MB"],
+                ],
+            )
+        )
 
     def build_settings_tab():
         ui("### Application Settings")
@@ -215,22 +254,124 @@ Configure your preferences here.
         ui("- Language: English")
         ui()
         ui("**Notifications:**")
-        ui(tu.Row([
-            tu.Button("Enable All", on_click=lambda: print("Enabling notifications...")),
-            tu.Button("Disable All", on_click=lambda: print("Disabling notifications...")),
-        ]))
+        ui(
+            tu.Row(
+                [
+                    tu.Button(
+                        "Enable All",
+                        on_click=lambda: print("Enabling notifications..."),
+                    ),
+                    tu.Button(
+                        "Disable All",
+                        on_click=lambda: print("Disabling notifications..."),
+                    ),
+                ]
+            )
+        )
         ui()
         ui("**Data Management:**")
         ui("Cache size: 245 MB")
         ui(tu.Button("Clear Cache", on_click=lambda: print("Clearing cache...")))
 
     # Use callables for complex tabs
-    ui(tu.Tabs([
-        tu.Tab("Analysis", build_analysis_tab),
-        tu.Tab("Reports", build_reports_tab),
-        tu.Tab("Settings", build_settings_tab),
-        tu.Tab("Quick", lambda: ui("### Quick Tab\nThis is built with a lambda!")),
-    ]))
+    ui(
+        tu.Tabs(
+            [
+                tu.Tab("Analysis", build_analysis_tab),
+                tu.Tab("Reports", build_reports_tab),
+                tu.Tab("Settings", build_settings_tab),
+                tu.Tab(
+                    "Quick", lambda: ui("### Quick Tab\nThis is built with a lambda!")
+                ),
+            ]
+        )
+    )
+
+
+@tapp.command()
+@upp.def_command(view=True)
+def ui_alert_confirm():
+    """Alert and Confirm dialogs - interactive dialogs for notifications and confirmations."""
+    ui("# Dialog Components")
+    ui("## Alert Dialog")
+    ui("Show informational alerts with OK button:")
+
+    ui(
+        tu.Row(
+            [
+                tu.Link(
+                    "Simple Alert",
+                    on_click=lambda: ui(
+                        tu.Alert("Information", "This is a simple alert message.")
+                    ),
+                ),
+                tu.Link(
+                    "Markdown Alert",
+                    on_click=lambda: ui(
+                        tu.Alert(
+                            "Formatted Content",
+                            tu.Md(
+                                """
+## Important Notice
+
+This alert contains **formatted** content:
+- Feature 1 enabled
+- Feature 2 configured
+- All systems operational
+                """
+                            ),
+                        )
+                    ),
+                ),
+            ]
+        )
+    )
+
+    ui()
+    ui("## Confirm Dialog")
+    ui("Ask for user confirmation with Yes/No buttons:")
+
+    def on_confirmed():
+        ui("✓ User confirmed the action!")
+
+    def on_cancelled():
+        ui("✗ User cancelled the action.")
+
+    ui(
+        tu.Row(
+            [
+                tu.Link(
+                    "Confirm Action",
+                    on_click=lambda: ui(
+                        tu.Confirm(
+                            "Confirm Action",
+                            "Are you sure you want to proceed with this operation?",
+                            on_yes=on_confirmed,
+                            on_no=on_cancelled,
+                        )
+                    ),
+                ),
+                tu.Link(
+                    "Delete Confirmation",
+                    on_click=lambda: ui(
+                        tu.Confirm(
+                            "Delete Item",
+                            tu.Md(
+                                "**Warning:** This action cannot be undone!\n\nAre you sure?"
+                            ),
+                            on_yes=lambda: ui("Item deleted."),
+                            on_no=lambda: ui("Delete cancelled."),
+                        )
+                    ),
+                ),
+            ]
+        )
+    )
+
+    ui()
+    ui(
+        "*Note: Dialogs work in both GUI and CLI modes. In CLI, they prompt for user input.*"
+    )
 
 
 @tapp.command()
@@ -240,20 +381,26 @@ def ui_nested():
     ui("# Dashboard")
     ui("Example of nested component composition")
 
-    ui(tu.Row([
-        tu.Button("Refresh", on_click=lambda: print("Refreshing...")),
-        tu.Button("Export", on_click=lambda: print("Exporting...")),
-    ]))
+    ui(
+        tu.Row(
+            [
+                tu.Button("Refresh", on_click=lambda: print("Refreshing...")),
+                tu.Button("Export", on_click=lambda: print("Exporting...")),
+            ]
+        )
+    )
 
-    ui(tu.Table(
-        cols=["Metric", "Value"],
-        data=[
-            ["Users", "1,234"],
-            ["Revenue", "$56,789"],
-            ["Growth", "+12%"],
-        ],
-        title="Key Metrics"
-    ))
+    ui(
+        tu.Table(
+            cols=["Metric", "Value"],
+            data=[
+                ["Users", "1,234"],
+                ["Revenue", "$56,789"],
+                ["Growth", "+12%"],
+            ],
+            title="Key Metrics",
+        )
+    )
 
     ui("All components work together seamlessly!")
 
@@ -271,5 +418,6 @@ python examples/03_ui_blocks.py --cli ui-table-progressive
 python examples/03_ui_blocks.py --cli ui-row-column
 python examples/03_ui_blocks.py --cli ui-button-link
 python examples/03_ui_blocks.py --cli ui-tabs
+python examples/03_ui_blocks.py --cli ui-alert-confirm
 python examples/03_ui_blocks.py --cli ui-nested
 """

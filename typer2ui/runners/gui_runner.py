@@ -63,6 +63,7 @@ class _CommandView:
         self.component_refs: dict[int, ft.Control] = {}
         self.text_buffer: list[str] = []  # Buffer for accumulating consecutive text
         self.current_text_control: Optional[ft.Text] = None  # For live text updates (long commands)
+        self.run_button: Optional[ft.ElevatedButton] = None  # Reference to run button
 
 
 class GUIRunner(Runner):
@@ -410,6 +411,15 @@ class GUIRunner(Runner):
             )
         )
 
+        # Call init callback if registered
+        if self.ui and hasattr(self.ui, '_init_callback') and self.ui._init_callback:
+            try:
+                self.ui._init_callback()
+            except Exception as e:
+                print(f"Error in init callback: {e}")
+                import traceback
+                traceback.print_exc()
+
         # Select first command
         if self.app_spec.commands:
             # Schedule async task to select first command
@@ -552,7 +562,7 @@ class GUIRunner(Runner):
 
         # Clear output for non-long-running tasks on selection
         # Long-running tasks keep their output for review
-        if not command.ui_spec.long and selected_view.output_view:
+        if not command.ui_spec.threaded and selected_view.output_view:
             if selected_view.output_view.controls:
                 selected_view.output_view.controls.clear()
 
@@ -792,21 +802,25 @@ class GUIRunner(Runner):
                 color=ft.Colors.WHITE,
             )
 
+            # Store button reference for enabling/disabling during execution
+            view.run_button = run_button
+
             buttons = [run_button]
 
-            # Add Clear button for long-running tasks
-            if command.ui_spec.long:
+            # Add Clear button for threaded tasks
+            if command.ui_spec.threaded:
                 async def handle_clear(e):
-                    # Clear output and re-run
+                    # Clear output only (no reexecution)
                     if view.output_view:
                         view.output_view.controls.clear()
+                        # Clear current text control for long commands
+                        view.current_text_control = None
                         if self.page:
                             self.page.update()
-                    await self._run_command()
 
                 clear_button = ft.OutlinedButton(
-                    "Clear & Re-run",
-                    icon=ft.Icons.REFRESH,
+                    "Clear",
+                    icon=ft.Icons.CLEAR_ALL,
                     on_click=handle_clear,
                 )
                 buttons.append(clear_button)
@@ -976,13 +990,22 @@ class GUIRunner(Runner):
     async def _run_command(self) -> None:
         """Execute current command."""
         if not self.current_command:
-            self._append_text("ERROR: No command selected.")
+            # Display error immediately for early returns
+            view = self._get_current_view()
+            if view and view.output_view:
+                self._append_to_live_text("ERROR: No command selected.")
             return
 
         view = self._get_current_view()
         if not view:
-            self._append_text("ERROR: Command view not initialized.")
+            # Can't display - no view available
             return
+
+        # Disable run button during execution
+        if view.run_button:
+            view.run_button.disabled = True
+            if self.page:
+                self.page.update()
 
         try:
             # Parse parameters
@@ -995,7 +1018,8 @@ class GUIRunner(Runner):
                 value = self._extract_value(control, param)
 
                 if param.required and value is None:
-                    self._append_text(
+                    # Display validation error immediately
+                    self._append_to_live_text(
                         f"ERROR: Required parameter '{param.name}' is missing."
                     )
                     return
@@ -1012,11 +1036,20 @@ class GUIRunner(Runner):
             # Execute command
             result, error, output = await self.execute_command(self.current_command.name, kwargs)
             if error:
-                self._append_text(f"ERROR: {error}")
+                # Display error immediately (though execute_command should have already shown it)
+                self._append_to_live_text(f"ERROR: {error}")
 
         except Exception as e:
-            self._append_text(f"ERROR: {e}")
-            self._append_text(traceback.format_exc())
+            # Display exception immediately
+            self._append_to_live_text(f"ERROR: {e}")
+            self._append_to_live_text(traceback.format_exc())
+
+        finally:
+            # Re-enable run button after execution
+            if view.run_button:
+                view.run_button.disabled = False
+                if self.page:
+                    self.page.update()
 
     def _extract_value(self, control: ft.Control, param) -> Any:
         """Extract value from Flet control."""
@@ -1133,9 +1166,9 @@ class GUIRunner(Runner):
         # Check if the callback has an original async function stored
         original_async = getattr(command_spec.callback, '_original_async_func', None)
         is_async = inspect.iscoroutinefunction(command_spec.callback) or original_async is not None
-        is_long = command_spec.ui_spec.long
+        is_threaded = command_spec.ui_spec.threaded
 
-        if is_long:
+        if is_threaded:
             # Mode 3: Execute in background thread with immediate updates
             return self._execute_in_thread(command_spec, params)
         elif is_async:
@@ -1186,11 +1219,18 @@ class GUIRunner(Runner):
         try:
             # Execute command with UI stack context
             with self.ctx.new_ui_stack() as ui_stack:
-                with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
-                    result = command_spec.callback(**params)
+                # Conditionally redirect stdout based on print2ui flag
+                if self.ui and self.ui.print2ui:
+                    # Capture print() statements
+                    with redirect_stdout(stdout_writer), redirect_stderr(stderr_capture):
+                        result = command_spec.callback(**params)
 
-                    # Flush any remaining buffered output
-                    stdout_writer.flush()
+                        # Flush any remaining buffered output
+                        stdout_writer.flush()
+                else:
+                    # Don't capture print() - let it go to stdout directly
+                    with redirect_stderr(stderr_capture):
+                        result = command_spec.callback(**params)
 
                 # If command returns a value, add it to stack
                 if result is not None:
@@ -1296,8 +1336,9 @@ class GUIRunner(Runner):
             exception = e
             error_text = f"ERROR: {e}"
             output_lines.append(error_text)
-            self._append_text(error_text)
-            self._append_text(traceback.format_exc())
+            # Display error immediately in async mode for consistency
+            self._append_to_live_text(error_text)
+            self._append_to_live_text(traceback.format_exc())
 
         finally:
             # Reset async context
@@ -1373,11 +1414,20 @@ class GUIRunner(Runner):
 
                     ui_stack.register_observer(on_append)
 
-                    with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
-                        result = command_spec.callback(**params)
+                    # Conditionally redirect stdout based on print2ui flag
+                    if self.ui and self.ui.print2ui:
+                        # Capture print() statements
+                        with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
+                            result = command_spec.callback(**params)
 
-                    stdout_writer.flush()
-                    stderr_writer.flush()
+                        stdout_writer.flush()
+                        stderr_writer.flush()
+                    else:
+                        # Don't capture print() - let it go to stdout directly
+                        with redirect_stderr(stderr_writer):
+                            result = command_spec.callback(**params)
+
+                        stderr_writer.flush()
 
                     # If command returns a value, add it to stack
                     # (This will trigger on_append immediately)
@@ -1390,8 +1440,9 @@ class GUIRunner(Runner):
                 stderr_writer.flush()
                 error_text = f"ERROR: {e}"
                 output_lines.append(error_text)
-                self._append_text(error_text)
-                self._append_text(traceback.format_exc())
+                # Use live text for immediate error display in threaded mode
+                self._append_to_live_text(error_text)
+                self._append_to_live_text(traceback.format_exc())
 
             # Restore runner
             set_current_runner(saved_runner)

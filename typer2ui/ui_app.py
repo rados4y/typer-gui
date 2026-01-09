@@ -278,6 +278,7 @@ class UiApp:
         title: Optional[str] = None,
         description: Optional[str] = None,
         runner: str = "gui",
+        print2ui: bool = True,
     ):
         """Initialize the UI wrapper for a Typer app.
 
@@ -286,6 +287,8 @@ class UiApp:
             title: Window title for the GUI
             description: Description text shown at the top of the GUI
             runner: Default runner mode - "gui" (default, use --cli to switch) or "cli" (use --gui to switch)
+            print2ui: If True (default), print() statements are captured and displayed in UI.
+                      If False, print() goes directly to stdout (regular behavior)
         """
         if runner not in ("gui", "cli"):
             raise ValueError(f"runner must be 'gui' or 'cli', got: {runner}")
@@ -294,12 +297,20 @@ class UiApp:
         self.description = description
         self._typer_app = typer_app
         self._runner_mode = runner
+        self.print2ui = print2ui
         self._cli_mode = False
 
         # Runtime attributes (initialized when app starts)
         self.app_spec: Optional[AppSpec] = None
         self.runner: Optional[Any] = None
         self.current_command: Optional[CommandSpec] = None
+
+        # Hold object for accessing GUI internals
+        from .hold import Hold
+        self.hold = Hold(self)
+
+        # Init callback (called when GUI starts)
+        self._init_callback: Optional[Callable] = None
 
     def clipboard(self, text: str) -> None:
         """Copy text to clipboard.
@@ -360,11 +371,54 @@ class UiApp:
 
         return State(initial_value)
 
+    def init(self, func: Optional[Callable] = None):
+        """Decorator to register a function that runs when GUI starts.
+
+        The decorated function is called after the GUI page is initialized
+        but before any commands are displayed. This is useful for:
+        - Showing welcome dialogs
+        - Initializing state
+        - Setting up page-level customizations
+
+        The function receives no arguments but can access:
+        - upp.hold.page - The Flet Page object
+        - All UiApp methods and state
+
+        Example:
+            >>> @upp.init()
+            >>> def on_startup():
+            >>>     import flet as ft
+            >>>     # Show welcome dialog
+            >>>     dlg = ft.AlertDialog(
+            >>>         title=ft.Text("Welcome!"),
+            >>>         content=ft.Text("Thanks for using our app")
+            >>>     )
+            >>>     upp.hold.page.dialog = dlg
+            >>>     dlg.open = True
+            >>>     upp.hold.page.update()
+
+        Args:
+            func: Function to call on GUI startup
+
+        Returns:
+            The decorated function
+        """
+        def decorator(f: Callable) -> Callable:
+            self._init_callback = f
+            return f
+
+        if func is None:
+            # Called with parentheses: @upp.init()
+            return decorator
+        else:
+            # Called without parentheses: @upp.init
+            return decorator(func)
+
     def def_command(
         self,
         *,
         button: bool = False,
-        long: bool = False,
+        threaded: bool = True,
         auto: bool = False,
         header: bool = True,
         submit_name: str = "Run Command",
@@ -380,7 +434,7 @@ class UiApp:
 
         Args:
             button: Display as a button in the left panel
-            long: Enable real-time output streaming for long-running commands
+            threaded: Run in background thread with real-time output streaming (default: True)
             auto: Execute automatically when selected, hide submit button
             header: Show command name and description (default: True)
             submit_name: Text for the submit button (default: "Run Command")
@@ -392,7 +446,7 @@ class UiApp:
 
         Example:
             >>> @typer_app.command()
-            >>> @app.def_command(button=True, long=True)
+            >>> @app.def_command(button=True, threaded=True)
             >>> def process():
             >>>     for i in range(10):
             >>>         print(f"Step {i}")
@@ -429,7 +483,7 @@ class UiApp:
                 _GUI_OPTIONS_ATTR,
                 CommandUiSpec(
                     button=button,
-                    long=long,
+                    threaded=threaded,
                     auto=final_auto,
                     header=final_header,
                     submit_name=submit_name,

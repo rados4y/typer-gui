@@ -5,6 +5,7 @@ import subprocess
 import sys
 import shutil
 import re
+import json
 from pathlib import Path
 
 
@@ -83,78 +84,155 @@ def update_version_in_file(file_path, old_version, new_version):
     print(f"  Updated {file_path}")
 
 
+def get_unreleased_version():
+    """Check if there's an unreleased version stored.
+
+    Returns:
+        dict or None: Unreleased version info or None
+    """
+    unreleased_file = Path(".unreleased_version")
+    if unreleased_file.exists():
+        try:
+            data = json.loads(unreleased_file.read_text(encoding="utf-8"))
+            return data
+        except Exception:
+            return None
+    return None
+
+
+def save_unreleased_version(version, is_bugfix, tag_name):
+    """Save unreleased version info to file.
+
+    Args:
+        version: Version number
+        is_bugfix: Whether it's a bugfix release
+        tag_name: Git tag name
+    """
+    unreleased_file = Path(".unreleased_version")
+    data = {
+        "version": version,
+        "is_bugfix": is_bugfix,
+        "tag_name": tag_name
+    }
+    unreleased_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    print(f"[SAVED] Unreleased version info saved to {unreleased_file}")
+
+
+def clear_unreleased_version():
+    """Remove unreleased version file after successful release."""
+    unreleased_file = Path(".unreleased_version")
+    if unreleased_file.exists():
+        unreleased_file.unlink()
+        print(f"[OK] Cleared unreleased version tracking")
+
+
 def main():
     """Main release workflow."""
     print("=" * 60)
     print("  Typer-UI Automated Release Script")
     print("=" * 60)
 
-    # Step 1: Get current version
-    print("\n[1/8] Reading current version...")
-    current_version = get_current_version()
-    print(f"  Current version: {current_version}")
+    # Check for unreleased version
+    unreleased = get_unreleased_version()
+    if unreleased:
+        print("\n" + "!" * 60)
+        print(f"  UNRELEASED VERSION FOUND: v{unreleased['version']}")
+        print("!" * 60)
+        print(f"  Version: {unreleased['version']}")
+        print(f"  Type: {'bugfix' if unreleased['is_bugfix'] else 'feature'}")
+        print(f"  Tag: {unreleased['tag_name']}")
+        print("\nThis version was prepared but not published to PyPI.")
+        response = input("Do you want to publish this version now? [y/N]: ").strip().lower()
 
-    # Step 2: Ask if it's a bugfix
-    print("\n[2/8] Determining version bump type...")
-    print("  Is this a bugfix release? (y/n)")
-    print("    y = Patch version (x.y.Z) - for bug fixes")
-    print("    n = Minor version (x.Y.0) - for new features")
-    bugfix_response = input("  Bugfix? [y/N]: ").strip().lower()
-    is_bugfix = bugfix_response == "y"
+        if response == "y":
+            # Use unreleased version info
+            new_version = unreleased['version']
+            is_bugfix = unreleased['is_bugfix']
+            tag_name = unreleased['tag_name']
+            current_version = None  # Not needed for unreleased
 
-    if is_bugfix:
-        new_version = bump_patch_version(current_version)
-        print(f"  Bumping patch version: {current_version} -> {new_version}")
+            # Skip to step 7 (build and upload)
+            print("\nResuming release from build step...")
+            skip_to_build = True
+        else:
+            print("\nCancelling unreleased version. Will create new release.")
+            clear_unreleased_version()
+            skip_to_build = False
     else:
-        new_version = bump_minor_version(current_version)
-        print(f"  Bumping minor version: {current_version} -> {new_version}")
+        skip_to_build = False
 
-    # Confirm with user
-    print("\n" + "=" * 60)
-    release_type = "bugfix" if is_bugfix else "feature"
-    response = input(f"Proceed with {release_type} release v{new_version}? [y/N]: ").strip().lower()
-    if response != "y":
-        print("Release cancelled.")
-        sys.exit(0)
-    print("=" * 60)
+    if not skip_to_build:
+        # Step 1: Get current version
+        print("\n[1/8] Reading current version...")
+        current_version = get_current_version()
+        print(f"  Current version: {current_version}")
 
-    # Step 3: Update version in files
-    print("\n[3/8] Updating version in files...")
-    update_version_in_file("pyproject.toml", current_version, new_version)
-    update_version_in_file("typer2ui/__init__.py", current_version, new_version)
-    print("[OK] Version updated in all files")
+        # Step 2: Ask if it's a bugfix
+        print("\n[2/8] Determining version bump type...")
+        print("  Is this a bugfix release? (y/n)")
+        print("    y = Patch version (x.y.Z) - for bug fixes")
+        print("    n = Minor version (x.Y.0) - for new features")
+        bugfix_response = input("  Bugfix? [y/N]: ").strip().lower()
+        is_bugfix = bugfix_response == "y"
 
-    # Step 4: Commit version bump
-    print("\n[4/8] Committing version bump...")
-    commit_msg = f"Bump version to {new_version}"
-    success, _ = run_command(
-        f'git add pyproject.toml typer2ui/__init__.py && git commit -m "{commit_msg}"',
-        "Committing version bump"
-    )
-    if not success:
-        print("[ERROR] Failed to commit version bump")
-        sys.exit(1)
+        if is_bugfix:
+            new_version = bump_patch_version(current_version)
+            print(f"  Bumping patch version: {current_version} -> {new_version}")
+        else:
+            new_version = bump_minor_version(current_version)
+            print(f"  Bumping minor version: {current_version} -> {new_version}")
 
-    # Step 5: Create git tag
-    print("\n[5/8] Creating git tag...")
-    tag_name = f"v{new_version}"
-    success, _ = run_command(
-        f'git tag -a {tag_name} -m "Release {tag_name}"',
-        f"Creating tag {tag_name}"
-    )
-    if not success:
-        print("[ERROR] Failed to create git tag")
-        sys.exit(1)
+        # Confirm with user
+        print("\n" + "=" * 60)
+        release_type = "bugfix" if is_bugfix else "feature"
+        response = input(f"Proceed with {release_type} release v{new_version}? [y/N]: ").strip().lower()
+        if response != "y":
+            print("Release cancelled.")
+            sys.exit(0)
+        print("=" * 60)
 
-    # Step 6: Push to remote
-    print("\n[6/8] Pushing to remote repository...")
-    success, _ = run_command(
-        f"git push && git push origin {tag_name}",
-        "Pushing commit and tag to remote"
-    )
-    if not success:
-        print("[ERROR] Failed to push to remote")
-        sys.exit(1)
+    if not skip_to_build:
+        # Step 3: Update version in files
+        print("\n[3/8] Updating version in files...")
+        update_version_in_file("pyproject.toml", current_version, new_version)
+        update_version_in_file("typer2ui/__init__.py", current_version, new_version)
+        print("[OK] Version updated in all files")
+
+        # Step 4: Commit version bump
+        print("\n[4/8] Committing version bump...")
+        commit_msg = f"Bump version to {new_version}"
+        success, _ = run_command(
+            f'git add pyproject.toml typer2ui/__init__.py && git commit -m "{commit_msg}"',
+            "Committing version bump"
+        )
+        if not success:
+            print("[ERROR] Failed to commit version bump")
+            sys.exit(1)
+
+        # Step 5: Create git tag
+        print("\n[5/8] Creating git tag...")
+        tag_name = f"v{new_version}"
+        success, _ = run_command(
+            f'git tag -a {tag_name} -m "Release {tag_name}"',
+            f"Creating tag {tag_name}"
+        )
+        if not success:
+            print("[ERROR] Failed to create git tag")
+            sys.exit(1)
+
+        # Save as unreleased in case next steps fail
+        save_unreleased_version(new_version, is_bugfix, tag_name)
+
+        # Step 6: Push to remote
+        print("\n[6/8] Pushing to remote repository...")
+        success, _ = run_command(
+            f"git push && git push origin {tag_name}",
+            "Pushing commit and tag to remote"
+        )
+        if not success:
+            print("[ERROR] Failed to push to remote")
+            print("[INFO] Version saved as unreleased. Run script again to retry.")
+            sys.exit(1)
 
     # Step 7: Clean and build package
     dist_dir = Path("dist")
@@ -165,6 +243,8 @@ def main():
 
     success, _ = run_command("python -m build", "Building package")
     if not success:
+        print("[ERROR] Failed to build package")
+        print("[INFO] Version saved as unreleased. Run script again to retry.")
         sys.exit(1)
 
     # Step 8: Upload to PyPI
@@ -177,13 +257,21 @@ def main():
 
     success, _ = run_command("python -m twine upload dist/*", "Uploading to PyPI")
     if not success:
+        print("[ERROR] Failed to upload to PyPI")
+        print("[INFO] Version saved as unreleased. Run script again to retry.")
         sys.exit(1)
+
+    # Clear unreleased version after successful upload
+    clear_unreleased_version()
 
     # Success message
     print("\n" + "=" * 60)
     print(f"  Release v{new_version} completed successfully!")
     print("=" * 60)
-    print(f"\n[OK] Version bumped: {current_version} -> {new_version}")
+    if current_version:
+        print(f"\n[OK] Version bumped: {current_version} -> {new_version}")
+    else:
+        print(f"\n[OK] Version released: {new_version}")
     print(f"[OK] Git tag created: {tag_name}")
     print(f"[OK] Pushed to GitHub")
     print(f"[OK] Published to PyPI")

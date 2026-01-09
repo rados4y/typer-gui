@@ -175,7 +175,7 @@ You can use **bold**, *italic*, and `code` formatting.
 
 
 @tapp.command()
-@upp.def_command(long=True)
+@upp.def_command(threaded=True)
 def long_running_task(steps: int = 5):
     """Demonstrates a long-running task with real-time table updates."""
     # Shortcut: ui(str) renders as Markdown
@@ -190,7 +190,7 @@ def long_running_task(steps: int = 5):
 
 
 @tapp.command()
-@upp.def_command(long=True)
+@upp.def_command(threaded=True)
 async def async_task(delay: float = 1.0):
     """
     Demonstrates an async command.

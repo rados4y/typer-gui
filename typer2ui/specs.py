@@ -53,8 +53,8 @@ class CommandUiSpec:
     button: bool = False
     """Display as a button in the left panel instead of a text link"""
 
-    long: bool = False
-    """Command is long-running, enable real-time output streaming"""
+    threaded: bool = True
+    """Run command in background thread with real-time output streaming (default: True)"""
 
     auto: bool = False
     """Execute command automatically when selected, hide submit button"""
