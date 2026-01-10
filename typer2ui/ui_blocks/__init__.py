@@ -16,6 +16,7 @@ from .base import (
 # Simple components
 from .text import Text
 from .md import Md
+from .print import Print
 
 # Data display
 from .table import Table
@@ -41,6 +42,7 @@ __all__ = [
     # Simple
     "Text",
     "Md",
+    "Print",
     # Data
     "Table",
     "DataTable",

@@ -411,6 +411,7 @@ class GUIRunner(Runner):
         page.window_width = 1000
         page.window_height = 700
         page.padding = 0
+        page.bgcolor = "#FAFAFA"  # Light gray background
 
         # Create main layout
         header = self._create_header()
@@ -458,8 +459,9 @@ class GUIRunner(Runner):
             controls.append(
                 ft.Text(
                     self.app_spec.title,
-                    size=24,
-                    weight=ft.FontWeight.BOLD,
+                    size=28,
+                    weight=ft.FontWeight.W_700,
+                    color="#1F2937",
                 )
             )
 
@@ -467,8 +469,8 @@ class GUIRunner(Runner):
             controls.append(
                 ft.Text(
                     self.app_spec.description,
-                    size=14,
-                    color=ft.Colors.GREY_700,
+                    size=15,
+                    color="#6B7280",
                 )
             )
 
@@ -476,9 +478,15 @@ class GUIRunner(Runner):
             return ft.Container()
 
         return ft.Container(
-            content=ft.Column(controls=controls, spacing=5),
-            padding=20,
-            bgcolor=ft.Colors.BLUE_GREY_50,
+            content=ft.Column(controls=controls, spacing=8),
+            padding=ft.Padding(left=28, right=28, top=24, bottom=24),
+            bgcolor="#FFFFFF",
+            shadow=ft.BoxShadow(
+                spread_radius=0,
+                blur_radius=2,
+                color="#00000008",
+                offset=ft.Offset(0, 1),
+            ),
         )
 
     def _create_content(self) -> ft.Control:
@@ -514,15 +522,17 @@ class GUIRunner(Runner):
         # Layout
         left_panel = ft.Container(
             content=self.command_list,
-            width=185,
-            bgcolor=ft.Colors.BLUE_GREY_50,
-            padding=10,
+            width=220,
+            bgcolor="#FFFFFF",
+            padding=ft.Padding(left=16, right=16, top=16, bottom=16),
+            border=ft.Border(right=ft.BorderSide(1, "#E5E7EB")),
         )
 
         right_panel = ft.Container(
             content=self.views_container,
             expand=True,
             padding=0,
+            bgcolor="#FFFFFF",
         )
 
         return ft.Row(
@@ -550,9 +560,16 @@ class GUIRunner(Runner):
                 on_click=handle_tab_click,
                 style=ft.ButtonStyle(
                     shape=ft.RoundedRectangleBorder(radius=0),
-                    padding=ft.Padding(left=20, right=20, top=10, bottom=10),
-                    bgcolor=ft.Colors.BLUE_700 if is_active else ft.Colors.BLUE_GREY_100,
-                    color=ft.Colors.WHITE if is_active else ft.Colors.BLACK87,
+                    padding=ft.Padding(left=24, right=24, top=14, bottom=14),
+                    bgcolor={"": "#FFFFFF" if is_active else "transparent"},
+                    color={"": "#2563EB" if is_active else "#6B7280"},
+                    overlay_color={"": "#F3F4F6"},
+                    side={
+                        "": ft.BorderSide(
+                            width=0 if not is_active else 2,
+                            color="#2563EB" if is_active else "transparent"
+                        )
+                    },
                 ),
             )
             tab_buttons.append(btn)
@@ -566,10 +583,11 @@ class GUIRunner(Runner):
         tab_bar = ft.Container(
             content=ft.Row(
                 controls=tab_buttons,
-                spacing=0,
+                spacing=4,
             ),
-            bgcolor=ft.Colors.BLUE_GREY_100,
-            padding=0,
+            bgcolor="#F9FAFB",
+            padding=ft.Padding(left=16, right=16, top=8, bottom=0),
+            border=ft.Border(bottom=ft.BorderSide(1, "#E5E7EB")),
         )
 
         # Content container showing current tab
@@ -605,15 +623,17 @@ class GUIRunner(Runner):
         # Layout: left panel (commands) + right panel (views)
         left_panel = ft.Container(
             content=command_list,
-            width=185,
-            bgcolor=ft.Colors.BLUE_GREY_50,
-            padding=10,
+            width=220,
+            bgcolor="#FFFFFF",
+            padding=ft.Padding(left=16, right=16, top=16, bottom=16),
+            border=ft.Border(right=ft.BorderSide(1, "#E5E7EB")),
         )
 
         right_panel = ft.Container(
             content=views_container,
             expand=True,
             padding=0,
+            bgcolor="#FFFFFF",
         )
 
         return ft.Container(
@@ -639,9 +659,16 @@ class GUIRunner(Runner):
             is_active = (name == tab_name)
             btn.style = ft.ButtonStyle(
                 shape=ft.RoundedRectangleBorder(radius=0),
-                padding=ft.Padding(left=20, right=20, top=10, bottom=10),
-                bgcolor=ft.Colors.BLUE_700 if is_active else ft.Colors.BLUE_GREY_100,
-                color=ft.Colors.WHITE if is_active else ft.Colors.BLACK87,
+                padding=ft.Padding(left=24, right=24, top=14, bottom=14),
+                bgcolor={"": "#FFFFFF" if is_active else "transparent"},
+                color={"": "#2563EB" if is_active else "#6B7280"},
+                overlay_color={"": "#F3F4F6"},
+                side={
+                    "": ft.BorderSide(
+                        width=0 if not is_active else 2,
+                        color="#2563EB" if is_active else "transparent"
+                    )
+                },
             )
 
         # Switch content
@@ -674,10 +701,13 @@ class GUIRunner(Runner):
                 btn = ft.ElevatedButton(
                     cmd.name,
                     on_click=handle_click,
-                    bgcolor=ft.Colors.BLUE_600,
-                    color=ft.Colors.WHITE,
+                    bgcolor="#2563EB",
+                    color="#FFFFFF",
                     style=ft.ButtonStyle(
-                        shape=ft.RoundedRectangleBorder(radius=5),
+                        shape=ft.RoundedRectangleBorder(radius=6),
+                        padding=ft.Padding(left=16, right=16, top=10, bottom=10),
+                        shadow_color="#2563EB40",
+                        elevation={"": 1, "hovered": 2},
                     ),
                 )
             else:
@@ -685,12 +715,16 @@ class GUIRunner(Runner):
                     cmd.name,
                     on_click=handle_click,
                     style=ft.ButtonStyle(
-                        shape=ft.RoundedRectangleBorder(radius=5),
+                        shape=ft.RoundedRectangleBorder(radius=6),
+                        padding=ft.Padding(left=16, right=16, top=10, bottom=10),
+                        color={"": "#374151", "hovered": "#2563EB"},
+                        bgcolor={"": "transparent", "hovered": "#F3F4F6"},
+                        overlay_color={"hovered": "#F3F4F610"},
                     ),
                 )
             buttons.append(btn)
 
-        return ft.ListView(controls=buttons, spacing=5, expand=True)
+        return ft.ListView(controls=buttons, spacing=8, expand=True)
 
 
     async def _select_command(self, command: CommandSpec) -> None:
@@ -975,8 +1009,14 @@ class GUIRunner(Runner):
                 command.ui_spec.submit_name,
                 icon=ft.Icons.PLAY_ARROW,
                 on_click=handle_run,
-                bgcolor=ft.Colors.BLUE_700,
-                color=ft.Colors.WHITE,
+                bgcolor="#2563EB",
+                color="#FFFFFF",
+                style=ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=6),
+                    padding=ft.Padding(left=20, right=20, top=12, bottom=12),
+                    shadow_color="#2563EB40",
+                    elevation={"": 2, "hovered": 3},
+                ),
             )
 
             # Store button reference for enabling/disabling during execution
@@ -999,6 +1039,12 @@ class GUIRunner(Runner):
                     "Clear",
                     icon=ft.Icons.CLEAR_ALL,
                     on_click=handle_clear,
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=6),
+                        padding=ft.Padding(left=20, right=20, top=12, bottom=12),
+                        color={"": "#6B7280"},
+                        side={"": ft.BorderSide(1, "#D1D5DB")},
+                    ),
                 )
                 buttons.append(clear_button)
 
@@ -1080,7 +1126,11 @@ class GUIRunner(Runner):
                 label=label,
                 hint_text=hint_text,
                 value=str(param.default) if param.default is not None else "",
-                width=400,
+                width=450,
+                border_color="#D1D5DB",
+                focused_border_color="#2563EB",
+                bgcolor="#FFFFFF",
+                text_size=14,
             )
         elif param.param_type == ParamType.INTEGER:
             control = ft.TextField(
@@ -1088,7 +1138,11 @@ class GUIRunner(Runner):
                 hint_text=hint_text,
                 value=str(param.default) if param.default is not None else "",
                 keyboard_type=ft.KeyboardType.NUMBER,
-                width=400,
+                width=450,
+                border_color="#D1D5DB",
+                focused_border_color="#2563EB",
+                bgcolor="#FFFFFF",
+                text_size=14,
             )
         elif param.param_type == ParamType.FLOAT:
             control = ft.TextField(
@@ -1096,7 +1150,11 @@ class GUIRunner(Runner):
                 hint_text=hint_text,
                 value=str(param.default) if param.default is not None else "",
                 keyboard_type=ft.KeyboardType.NUMBER,
-                width=400,
+                width=450,
+                border_color="#D1D5DB",
+                focused_border_color="#2563EB",
+                bgcolor="#FFFFFF",
+                text_size=14,
             )
         elif param.param_type == ParamType.BOOLEAN:
             control = ft.Checkbox(
@@ -1115,7 +1173,11 @@ class GUIRunner(Runner):
                     hint_text=hint_text,
                     options=[ft.dropdown.Option(c) for c in param.enum_choices],
                     value=default_value,
-                    width=400,
+                    width=450,
+                    border_color="#D1D5DB",
+                    focused_border_color="#2563EB",
+                    bgcolor="#FFFFFF",
+                    text_size=14,
                 )
         elif param.param_type == ParamType.ENUM_LIST:
             # Multiple checkboxes for list[Enum]
@@ -1164,7 +1226,11 @@ class GUIRunner(Runner):
                 multiline=True,
                 min_lines=3,
                 max_lines=10,
-                width=400,
+                width=450,
+                border_color="#D1D5DB",
+                focused_border_color="#2563EB",
+                bgcolor="#FFFFFF",
+                text_size=14,
             )
 
         if control and view:
@@ -1191,6 +1257,9 @@ class GUIRunner(Runner):
             view.run_button.disabled = True
             if self.page:
                 self.page.update()
+
+        # Check if command is threaded (will run in background)
+        is_threaded = self.current_command and self.current_command.ui_spec.threaded
 
         try:
             # Parse parameters
@@ -1231,7 +1300,8 @@ class GUIRunner(Runner):
 
         finally:
             # Re-enable run button after execution
-            if view.run_button:
+            # BUT: Don't re-enable for threaded commands - they handle it themselves when done
+            if not is_threaded and view.run_button:
                 view.run_button.disabled = False
                 if self.page:
                     self.page.update()
@@ -1408,9 +1478,13 @@ class GUIRunner(Runner):
         # This displays print() output immediately while also capturing it
         def display_print_line(line: str):
             """Display and capture a line from print()."""
+            from ..output import ui
+            from ..ui_blocks import Print
+
             output_lines.append(line)
-            # Add to text buffer instead of creating separate controls
-            self._append_text(line)
+            # Use Print() UI block to handle text accumulation
+            # print() is now equivalent to ui(tu.Print(...))
+            ui(Print(line))
 
         stdout_writer = _RealTimeWriter(display_print_line)
         stderr_capture = io.StringIO()
@@ -1643,14 +1717,21 @@ class GUIRunner(Runner):
                 self._append_to_live_text(error_text)
                 self._append_to_live_text(traceback.format_exc())
 
-            # Restore runner
-            set_current_runner(saved_runner)
+            finally:
+                # Restore runner
+                set_current_runner(saved_runner)
 
-            # Clear live text control (command finished)
-            view = self._get_current_view()
-            if view:
-                view.current_text_control = None
-                self._flush_text_buffer(view)
+                # Clear live text control (command finished)
+                view = self._get_current_view()
+                if view:
+                    view.current_text_control = None
+                    self._flush_text_buffer(view)
+
+                    # Re-enable run button now that thread is done
+                    if view.run_button:
+                        view.run_button.disabled = False
+                        if self.page:
+                            self._safe_page_update()
 
         # Start thread
         thread = threading.Thread(target=thread_target, daemon=True)
