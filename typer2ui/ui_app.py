@@ -27,16 +27,18 @@ class UICommand:
         out: Property - captured text output (chainable)
     """
 
-    def __init__(self, ui_app: 'UiApp', command_spec: CommandSpec):
+    def __init__(self, ui_app: 'UiApp', command_spec: CommandSpec, tab_name: Optional[str] = None):
         """Initialize UICommand.
 
         Args:
             ui_app: Parent UiApp instance
             command_spec: Command specification
+            tab_name: Optional tab/sub-app name for context
         """
         self.ui_app = ui_app
         self.command_spec = command_spec
         self.name = command_spec.name
+        self.tab_name = tab_name  # Track which tab this command belongs to
         self._output: Optional[str] = None  # Internal captured output
         self.result: Any = None  # Return value from last run()
 
@@ -69,6 +71,11 @@ class UICommand:
         # Trigger GUI update if in GUI mode
         if self.ui_app.runner and hasattr(self.ui_app.runner, '_select_command'):
             runner = self.ui_app.runner
+
+            # Set tab context if this command has a tab
+            if self.tab_name is not None and hasattr(runner, 'current_tab'):
+                runner.current_tab = self.tab_name
+
             # Use page.run_task if available (Flet GUI mode)
             if hasattr(runner, 'page') and runner.page:
                 async def do_select():
@@ -520,15 +527,22 @@ class UiApp:
     def command(self, name: Optional[str] = None):
         """Get a command by name or return the current command.
 
+        Supports qualified names to specify sub-app (e.g., "users:create").
+        If no qualifier, uses current tab context.
+
         Args:
-            name: Command name (optional). If None, returns current command.
+            name: Command name or qualified name ("tab:command").
+                  If None, returns current command.
 
         Returns:
             UICommand instance or None
 
         Examples:
-            >>> # Get command by name
+            >>> # Get command by name (uses current tab)
             >>> app.command("fetch-data").run(source="api")
+            >>>
+            >>> # Get command with qualified name
+            >>> app.command("users:create").run(name="John")
             >>>
             >>> # Get current command
             >>> current = app.command()
@@ -536,20 +550,35 @@ class UiApp:
         if name is None:
             # Return current command
             if self.current_command:
-                return UICommand(self, self.current_command)
+                # Determine tab for current command
+                tab_name = None
+                if self.runner and hasattr(self.runner, 'current_tab'):
+                    tab_name = self.runner.current_tab
+                return UICommand(self, self.current_command, tab_name)
             return None
+
+        # Determine tab_name from qualified name
+        tab_name = None
+        if ":" in name:
+            tab_name, _ = name.split(":", 1)
 
         # Find command by name
         command_spec = self._find_command(name)
         if command_spec:
-            return UICommand(self, command_spec)
+            # If tab_name not specified in qualified name, get from runner
+            if tab_name is None and self.runner and hasattr(self.runner, 'current_tab'):
+                tab_name = self.runner.current_tab
+            return UICommand(self, command_spec, tab_name)
         return None
 
     def _find_command(self, command_name: str) -> Optional[CommandSpec]:
         """Find command spec by name.
 
+        Supports qualified names (e.g., "users:create") to specify sub-app.
+        If no qualifier, uses current tab context from runner.
+
         Args:
-            command_name: Command name
+            command_name: Command name or qualified name ("tab:command")
 
         Returns:
             CommandSpec or None
@@ -557,9 +586,36 @@ class UiApp:
         if not self.app_spec:
             return None
 
+        # Check if qualified name (e.g., "users:create")
+        if ":" in command_name:
+            tab_name, cmd_name = command_name.split(":", 1)
+
+            # Search in specified sub-app
+            for sub_app in self.app_spec.sub_apps:
+                if sub_app.name == tab_name:
+                    for cmd in sub_app.commands:
+                        if cmd.name == cmd_name:
+                            return cmd
+            return None
+
+        # Unqualified name - determine context from runner
+        current_tab = None
+        if self.runner and hasattr(self.runner, 'current_tab'):
+            current_tab = self.runner.current_tab
+
+        # Search in current tab/sub-app if applicable
+        if current_tab is not None:
+            for sub_app in self.app_spec.sub_apps:
+                if sub_app.name == current_tab:
+                    for cmd in sub_app.commands:
+                        if cmd.name == command_name:
+                            return cmd
+
+        # Fallback: search in root commands
         for cmd in self.app_spec.commands:
             if cmd.name == command_name:
                 return cmd
+
         return None
 
     @property

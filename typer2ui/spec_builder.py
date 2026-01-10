@@ -154,6 +154,40 @@ def _extract_command_info(command_name: str, command_info: CommandInfo) -> Comma
     )
 
 
+def _build_sub_app_spec(typer_info) -> 'SubAppSpec':
+    """Build SubAppSpec from a Typer TyperInfo object.
+
+    Args:
+        typer_info: TyperInfo object from app.registered_groups
+
+    Returns:
+        SubAppSpec: Immutable sub-application specification
+    """
+    from .specs import SubAppSpec
+
+    commands: list[CommandSpec] = []
+
+    # Access the registered commands from the sub-app's Typer instance
+    if hasattr(typer_info.typer_instance, "registered_commands"):
+        for command_info in typer_info.typer_instance.registered_commands:
+            # Get command name
+            command_name = command_info.name or (
+                command_info.callback.__name__ if command_info.callback else "unnamed"
+            )
+
+            # Convert underscores to dashes to match Typer's CLI convention
+            command_name = command_name.replace("_", "-")
+
+            command_spec = _extract_command_info(command_name, command_info)
+            commands.append(command_spec)
+
+    return SubAppSpec(
+        name=typer_info.name,
+        commands=tuple(commands),
+        description=typer_info.help
+    )
+
+
 def build_app_spec(
     app: typer.Typer,
     *,
@@ -172,7 +206,7 @@ def build_app_spec(
     """
     commands: list[CommandSpec] = []
 
-    # Access the registered commands from Typer
+    # Access the registered commands from Typer (root-level commands)
     if hasattr(app, "registered_commands"):
         for command_info in app.registered_commands:
             # Get command name
@@ -192,8 +226,16 @@ def build_app_spec(
         command_spec = _extract_command_info("main", callback_info)
         commands.append(command_spec)
 
+    # Process sub-applications (registered via add_typer)
+    sub_apps: list['SubAppSpec'] = []
+    if hasattr(app, "registered_groups"):
+        for group in app.registered_groups:
+            sub_app_spec = _build_sub_app_spec(group)
+            sub_apps.append(sub_app_spec)
+
     return AppSpec(
         commands=tuple(commands),
+        sub_apps=tuple(sub_apps),
         title=title,
         description=description,
     )

@@ -96,11 +96,28 @@ class CommandSpec:
 
 
 @dataclass(frozen=True)
+class SubAppSpec:
+    """Immutable specification for a sub-application (Typer group)."""
+
+    name: str
+    """Sub-app name (e.g., 'users', 'orders')"""
+
+    commands: tuple[CommandSpec, ...]
+    """Commands in this sub-app"""
+
+    description: Optional[str] = None
+    """Sub-app description"""
+
+
+@dataclass(frozen=True)
 class AppSpec:
     """Immutable specification for the entire application."""
 
     commands: tuple[CommandSpec, ...]
-    """Tuple of all commands in the app"""
+    """Tuple of all commands in the app (root-level commands)"""
+
+    sub_apps: tuple[SubAppSpec, ...] = ()
+    """Sub-applications added via add_typer()"""
 
     title: Optional[str] = None
     """Optional app title"""

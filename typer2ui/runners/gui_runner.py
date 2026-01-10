@@ -80,13 +80,21 @@ class GUIRunner(Runner):
         self.ctx: Optional[GUIRunnerCtx] = None
 
         # Per-command views (lazy initialized)
-        self.command_views: dict[str, _CommandView] = {}
+        # Key: (tab_name, command_name) where tab_name is None for root commands
+        self.command_views: dict[tuple[Optional[str], str], _CommandView] = {}
 
         # Container for all command views
         self.views_container: Optional[ft.Column] = None
 
         # UI components
         self.command_list: Optional[ft.ListView] = None
+
+        # Tab management (for sub-applications)
+        self.current_tab: Optional[str] = None  # None = root/main, otherwise sub-app name
+        self.tab_buttons: dict[str, ft.TextButton] = {}  # Tab name -> button
+        self.tab_content_controls: dict[str, ft.Container] = {}  # Tab name -> content control
+        self.tab_contents: dict[Optional[str], tuple[ft.ListView, ft.Column]] = {}  # (command_list, views_container) per tab
+        self._tab_content_container: Optional[ft.Container] = None  # Container holding current tab content
 
         # Component tracking for updates (global registry)
         self._control_registry: dict[Any, ft.Control] = {}
@@ -122,17 +130,23 @@ class GUIRunner(Runner):
         """
         # Priority 1: Check async context (for Mode 2: async commands)
         async_cmd = self._async_context.get()
-        if async_cmd and async_cmd.name in self.command_views:
-            return self.command_views[async_cmd.name]
+        if async_cmd:
+            key = (self.current_tab, async_cmd.name)
+            if key in self.command_views:
+                return self.command_views[key]
 
         # Priority 2: Check thread-local storage (for Mode 3: long-running threads)
         thread_cmd = getattr(self._thread_local, 'current_command', None)
-        if thread_cmd and thread_cmd.name in self.command_views:
-            return self.command_views[thread_cmd.name]
+        if thread_cmd:
+            key = (self.current_tab, thread_cmd.name)
+            if key in self.command_views:
+                return self.command_views[key]
 
         # Priority 3: Fallback to global current_command (for Mode 1: default sync, UI interactions)
-        if self.current_command and self.current_command.name in self.command_views:
-            return self.command_views[self.current_command.name]
+        if self.current_command:
+            key = (self.current_tab, self.current_command.name)
+            if key in self.command_views:
+                return self.command_views[key]
 
         return None
 
@@ -421,10 +435,18 @@ class GUIRunner(Runner):
                 traceback.print_exc()
 
         # Select first command
-        if self.app_spec.commands:
+        # If we have sub-apps, select first command in first tab
+        # Otherwise, select first root command
+        first_command = None
+        if self.app_spec.sub_apps and self.app_spec.sub_apps[0].commands:
+            first_command = self.app_spec.sub_apps[0].commands[0]
+        elif self.app_spec.commands:
+            first_command = self.app_spec.commands[0]
+
+        if first_command:
             # Schedule async task to select first command
             async def select_first():
-                await self._select_command(self.app_spec.commands[0])
+                await self._select_command(first_command)
 
             page.run_task(select_first)
 
@@ -459,10 +481,25 @@ class GUIRunner(Runner):
             bgcolor=ft.Colors.BLUE_GREY_50,
         )
 
-    def _create_content(self) -> ft.Row:
-        """Create main content area."""
-        # Command list
-        self.command_list = self._create_command_list()
+    def _create_content(self) -> ft.Control:
+        """Create main content area.
+
+        If app has sub-applications, creates tabbed layout.
+        Otherwise, creates flat layout (backward compatible).
+        """
+        # Check if we have sub-applications
+        has_sub_apps = len(self.app_spec.sub_apps) > 0
+
+        if has_sub_apps:
+            return self._create_tabbed_layout()
+        else:
+            return self._create_flat_layout()
+
+    def _create_flat_layout(self) -> ft.Row:
+        """Create flat layout (no tabs) - backward compatible."""
+        # Command list for root commands
+        self.current_tab = None
+        self.command_list = self._create_command_list_for_commands(self.app_spec.commands)
 
         # Container that will hold all command views (lazy initialized)
         self.views_container = ft.Column(
@@ -470,6 +507,9 @@ class GUIRunner(Runner):
             expand=True,
             spacing=0,
         )
+
+        # Store for current tab
+        self.tab_contents[None] = (self.command_list, self.views_container)
 
         # Layout
         left_panel = ft.Container(
@@ -491,15 +531,141 @@ class GUIRunner(Runner):
             spacing=0,
         )
 
-    def _create_command_list(self) -> ft.ListView:
-        """Create command list view."""
-        if not self.app_spec.commands:
+    def _create_tabbed_layout(self) -> ft.Column:
+        """Create tabbed layout for sub-applications."""
+
+        # Determine initial tab (first sub-app)
+        self.current_tab = self.app_spec.sub_apps[0].name if self.app_spec.sub_apps else None
+
+        # Create tab buttons and content
+        tab_buttons = []
+        for sub_app in self.app_spec.sub_apps:
+            async def handle_tab_click(e, tab_name=sub_app.name):
+                await self._switch_to_tab(tab_name)
+
+            is_active = (sub_app.name == self.current_tab)
+
+            btn = ft.TextButton(
+                sub_app.name,
+                on_click=handle_tab_click,
+                style=ft.ButtonStyle(
+                    shape=ft.RoundedRectangleBorder(radius=0),
+                    padding=ft.Padding(left=20, right=20, top=10, bottom=10),
+                    bgcolor=ft.Colors.BLUE_700 if is_active else ft.Colors.BLUE_GREY_100,
+                    color=ft.Colors.WHITE if is_active else ft.Colors.BLACK87,
+                ),
+            )
+            tab_buttons.append(btn)
+            self.tab_buttons[sub_app.name] = btn
+
+            # Create content for this tab
+            tab_content = self._create_tab_content(sub_app.name, sub_app.commands)
+            self.tab_content_controls[sub_app.name] = tab_content
+
+        # Tab bar
+        tab_bar = ft.Container(
+            content=ft.Row(
+                controls=tab_buttons,
+                spacing=0,
+            ),
+            bgcolor=ft.Colors.BLUE_GREY_100,
+            padding=0,
+        )
+
+        # Content container showing current tab
+        tab_content_container = ft.Container(
+            content=self.tab_content_controls.get(self.current_tab),
+            expand=True
+        )
+
+        # Store reference to container for switching
+        self._tab_content_container = tab_content_container
+
+        return ft.Column(
+            controls=[tab_bar, tab_content_container],
+            expand=True,
+            spacing=0,
+        )
+
+    def _create_tab_content(self, tab_name: str, commands: tuple) -> ft.Container:
+        """Create content for a single tab (command list + views area)."""
+        # Create command list for this tab
+        command_list = self._create_command_list_for_commands(commands)
+
+        # Create views container for this tab
+        views_container = ft.Column(
+            controls=[],
+            expand=True,
+            spacing=0,
+        )
+
+        # Store for this tab
+        self.tab_contents[tab_name] = (command_list, views_container)
+
+        # Layout: left panel (commands) + right panel (views)
+        left_panel = ft.Container(
+            content=command_list,
+            width=185,
+            bgcolor=ft.Colors.BLUE_GREY_50,
+            padding=10,
+        )
+
+        right_panel = ft.Container(
+            content=views_container,
+            expand=True,
+            padding=0,
+        )
+
+        return ft.Container(
+            content=ft.Row(
+                controls=[left_panel, right_panel],
+                expand=True,
+                spacing=0,
+            ),
+            expand=True,
+        )
+
+    async def _switch_to_tab(self, tab_name: str):
+        """Switch to a different tab."""
+        if tab_name == self.current_tab:
+            return  # Already on this tab
+
+        # Update current tab
+        old_tab = self.current_tab
+        self.current_tab = tab_name
+
+        # Update tab button styles
+        for name, btn in self.tab_buttons.items():
+            is_active = (name == tab_name)
+            btn.style = ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=0),
+                padding=ft.Padding(left=20, right=20, top=10, bottom=10),
+                bgcolor=ft.Colors.BLUE_700 if is_active else ft.Colors.BLUE_GREY_100,
+                color=ft.Colors.WHITE if is_active else ft.Colors.BLACK87,
+            )
+
+        # Switch content
+        if self._tab_content_container and tab_name in self.tab_content_controls:
+            self._tab_content_container.content = self.tab_content_controls[tab_name]
+
+        # Update page
+        if self.page:
+            self.page.update()
+
+        # Find sub-app and select first command
+        sub_app = next((sa for sa in self.app_spec.sub_apps if sa.name == tab_name), None)
+        if sub_app and sub_app.commands:
+            await self._select_command(sub_app.commands[0])
+
+    def _create_command_list_for_commands(self, commands: tuple) -> ft.ListView:
+        """Create command list view for specific commands."""
+        if not commands:
             return ft.ListView(
                 controls=[ft.Text("No commands", color=ft.Colors.GREY_600)]
             )
 
         buttons = []
-        for cmd in self.app_spec.commands:
+        for cmd in commands:
             # Use an async lambda for on_click handlers
             async def handle_click(e, command=cmd):
                 await self._select_command(command)
@@ -526,6 +692,7 @@ class GUIRunner(Runner):
 
         return ft.ListView(controls=buttons, spacing=5, expand=True)
 
+
     async def _select_command(self, command: CommandSpec) -> None:
         """Select and display a command.
 
@@ -546,17 +713,27 @@ class GUIRunner(Runner):
             await self._show_modal_command(command)
             return
 
+        # Use tab-aware key
+        key = (self.current_tab, command.name)
+
         # Lazy initialize command view if it doesn't exist
-        if command.name not in self.command_views:
+        if key not in self.command_views:
             await self._create_command_view(command)
 
-        # Hide all command views
-        for view in self.command_views.values():
-            if view.main_container:
+        # Get views container for current tab
+        if self.current_tab in self.tab_contents:
+            _, views_container = self.tab_contents[self.current_tab]
+        else:
+            # Fallback to main views_container
+            views_container = self.views_container
+
+        # Hide all command views in current tab
+        for (tab, cmd_name), view in self.command_views.items():
+            if tab == self.current_tab and view.main_container:
                 view.main_container.visible = False
 
         # Show selected command view
-        selected_view = self.command_views[command.name]
+        selected_view = self.command_views[key]
         if selected_view.main_container:
             selected_view.main_container.visible = True
 
@@ -865,12 +1042,20 @@ class GUIRunner(Runner):
             visible=False,  # Hidden by default
         )
 
-        # Add to views container
-        if self.views_container:
-            self.views_container.controls.append(view.main_container)
+        # Get views container for current tab
+        if self.current_tab in self.tab_contents:
+            _, views_container = self.tab_contents[self.current_tab]
+        else:
+            # Fallback to main views_container
+            views_container = self.views_container
 
-        # Store view
-        self.command_views[command.name] = view
+        # Add to views container
+        if views_container:
+            views_container.controls.append(view.main_container)
+
+        # Store view with tab-aware key
+        key = (self.current_tab, command.name)
+        self.command_views[key] = view
 
     def _create_param_control(self, param, view: Optional[_CommandView] = None) -> Optional[ft.Control]:
         """Create Flet control for parameter.
@@ -1152,9 +1337,23 @@ class GUIRunner(Runner):
         Returns:
             Tuple of (result, exception, output_text)
         """
-        # Find command
+        # Find command in correct tab/sub-app
         command_spec: Optional[CommandSpec] = None
-        for cmd in self.app_spec.commands:
+
+        # Determine which commands to search based on current tab
+        if self.current_tab is None:
+            # Search in root commands
+            commands_to_search = self.app_spec.commands
+        else:
+            # Search in sub-app commands
+            sub_app = next(
+                (sa for sa in self.app_spec.sub_apps if sa.name == self.current_tab),
+                None
+            )
+            commands_to_search = sub_app.commands if sub_app else ()
+
+        # Find the command by name
+        for cmd in commands_to_search:
             if cmd.name == command_name:
                 command_spec = cmd
                 break
