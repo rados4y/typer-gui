@@ -1,9 +1,10 @@
 ONGOING:
 
 [-] BUG: when long or async commands are executed, Run Command button should be disabled and greyed out
+[] add support for sub-applications app = typer.Typer() app.add_typer(users_app, name="users") app.add_typer(orders_app, name="orders") app.add_typer(reports_app, name="reports").
+
 [] add systray functionality, add param to UiAPP(systray:bool=False), follow concept from https://github.com/ndonkoHenri/Flet-as-System-Tray-Icon. Closure should minimize to systray. On systray right click there should be "close" button and "Open". When i click systray app should be opened. Minimize should simply minimize app.
 [] add proper python typing
-[] add support for sub-applications app = typer.Typer() app.add_typer(users_app, name="users") app.add_typer(orders_app, name="orders") app.add_typer(reports_app, name="reports").
 
 [] extract AppShell?
 
