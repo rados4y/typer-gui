@@ -414,17 +414,23 @@ class GUIRunner(Runner):
         page.bgcolor = "#FAFAFA"  # Light gray background
 
         # Create main layout
-        header = self._create_header()
         content = self._create_content()
 
-        page.add(
-            ft.Column(
-                controls=[header, content],
-                expand=True,
-                spacing=0,
-                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+        # Only add separate header if we don't have sub-apps (they have integrated header)
+        has_sub_apps = len(self.app_spec.sub_apps) > 0
+
+        if has_sub_apps:
+            page.add(content)
+        else:
+            header = self._create_header()
+            page.add(
+                ft.Column(
+                    controls=[header, content],
+                    expand=True,
+                    spacing=0,
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                )
             )
-        )
 
         # Call init callback if registered
         if self.ui and hasattr(self.ui, '_init_callback') and self.ui._init_callback:
@@ -481,12 +487,7 @@ class GUIRunner(Runner):
             content=ft.Column(controls=controls, spacing=6),
             padding=ft.Padding(left=28, right=28, top=12, bottom=12),
             bgcolor="#FFFFFF",
-            shadow=ft.BoxShadow(
-                spread_radius=0,
-                blur_radius=2,
-                color="#00000008",
-                offset=ft.Offset(0, 1),
-            ),
+            border=ft.Border(bottom=ft.BorderSide(1, "#E5E7EB")),
         )
 
     def _create_content(self) -> ft.Control:
@@ -577,14 +578,46 @@ class GUIRunner(Runner):
             tab_content = self._create_tab_content(sub_app.name, sub_app.commands)
             self.tab_content_controls[sub_app.name] = tab_content
 
-        # Tab bar
-        tab_bar = ft.Container(
+        # Create combined header with title/description on left and tabs in same row on right
+        title_desc_column = ft.Column(
+            controls=[
+                ft.Text(
+                    self.app_spec.title,
+                    size=24,
+                    weight=ft.FontWeight.W_700,
+                    color="#1F2937",
+                ),
+                ft.Text(
+                    self.app_spec.description,
+                    size=13,
+                    color="#6B7280",
+                ),
+            ] if self.app_spec.description else [
+                ft.Text(
+                    self.app_spec.title,
+                    size=24,
+                    weight=ft.FontWeight.W_700,
+                    color="#1F2937",
+                ),
+            ],
+            spacing=4,
+        )
+
+        tabs_row = ft.Row(
+            controls=tab_buttons,
+            spacing=4,
+        )
+
+        # Combined header bar with title/description and tabs in same row
+        combined_header = ft.Container(
             content=ft.Row(
-                controls=tab_buttons,
-                spacing=4,
+                controls=[title_desc_column, tabs_row],
+                alignment=ft.MainAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.END,
+                spacing=40,
             ),
             bgcolor="#FFFFFF",
-            padding=ft.Padding(left=20, right=20, top=8, bottom=0),
+            padding=ft.Padding(left=28, right=28, top=16, bottom=0),
             border=ft.Border(bottom=ft.BorderSide(1, "#E5E7EB")),
         )
 
@@ -598,7 +631,7 @@ class GUIRunner(Runner):
         self._tab_content_container = tab_content_container
 
         return ft.Column(
-            controls=[tab_bar, tab_content_container],
+            controls=[combined_header, tab_content_container],
             expand=True,
             spacing=0,
         )
@@ -1064,12 +1097,20 @@ class GUIRunner(Runner):
             spacing=0,
         )
 
+        # Determine padding - no padding for view commands without header or params
+        has_header = command.ui_spec.header
+        has_params = len(command.params) > 0
+        has_buttons = not command.ui_spec.auto
+
+        # Only add padding if there's actual form content (header, params, or buttons)
+        form_padding = 20 if (has_header or has_params or has_buttons) else 0
+
         # Create main container for this command view
         view.main_container = ft.Column(
             controls=[
                 ft.Container(
                     content=view.form_container,
-                    padding=20,
+                    padding=form_padding,
                 ),
                 ft.Container(
                     content=view.output_view,
