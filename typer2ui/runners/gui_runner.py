@@ -478,8 +478,8 @@ class GUIRunner(Runner):
             return ft.Container()
 
         return ft.Container(
-            content=ft.Column(controls=controls, spacing=8),
-            padding=ft.Padding(left=28, right=28, top=24, bottom=24),
+            content=ft.Column(controls=controls, spacing=6),
+            padding=ft.Padding(left=28, right=28, top=12, bottom=12),
             bgcolor="#FFFFFF",
             shadow=ft.BoxShadow(
                 spread_radius=0,
@@ -523,7 +523,7 @@ class GUIRunner(Runner):
         left_panel = ft.Container(
             content=self.command_list,
             width=220,
-            bgcolor="#FFFFFF",
+            bgcolor="#F9FAFB",
             padding=ft.Padding(left=16, right=16, top=16, bottom=16),
             border=ft.Border(right=ft.BorderSide(1, "#E5E7EB")),
         )
@@ -555,22 +555,20 @@ class GUIRunner(Runner):
 
             is_active = (sub_app.name == self.current_tab)
 
-            btn = ft.TextButton(
-                sub_app.name,
-                on_click=handle_tab_click,
-                style=ft.ButtonStyle(
-                    shape=ft.RoundedRectangleBorder(radius=0),
-                    padding=ft.Padding(left=24, right=24, top=14, bottom=14),
-                    bgcolor={"": "#FFFFFF" if is_active else "transparent"},
-                    color={"": "#2563EB" if is_active else "#6B7280"},
-                    overlay_color={"": "#F3F4F6"},
-                    side={
-                        "": ft.BorderSide(
-                            width=0 if not is_active else 2,
-                            color="#2563EB" if is_active else "transparent"
-                        )
-                    },
+            btn = ft.Container(
+                content=ft.Text(
+                    sub_app.name,
+                    size=14,
+                    weight=ft.FontWeight.W_600 if is_active else ft.FontWeight.W_400,
+                    color="#2563EB" if is_active else "#6B7280",
                 ),
+                padding=ft.Padding(left=20, right=20, top=12, bottom=12),
+                border=ft.Border(
+                    bottom=ft.BorderSide(3, "#2563EB" if is_active else "transparent")
+                ),
+                on_click=handle_tab_click,
+                ink=True,
+                ink_color="#EFF6FF",
             )
             tab_buttons.append(btn)
             self.tab_buttons[sub_app.name] = btn
@@ -585,8 +583,8 @@ class GUIRunner(Runner):
                 controls=tab_buttons,
                 spacing=4,
             ),
-            bgcolor="#F9FAFB",
-            padding=ft.Padding(left=16, right=16, top=8, bottom=0),
+            bgcolor="#FFFFFF",
+            padding=ft.Padding(left=20, right=20, top=8, bottom=0),
             border=ft.Border(bottom=ft.BorderSide(1, "#E5E7EB")),
         )
 
@@ -624,7 +622,7 @@ class GUIRunner(Runner):
         left_panel = ft.Container(
             content=command_list,
             width=220,
-            bgcolor="#FFFFFF",
+            bgcolor="#F9FAFB",
             padding=ft.Padding(left=16, right=16, top=16, bottom=16),
             border=ft.Border(right=ft.BorderSide(1, "#E5E7EB")),
         )
@@ -655,20 +653,15 @@ class GUIRunner(Runner):
         self.current_tab = tab_name
 
         # Update tab button styles
-        for name, btn in self.tab_buttons.items():
+        for name, btn_container in self.tab_buttons.items():
             is_active = (name == tab_name)
-            btn.style = ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=0),
-                padding=ft.Padding(left=24, right=24, top=14, bottom=14),
-                bgcolor={"": "#FFFFFF" if is_active else "transparent"},
-                color={"": "#2563EB" if is_active else "#6B7280"},
-                overlay_color={"": "#F3F4F6"},
-                side={
-                    "": ft.BorderSide(
-                        width=0 if not is_active else 2,
-                        color="#2563EB" if is_active else "transparent"
-                    )
-                },
+            # Update the Text inside the Container
+            text_control = btn_container.content
+            text_control.weight = ft.FontWeight.W_600 if is_active else ft.FontWeight.W_400
+            text_control.color = "#2563EB" if is_active else "#6B7280"
+            # Update the Container border
+            btn_container.border = ft.Border(
+                bottom=ft.BorderSide(3, "#2563EB" if is_active else "transparent")
             )
 
         # Switch content
