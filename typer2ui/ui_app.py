@@ -286,6 +286,7 @@ class UiApp:
         description: Optional[str] = None,
         runner: str = "gui",
         print2ui: bool = True,
+        main_label: str = "main",
     ):
         """Initialize the UI wrapper for a Typer app.
 
@@ -296,6 +297,7 @@ class UiApp:
             runner: Default runner mode - "gui" (default, use --cli to switch) or "cli" (use --gui to switch)
             print2ui: If True (default), print() statements are captured and displayed in UI.
                       If False, print() goes directly to stdout (regular behavior)
+            main_label: Label for the main/root commands tab when app has both main and sub-app commands (default: "main")
         """
         if runner not in ("gui", "cli"):
             raise ValueError(f"runner must be 'gui' or 'cli', got: {runner}")
@@ -305,6 +307,7 @@ class UiApp:
         self._typer_app = typer_app
         self._runner_mode = runner
         self.print2ui = print2ui
+        self.main_label = main_label
         self._cli_mode = False
 
         # Runtime attributes (initialized when app starts)
@@ -670,7 +673,8 @@ class UiApp:
             self.app_spec = build_app_spec(
                 self._typer_app,
                 title=self.title,
-                description=self.description
+                description=self.description,
+                main_label=self.main_label
             )
 
             # Create CLI runner and set as current
@@ -698,7 +702,8 @@ class UiApp:
         self.app_spec = build_app_spec(
             self._typer_app,
             title=self.title,
-            description=self.description
+            description=self.description,
+            main_label=self.main_label
         )
 
         # Create the Flet app function

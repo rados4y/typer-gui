@@ -192,7 +192,8 @@ def build_app_spec(
     app: typer.Typer,
     *,
     title: Optional[str] = None,
-    description: Optional[str] = None
+    description: Optional[str] = None,
+    main_label: str = "main"
 ) -> AppSpec:
     """Build an application specification from a Typer app.
 
@@ -200,6 +201,7 @@ def build_app_spec(
         app: A Typer application instance
         title: Optional title for the application
         description: Optional description for the application
+        main_label: Label for main/root commands tab (default: "main")
 
     Returns:
         AppSpec: Immutable application specification
@@ -238,4 +240,5 @@ def build_app_spec(
         sub_apps=tuple(sub_apps),
         title=title,
         description=description,
+        main_label=main_label,
     )

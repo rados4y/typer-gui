@@ -125,6 +125,9 @@ class AppSpec:
     description: Optional[str] = None
     """Optional app description"""
 
+    main_label: str = "main"
+    """Label for main/root commands tab when app has both main and sub-app commands"""
+
 
 # Legacy type alias for backward compatibility during transition
 Markdown = str  # Will be replaced with proper type

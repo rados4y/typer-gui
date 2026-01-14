@@ -24,7 +24,7 @@ reports_app = typer.Typer()
 upp = tu.UiApp(
     app,
     title="Business Management System",
-    description="Manage users, orders, and view reports"
+    description="Manage users, orders, and view reports",
 )
 
 
@@ -33,7 +33,7 @@ upp = tu.UiApp(
 # ============================================================================
 
 
-@users_app.command()
+@app.command()
 def create(name: str, email: str = ""):
     """Create a new user."""
     ui("# Create User")
@@ -42,15 +42,17 @@ def create(name: str, email: str = ""):
         ui(f"**Email:** {email}")
 
     ui()
-    ui(tu.Table(
-        cols=["Field", "Value"],
-        data=[
-            ["Name", name],
-            ["Email", email or "(not provided)"],
-            ["Status", "Active"],
-        ],
-        title="New User Details"
-    ))
+    ui(
+        tu.Table(
+            cols=["Field", "Value"],
+            data=[
+                ["Name", name],
+                ["Email", email or "(not provided)"],
+                ["Status", "Active"],
+            ],
+            title="New User Details",
+        )
+    )
 
     ui()
     ui("✅ User created successfully!")
@@ -72,11 +74,13 @@ def list_users(status: str = "all"):
     if status != "all":
         users_data = [u for u in users_data if u[2].lower() == status.lower()]
 
-    ui(tu.Table(
-        cols=["Name", "Email", "Status"],
-        data=users_data,
-        title=f"Users ({len(users_data)} total)"
-    ))
+    ui(
+        tu.Table(
+            cols=["Name", "Email", "Status"],
+            data=users_data,
+            title=f"Users ({len(users_data)} total)",
+        )
+    )
 
 
 @users_app.command()
@@ -131,16 +135,18 @@ def create_order(product: str, quantity: int = 1):
     price_per_item = 29.99
     total = price_per_item * quantity
 
-    ui(tu.Table(
-        cols=["Field", "Value"],
-        data=[
-            ["Product", product],
-            ["Quantity", str(quantity)],
-            ["Price per item", f"${price_per_item:.2f}"],
-            ["Total", f"${total:.2f}"],
-        ],
-        title="Order Details"
-    ))
+    ui(
+        tu.Table(
+            cols=["Field", "Value"],
+            data=[
+                ["Product", product],
+                ["Quantity", str(quantity)],
+                ["Price per item", f"${price_per_item:.2f}"],
+                ["Total", f"${total:.2f}"],
+            ],
+            title="Order Details",
+        )
+    )
 
     ui()
     ui("✅ Order created successfully!")
@@ -163,11 +169,13 @@ def list_orders(status: str = "all"):
     if status != "all":
         orders_data = [o for o in orders_data if o[3].lower() == status.lower()]
 
-    ui(tu.Table(
-        cols=["Order ID", "Product", "Qty", "Status"],
-        data=orders_data,
-        title=f"Orders ({len(orders_data)} total)"
-    ))
+    ui(
+        tu.Table(
+            cols=["Order ID", "Product", "Qty", "Status"],
+            data=orders_data,
+            title=f"Orders ({len(orders_data)} total)",
+        )
+    )
 
 
 @orders_app.command()
@@ -193,15 +201,17 @@ def sales_report():
     ui("Monthly sales overview")
     ui()
 
-    ui(tu.Table(
-        cols=["Month", "Orders", "Revenue"],
-        data=[
-            ["January", "145", "$12,450"],
-            ["February", "163", "$14,200"],
-            ["March", "187", "$16,800"],
-        ],
-        title="Q1 2024 Sales"
-    ))
+    ui(
+        tu.Table(
+            cols=["Month", "Orders", "Revenue"],
+            data=[
+                ["January", "145", "$12,450"],
+                ["February", "163", "$14,200"],
+                ["March", "187", "$16,800"],
+            ],
+            title="Q1 2024 Sales",
+        )
+    )
 
     ui()
     ui("**Total Q1 Revenue:** $43,450")
@@ -215,31 +225,34 @@ def user_stats():
     ui("# User Statistics")
     ui()
 
-    ui(tu.Row([
-        tu.Column([
-            tu.Text("Total Users"),
-            tu.Text("1,234", size=32, weight="bold")
-        ]),
-        tu.Column([
-            tu.Text("Active Users"),
-            tu.Text("987", size=32, weight="bold")
-        ]),
-        tu.Column([
-            tu.Text("New This Month"),
-            tu.Text("156", size=32, weight="bold")
-        ]),
-    ]))
+    ui(
+        tu.Row(
+            [
+                tu.Column(
+                    [tu.Text("Total Users"), tu.Text("1,234", size=32, weight="bold")]
+                ),
+                tu.Column(
+                    [tu.Text("Active Users"), tu.Text("987", size=32, weight="bold")]
+                ),
+                tu.Column(
+                    [tu.Text("New This Month"), tu.Text("156", size=32, weight="bold")]
+                ),
+            ]
+        )
+    )
 
     ui()
 
-    ui(tu.Table(
-        cols=["Status", "Count", "Percentage"],
-        data=[
-            ["Active", "987", "80%"],
-            ["Inactive", "247", "20%"],
-        ],
-        title="User Status Breakdown"
-    ))
+    ui(
+        tu.Table(
+            cols=["Status", "Count", "Percentage"],
+            data=[
+                ["Active", "987", "80%"],
+                ["Inactive", "247", "20%"],
+            ],
+            title="User Status Breakdown",
+        )
+    )
 
 
 @reports_app.command()
@@ -250,6 +263,7 @@ def generate_report(report_type: str = "summary"):
     ui()
 
     import time
+
     ui("Generating report...")
     time.sleep(1)
 

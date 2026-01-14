@@ -442,13 +442,14 @@ class GUIRunner(Runner):
                 traceback.print_exc()
 
         # Select first command
-        # If we have sub-apps, select first command in first tab
-        # Otherwise, select first root command
+        # Priority: main commands > sub-app commands
         first_command = None
-        if self.app_spec.sub_apps and self.app_spec.sub_apps[0].commands:
-            first_command = self.app_spec.sub_apps[0].commands[0]
-        elif self.app_spec.commands:
+        if self.app_spec.commands:
+            # If we have main commands, select first main command
             first_command = self.app_spec.commands[0]
+        elif self.app_spec.sub_apps and self.app_spec.sub_apps[0].commands:
+            # Otherwise, select first command in first sub-app
+            first_command = self.app_spec.sub_apps[0].commands[0]
 
         if first_command:
             # Schedule async task to select first command
@@ -543,13 +544,57 @@ class GUIRunner(Runner):
         )
 
     def _create_tabbed_layout(self) -> ft.Column:
-        """Create tabbed layout for sub-applications."""
+        """Create tabbed layout for sub-applications.
 
-        # Determine initial tab (first sub-app)
-        self.current_tab = self.app_spec.sub_apps[0].name if self.app_spec.sub_apps else None
+        If app has both main commands and sub-apps, creates a main tab first.
+        """
+
+        # Check if we have main/root commands
+        has_main_commands = len(self.app_spec.commands) > 0
+
+        # Determine initial tab
+        if has_main_commands:
+            # Start with main tab if we have main commands
+            self.current_tab = self.app_spec.main_label
+        elif self.app_spec.sub_apps:
+            # Otherwise start with first sub-app
+            self.current_tab = self.app_spec.sub_apps[0].name
+        else:
+            self.current_tab = None
 
         # Create tab buttons and content
         tab_buttons = []
+
+        # Add main commands tab first if we have main commands
+        if has_main_commands:
+            async def handle_main_tab_click(e):
+                await self._switch_to_tab(self.app_spec.main_label)
+
+            is_active = (self.app_spec.main_label == self.current_tab)
+
+            main_btn = ft.Container(
+                content=ft.Text(
+                    self.app_spec.main_label,
+                    size=14,
+                    weight=ft.FontWeight.W_600 if is_active else ft.FontWeight.W_400,
+                    color="#2563EB" if is_active else "#6B7280",
+                ),
+                padding=ft.Padding(left=20, right=20, top=12, bottom=12),
+                border=ft.Border(
+                    bottom=ft.BorderSide(3, "#2563EB" if is_active else "transparent")
+                ),
+                on_click=handle_main_tab_click,
+                ink=True,
+                ink_color="#EFF6FF",
+            )
+            tab_buttons.append(main_btn)
+            self.tab_buttons[self.app_spec.main_label] = main_btn
+
+            # Create content for main tab
+            main_content = self._create_tab_content(self.app_spec.main_label, self.app_spec.commands)
+            self.tab_content_controls[self.app_spec.main_label] = main_content
+
+        # Add sub-app tabs
         for sub_app in self.app_spec.sub_apps:
             async def handle_tab_click(e, tab_name=sub_app.name):
                 await self._switch_to_tab(tab_name)
@@ -705,10 +750,16 @@ class GUIRunner(Runner):
         if self.page:
             self.page.update()
 
-        # Find sub-app and select first command
-        sub_app = next((sa for sa in self.app_spec.sub_apps if sa.name == tab_name), None)
-        if sub_app and sub_app.commands:
-            await self._select_command(sub_app.commands[0])
+        # Find commands for this tab and select first one
+        if tab_name == self.app_spec.main_label:
+            # Switching to main tab - select first main command
+            if self.app_spec.commands:
+                await self._select_command(self.app_spec.commands[0])
+        else:
+            # Switching to sub-app tab - find sub-app and select first command
+            sub_app = next((sa for sa in self.app_spec.sub_apps if sa.name == tab_name), None)
+            if sub_app and sub_app.commands:
+                await self._select_command(sub_app.commands[0])
 
     def _create_command_list_for_commands(self, commands: tuple) -> ft.ListView:
         """Create command list view for specific commands."""
