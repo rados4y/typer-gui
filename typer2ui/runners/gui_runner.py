@@ -1496,8 +1496,8 @@ class GUIRunner(Runner):
         command_spec: Optional[CommandSpec] = None
 
         # Determine which commands to search based on current tab
-        if self.current_tab is None:
-            # Search in root commands
+        if self.current_tab is None or self.current_tab == self.app_spec.main_label:
+            # Search in root commands (main tab or no tabs)
             commands_to_search = self.app_spec.commands
         else:
             # Search in sub-app commands
