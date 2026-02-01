@@ -2,7 +2,7 @@
 
 from .spec_builder import build_app_spec
 from .state import State
-from .ui_app import UiApp, UICommand
+from .ui_app import Typer2Ui, UICommand
 from .output import ui, text, dx
 from .data_source import DataSource
 from .ui_blocks import (
@@ -24,10 +24,14 @@ from .ui_blocks import (
     DataTable,
 )
 
+# Backwards compatibility
+UiApp = Typer2Ui
+
 __version__ = "0.15.1"
 __all__ = [
     "build_app_spec",
     "State",
+    "Typer2Ui",
     "UiApp",
     "UICommand",
     "ui",

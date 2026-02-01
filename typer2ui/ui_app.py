@@ -1,4 +1,4 @@
-"""UiApp and UICommand - Main UI classes for typer-ui."""
+"""Typer2Ui and UICommand - Main UI classes for typer-ui."""
 
 from typing import Any, Callable, Optional, TYPE_CHECKING, Union
 import sys
@@ -27,11 +27,11 @@ class UICommand:
         out: Property - captured text output (chainable)
     """
 
-    def __init__(self, ui_app: 'UiApp', command_spec: CommandSpec, tab_name: Optional[str] = None):
+    def __init__(self, ui_app: 'Typer2Ui', command_spec: CommandSpec, tab_name: Optional[str] = None):
         """Initialize UICommand.
 
         Args:
-            ui_app: Parent UiApp instance
+            ui_app: Parent Typer2Ui instance
             command_spec: Command specification
             tab_name: Optional tab/sub-app name for context
         """
@@ -250,10 +250,10 @@ class UICommand:
         return self  # Return self for chaining
 
 
-class UiApp:
+class Typer2Ui:
     """Main entry point for typer2ui - creates GUI applications with Typer CLI support.
 
-    UiApp owns a Typer instance internally and provides a unified API for defining
+    Typer2Ui owns a Typer instance internally and provides a unified API for defining
     commands with both CLI and GUI capabilities.
 
     Example:
@@ -261,7 +261,7 @@ class UiApp:
         >>> from typer2ui import ui
         >>>
         >>> # Create app (Typer instance created internally)
-        >>> upp = tu.UiApp(title="My Application", description="A demo app")
+        >>> upp = tu.Typer2Ui(title="My Application", description="A demo app")
         >>>
         >>> # Define commands with single decorator
         >>> @upp.command(button=True)
@@ -272,7 +272,7 @@ class UiApp:
         >>> upp.typer  # The underlying typer.Typer instance
         >>>
         >>> # Add sub-applications
-        >>> sub_upp = tu.UiApp(title="Sub App")
+        >>> sub_upp = tu.Typer2Ui(title="Sub App")
         >>> @sub_upp.command()
         >>> def sub_cmd():
         >>>     ui("Sub command")
@@ -292,7 +292,7 @@ class UiApp:
         print2ui: bool = True,
         main_label: str = "main",
     ):
-        """Initialize the UiApp.
+        """Initialize the Typer2Ui.
 
         Args:
             typer_app: Optional existing Typer app to wrap (for backwards compatibility).
@@ -323,8 +323,8 @@ class UiApp:
         # Store reference to self on the Typer app for discovery
         setattr(self._typer_app, '_ui_app', self)
 
-        # Track registered sub-apps (UiApp instances)
-        self._sub_apps: list[tuple['UiApp', str, Optional[str]]] = []  # (upp, name, help)
+        # Track registered sub-apps (Typer2Ui instances)
+        self._sub_apps: list[tuple['Typer2Ui', str, Optional[str]]] = []  # (upp, name, help)
 
         # Runtime attributes (initialized when app starts)
         self.app_spec: Optional[AppSpec] = None
@@ -343,17 +343,17 @@ class UiApp:
         """Access the underlying Typer application.
 
         This allows advanced usage if you need direct access to the Typer app,
-        for example to use Typer-specific features not exposed by UiApp.
+        for example to use Typer-specific features not exposed by Typer2Ui.
 
         Example:
-            >>> upp = tu.UiApp(title="My App")
+            >>> upp = tu.Typer2Ui(title="My App")
             >>> upp.typer.add_typer(other_typer_app, name="other")
         """
         return self._typer_app
 
     def add_typer(
         self,
-        sub_app: Union['UiApp', 'typer.Typer'],
+        sub_app: Union['Typer2Ui', 'typer.Typer'],
         *,
         name: str,
         help: Optional[str] = None
@@ -363,13 +363,13 @@ class UiApp:
         Creates a tab in the GUI for the sub-application's commands.
 
         Args:
-            sub_app: UiApp instance or raw typer.Typer app to add as sub-application
+            sub_app: Typer2Ui instance or raw typer.Typer app to add as sub-application
             name: Name for the sub-app (used in CLI as command group and in GUI as tab)
             help: Optional help text for the sub-app
 
         Example:
-            >>> main_upp = tu.UiApp(title="Main App")
-            >>> users_upp = tu.UiApp(title="Users")
+            >>> main_upp = tu.Typer2Ui(title="Main App")
+            >>> users_upp = tu.Typer2Ui(title="Users")
             >>>
             >>> @users_upp.command()
             >>> def create(name: str):
@@ -383,14 +383,14 @@ class UiApp:
             >>> main_upp.add_typer(tapp, name="legacy", help="Legacy commands")
         """
         # Determine the Typer app to add
-        if isinstance(sub_app, UiApp):
+        if isinstance(sub_app, Typer2Ui):
             typer_app = sub_app._typer_app
             # Track the sub-app for later spec building
             self._sub_apps.append((sub_app, name, help))
         else:
             # Raw Typer app
             typer_app = sub_app
-            # Check if it has a UiApp wrapper attached
+            # Check if it has a Typer2Ui wrapper attached
             ui_app = getattr(sub_app, '_ui_app', None)
             if ui_app:
                 self._sub_apps.append((ui_app, name, help))
@@ -468,7 +468,7 @@ class UiApp:
 
         The function receives no arguments but can access:
         - upp.hold.page - The Flet Page object
-        - All UiApp methods and state
+        - All Typer2Ui methods and state
 
         Example:
             >>> @upp.init()
@@ -812,12 +812,12 @@ class UiApp:
 
         Example:
             >>> # Default GUI mode
-            >>> app = tu.UiApp(title="My App")
+            >>> app = tu.Typer2Ui(title="My App")
             >>> app()  # Launches GUI
             >>> # Or use: python script.py --cli command arg1 arg2
             >>>
             >>> # Default CLI mode
-            >>> app = tu.UiApp(runner="cli")
+            >>> app = tu.Typer2Ui(runner="cli")
             >>> app()  # Launches CLI
             >>> # Or use: python script.py --gui
         """

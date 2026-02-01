@@ -35,13 +35,13 @@ pip install -e .
 ### Running Examples
 ```bash
 # GUI mode
-python examples/01_basic_typer_to_gui.py
+python examples/e01_basic_typer_to_gui.py
 
 # CLI mode (add --cli flag)
-python examples/01_basic_typer_to_gui.py --cli add 5 3
+python examples/e02_arguments_and_output.py --cli basic-parameters Alice
 
 # Specific command in CLI mode
-python examples/03_ui_blocks.py --cli show-table
+python examples/e03_ui_blocks.py --cli ui-table
 ```
 
 ### Testing
@@ -63,7 +63,7 @@ mypy typer2ui/
 ### Core Execution Flow
 
 ```
-User calls app() (UiApp instance)
+User calls app() (Typer2Ui instance)
     ↓
 Checks for --cli flag in sys.argv
     ↓
@@ -76,7 +76,7 @@ Typer handles args   Flet app builds UI
     ↓                   ↓
 Command executed     User fills form
     ↓                   ↓
-ui(component) called (standalone function)
+ui(component) called (callable UiOutput object)
     ↓
 get_current_runner().show(component)
     ↓
@@ -95,16 +95,16 @@ Every UI component implements TWO rendering methods:
 - `show_cli(runner)`: Terminal output (uses print)
 - `show_gui(runner)`: GUI output (creates Flet controls)
 
-This allows the same `ui(tu.Text("Hello"))` call to work in both modes.
+This allows the same `ui(typer2ui.Text("Hello"))` call to work in both modes.
 
 ## Key Components
 
-### Entry Point: `UiApp` class (`typer2ui/ui_app.py`)
+### Entry Point: `Typer2Ui` class (`typer2ui/ui_app.py`)
 - Main API wrapper around Typer app
 - `app()`: Launches GUI or CLI mode based on --cli flag (callable pattern)
 - `app.command(name)`: Returns UICommand wrapper for programmatic control
 - `app.state(value)`: Creates reactive state objects
-- `app.def_command()`: Decorator for GUI-specific options
+- `app.def_command()`: Decorator for GUI-specific options (deprecated, use `app.command()`)
   - `button=True`: Display as button in left panel
   - `long=True`: Enable real-time output streaming for long-running commands
   - `auto=True`: Execute automatically when selected, hide submit button
@@ -113,10 +113,14 @@ This allows the same `ui(tu.Text("Hello"))` call to work in both modes.
   - `view=True`: Convenience flag - sets `auto=True, auto_scroll=False, header=False` (useful for dashboards)
   - `modal=True`: Display parameters and results in a modal dialog (GUI only). All flags (long, auto, header, auto_scroll, view) are supported in modals. Close button is always enabled, allowing users to close the dialog at any time.
 
-### Standalone Functions (`typer2ui/output.py`)
+### UI Output (`typer2ui/output.py`)
+`ui` is a callable `UiOutput` instance with methods:
 - `ui(component_or_value)`: Universal output function for displaying components. **When passed a string, it renders as markdown** (e.g., `ui("# Hello")` renders markdown, not plain text)
-- `text(value)`: Shortcut for displaying plain text (equivalent to `ui(tu.Text(...))`)
-- `dx(renderer, *dependencies)`: Creates dynamic/reactive UI blocks
+- `ui.print(value)`: Display plain text (no markdown rendering)
+- `ui.dx(renderer, *dependencies)`: Create dynamic/reactive UI blocks
+- `ui.md(value)`: Explicit markdown output (same as `ui("string")`)
+
+Backwards-compatible standalone `text()` and `dx()` functions still exist but are deprecated.
 
 ### Runners (`typer2ui/runners/`)
 - **base.py**: Abstract Runner interface
@@ -180,7 +184,7 @@ For commands marked `long=True`, uses custom `_RealTimeWriter` that:
 ### Progressive Rendering
 Container components support context managers:
 ```python
-with ui(tu.Table(cols=["Name"], data=[])) as table:
+with ui(typer2ui.Table(cols=["Name"], data=[])) as table:
     table.add_row(["Alice"])  # Auto-updates in real-time
 ```
 
@@ -203,7 +207,7 @@ Implementation:
 
 ### Runner Lifecycle
 ```python
-# In app() (UiApp.__call__):
+# In app() (Typer2Ui.__call__):
 runner = CLIRunner() or GUIRunner()
 set_current_runner(runner)
 # Execute command
@@ -234,8 +238,8 @@ Flet Page
 ```
 typer2ui/
 ├── __init__.py          # Public API exports
-├── ui_app.py            # Main UiApp class and UICommand controller
-├── output.py            # Standalone functions: ui(), text(), dx()
+├── ui_app.py            # Main Typer2Ui class and UICommand controller
+├── output.py            # UiOutput callable object: ui(), ui.print(), ui.dx(), ui.md()
 ├── ui_blocks.py         # UI component definitions
 ├── state.py             # Reactive state management
 ├── specs.py             # Immutable data models
@@ -277,10 +281,10 @@ class MyComponent(UiBlock):
 Commands can be tested in both CLI and GUI modes:
 ```bash
 # CLI mode - output goes to stdout
-python examples/03_ui_blocks.py --cli calc --x 10 --y 5
+python examples/e03_ui_blocks.py --cli ui-table
 
 # GUI mode - visual inspection
-python examples/03_ui_blocks.py
+python examples/e03_ui_blocks.py
 ```
 
 ## Package Notes
@@ -288,61 +292,54 @@ python examples/03_ui_blocks.py
 - Python 3.10+ required
 - Dependencies: `typer>=0.9.0`, `flet>=0.80.1`
 - Package name: `typer2ui` (note: no hyphens in package name, but import uses underscore: `typer2ui`)
-- Import pattern (dual import):
+- Import pattern:
   ```python
-  import typer2ui as tu              # For components: tu.Table, tu.Row, etc.
-  from typer2ui import ui, text, dx  # For standalone functions
+  import typer2ui                    # For components: typer2ui.Table, typer2ui.Row, etc.
+  from typer2ui import ui            # For output: ui(), ui.print(), ui.dx()
   ```
 
 ## API Pattern
 
 **Naming Convention:**
-- `tapp` = Typer app instance
-- `upp` = UiApp instance (UI wrapper)
+- `typer_app` = Typer app instance (when wrapping existing Typer apps)
+- `app` = Typer2Ui instance
 
 ```python
-import typer
-import typer2ui as tu
-from typer2ui import ui, text, dx
+import typer2ui
+from typer2ui import ui
 
-# Create Typer app
-tapp = typer.Typer()
-
-# Create UiApp instance
-upp = tu.UiApp(
-    tapp,
+# Create Typer2Ui instance (creates internal Typer app automatically)
+app = typer2ui.Typer2Ui(
     title="My Application",
     description="Description here"
 )
 
-# Define commands
-@tapp.command()
-@upp.def_command(button=True)
+# Define commands with single decorator
+@app.command(button=True)
 def my_command():
     # ui(str) renders as markdown
     ui("# Hello World")
     ui("This is **bold** text")
 
-    # For plain text, use text()
-    text("This is plain text, not markdown")
+    # For plain text, use ui.print()
+    ui.print("This is plain text, not markdown")
 
-    # Components via tu prefix
-    ui(tu.Table(...))
+    # Components via typer2ui prefix
+    ui(typer2ui.Table(...))
 
-    # Reactive UI with dx()
-    counter = upp.state(0)
-    ui(dx(lambda: f"Count: {counter.value}", counter))
+    # Reactive UI with ui.dx()
+    counter = app.state(0)
+    ui(ui.dx(lambda: f"Count: {counter.value}", counter))
 
 # Dashboard/view command (auto-executes, no header, no scroll)
-@tapp.command()
-@upp.def_command(view=True)
+@app.command(view=True)
 def dashboard():
     ui("# Dashboard")
-    ui(tu.Table(cols=["Metric", "Value"], data=[...]))
+    ui(typer2ui.Table(cols=["Metric", "Value"], data=[...]))
 
 # Launch app
 if __name__ == "__main__":
-    upp()  # Callable pattern
+    app()  # Callable pattern
 ```
 
 ## Examples Structure
@@ -351,7 +348,9 @@ Examples are numbered progressively:
 - **01**: Basic conversion (minimal example)
 - **02**: Parameters and output types
 - **03**: UI blocks and components
-- **04**: Application control (app.command() API)
+- **04**: Application control (app.get_command() API)
 - **05**: State management and reactive UI
+- **06**: DataTable with pagination and filtering
+- **07**: Sub-applications with tab navigation
 
 Each example is self-contained and runnable in both CLI and GUI modes.

@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass
 
-import typer2ui as tu
-from typer2ui import ui, text, dx
+import typer2ui
+from typer2ui import ui
 
-upp = tu.UiApp(
+app = typer2ui.Typer2Ui(
     title="State Management Demo",
     description="Demonstrates reactive UI based on application state.",
 )
@@ -19,31 +19,31 @@ class Order:
     total: float
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def state_demo():
     """Demonstrates reactive UI components tied to state."""
-    counter = upp.state(0)
+    counter = app.state(0)
     # --- Counter Example ---
     ui("## Counter")
     # Reactive shortcut: lambda returns string → auto-converted to Markdown
-    ui(dx(lambda: f"### **Current Count:** {counter.value}", counter))
+    ui(ui.dx(lambda: f"### **Current Count:** {counter.value}", counter))
 
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Button(
+                typer2ui.Button(
                     "Increment +", on_click=lambda: counter.set(counter.value + 1)
                 ),
-                tu.Button(
+                typer2ui.Button(
                     "Decrement -", on_click=lambda: counter.set(counter.value - 1)
                 ),
-                tu.Button("Reset", on_click=lambda: counter.set(0)),
+                typer2ui.Button("Reset", on_click=lambda: counter.set(0)),
             ]
         )
     )
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def orders_demo():
     """Demonstrates a master-detail view using state."""
 
@@ -55,7 +55,7 @@ def orders_demo():
     ]
 
     # The ID of the currently selected order is the only state we need
-    selected_order_id = upp.state(None)
+    selected_order_id = app.state(None)
 
     # --- Display List of Orders ---
     ui("## Orders")
@@ -68,11 +68,11 @@ def orders_demo():
             order.quantity,
             f"${order.total:.2f}",
             # This Link modifies the `selected_order_id` state on click
-            tu.Link("Select", on_click=lambda o=order: selected_order_id.set(o)),
+            typer2ui.Link("Select", on_click=lambda o=order: selected_order_id.set(o)),
         ]
         for order in orders_data
     ]
-    ui(tu.Table(cols=["ID", "Item", "Quantity", "Total", "Action"], data=table_data))
+    ui(typer2ui.Table(cols=["ID", "Item", "Quantity", "Total", "Action"], data=table_data))
     ui()  # Empty line shortcut
     ui("---")
 
@@ -98,9 +98,9 @@ def orders_demo():
         """
         )
 
-    # The dx() call wraps the renderer and dependencies, ui() displays it
-    ui(dx(render_order_details, selected_order_id))
+    # The ui.dx() call wraps the renderer and dependencies, ui() displays it
+    ui(ui.dx(render_order_details, selected_order_id))
 
 
 if __name__ == "__main__":
-    upp()
+    app()

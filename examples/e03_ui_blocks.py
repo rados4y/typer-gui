@@ -11,21 +11,21 @@ This example demonstrates individual UI components:
 
 import time
 
-import typer2ui as tu
-from typer2ui import ui, text, dx
+import typer2ui
+from typer2ui import ui
 
-upp = tu.UiApp(
+app = typer2ui.Typer2Ui(
     title="UI Components", description="Demonstrations of each UI component"
 )
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def ui_text_md():
     """Text and Markdown components - simple text display and rich formatting."""
     # Plain text
-    text("This is plain text using text()")
+    ui.print("This is plain text using ui.print()")
 
-    # Markdown (use tu.Md() directly or just ui() with string)
+    # Markdown (use typer2ui.Md() directly or just ui() with string)
     ui(
         """
 # Markdown Component
@@ -40,11 +40,11 @@ You can use **bold**, *italic*, and `code` formatting.
     )
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def ui_table():
     """Table component - display tabular data."""
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Name", "Email", "Role"],
             data=[
                 ["Alice Smith", "alice@example.com", "Admin"],
@@ -56,20 +56,20 @@ def ui_table():
     )
 
 
-@upp.command(threaded=True)
+@app.command(threaded=True)
 def ui_table_progressive():
     """Table with progressive rendering - add rows dynamically with context manager."""
     ui("## Progressive Table")
 
     # Use context manager for progressive rendering
-    with ui(tu.Table(cols=["Step", "Status"], data=[])) as table:
+    with ui(typer2ui.Table(cols=["Step", "Status"], data=[])) as table:
         steps = ["Initialize", "Load Data", "Process", "Validate", "Complete"]
         for step in steps:
             table.add_row([step, "[OK]"])
             time.sleep(0.5)
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def ui_row_column():
     """Row and Column layout - arrange components horizontally and vertically."""
     ui("# Layout Components")
@@ -77,11 +77,11 @@ def ui_row_column():
     # Horizontal layout
     ui("## Row (Horizontal)")
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Text("Item 1"),
-                tu.Text("Item 2"),
-                tu.Text("Item 3"),
+                typer2ui.Text("Item 1"),
+                typer2ui.Text("Item 2"),
+                typer2ui.Text("Item 3"),
             ]
         )
     )
@@ -89,39 +89,39 @@ def ui_row_column():
     # Vertical layout
     ui("## Column (Vertical)")
     ui(
-        tu.Column(
+        typer2ui.Column(
             [
-                tu.Text("First"),
-                tu.Text("Second"),
-                tu.Text("Third"),
+                typer2ui.Text("First"),
+                typer2ui.Text("Second"),
+                typer2ui.Text("Third"),
             ]
         )
     )
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def ui_button_link():
     """Button and Link components - interactive elements (GUI only)."""
     ui("# Interactive Components")
 
     ui("## Buttons")
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Button("Save", on_click=lambda: print("Save clicked")),
-                tu.Button("Cancel", on_click=lambda: print("Cancel clicked")),
-                tu.Button("Delete", on_click=lambda: print("Delete clicked")),
+                typer2ui.Button("Save", on_click=lambda: print("Save clicked")),
+                typer2ui.Button("Cancel", on_click=lambda: print("Cancel clicked")),
+                typer2ui.Button("Delete", on_click=lambda: print("Delete clicked")),
             ]
         )
     )
 
     ui("## Links")
     ui(
-        tu.Column(
+        typer2ui.Column(
             [
-                tu.Link("Settings", on_click=lambda: print("Settings clicked")),
-                tu.Link("Help", on_click=lambda: print("Help clicked")),
-                tu.Link("About", on_click=lambda: print("About clicked")),
+                typer2ui.Link("Settings", on_click=lambda: print("Settings clicked")),
+                typer2ui.Link("Help", on_click=lambda: print("Help clicked")),
+                typer2ui.Link("About", on_click=lambda: print("About clicked")),
             ]
         )
     )
@@ -129,7 +129,7 @@ def ui_button_link():
     ui("*Note: Buttons and Links are GUI-only and won't appear in CLI mode.*")
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def ui_tabs():
     """Tabs component - organize content in tabbed interface."""
     ui("# Tabs Component")
@@ -137,9 +137,9 @@ def ui_tabs():
     # Basic tabs with simple content
     ui("## Basic Tabs (Simple Content)")
     ui(
-        tu.Tabs(
+        typer2ui.Tabs(
             [
-                tu.Tab(
+                typer2ui.Tab(
                     "Overview",
                     """
 ### Welcome to the Overview
@@ -151,12 +151,12 @@ This is the **first tab** with some markdown content.
 - Feature 3
         """,
                 ),
-                tu.Tab(
+                typer2ui.Tab(
                     "Details",
-                    tu.Column(
+                    typer2ui.Column(
                         [
-                            tu.Text("This tab contains multiple components:"),
-                            tu.Table(
+                            typer2ui.Text("This tab contains multiple components:"),
+                            typer2ui.Table(
                                 cols=["Property", "Value"],
                                 data=[
                                     ["Name", "Sample Project"],
@@ -167,7 +167,7 @@ This is the **first tab** with some markdown content.
                         ]
                     ),
                 ),
-                tu.Tab(
+                typer2ui.Tab(
                     "Settings",
                     """
 ### Settings
@@ -190,7 +190,7 @@ Configure your preferences here.
         ui("Loading data from multiple sources...")
         ui()
         ui(
-            tu.Table(
+            typer2ui.Table(
                 cols=["Source", "Records", "Status"],
                 data=[
                     ["Database A", "1,234", "OK"],
@@ -203,7 +203,7 @@ Configure your preferences here.
         ui()
         ui("### Processing Results")
         ui(
-            tu.Table(
+            typer2ui.Table(
                 cols=["Step", "Duration", "Result"],
                 data=[
                     ["Extract", "2.3s", "Success"],
@@ -219,16 +219,16 @@ Configure your preferences here.
         ui("### Available Reports")
         ui()
         ui("**Sales Reports:**")
-        ui(tu.Link("Q1 Sales Report", on_click=lambda: print("Opening Q1...")))
-        ui(tu.Link("Q2 Sales Report", on_click=lambda: print("Opening Q2...")))
+        ui(typer2ui.Link("Q1 Sales Report", on_click=lambda: print("Opening Q1...")))
+        ui(typer2ui.Link("Q2 Sales Report", on_click=lambda: print("Opening Q2...")))
         ui()
         ui("**User Reports:**")
-        ui(tu.Link("Active Users", on_click=lambda: print("Opening active users...")))
-        ui(tu.Link("User Growth", on_click=lambda: print("Opening user growth...")))
+        ui(typer2ui.Link("Active Users", on_click=lambda: print("Opening active users...")))
+        ui(typer2ui.Link("User Growth", on_click=lambda: print("Opening user growth...")))
         ui()
         ui("**Financial Reports:**")
         ui(
-            tu.Table(
+            typer2ui.Table(
                 cols=["Report", "Period", "Size"],
                 data=[
                     ["Revenue Summary", "2024-Q4", "2.3 MB"],
@@ -248,13 +248,13 @@ Configure your preferences here.
         ui()
         ui("**Notifications:**")
         ui(
-            tu.Row(
+            typer2ui.Row(
                 [
-                    tu.Button(
+                    typer2ui.Button(
                         "Enable All",
                         on_click=lambda: print("Enabling notifications..."),
                     ),
-                    tu.Button(
+                    typer2ui.Button(
                         "Disable All",
                         on_click=lambda: print("Disabling notifications..."),
                     ),
@@ -264,16 +264,16 @@ Configure your preferences here.
         ui()
         ui("**Data Management:**")
         ui("Cache size: 245 MB")
-        ui(tu.Button("Clear Cache", on_click=lambda: print("Clearing cache...")))
+        ui(typer2ui.Button("Clear Cache", on_click=lambda: print("Clearing cache...")))
 
     # Use callables for complex tabs
     ui(
-        tu.Tabs(
+        typer2ui.Tabs(
             [
-                tu.Tab("Analysis", build_analysis_tab),
-                tu.Tab("Reports", build_reports_tab),
-                tu.Tab("Settings", build_settings_tab),
-                tu.Tab(
+                typer2ui.Tab("Analysis", build_analysis_tab),
+                typer2ui.Tab("Reports", build_reports_tab),
+                typer2ui.Tab("Settings", build_settings_tab),
+                typer2ui.Tab(
                     "Quick", lambda: ui("### Quick Tab\nThis is built with a lambda!")
                 ),
             ]
@@ -281,7 +281,7 @@ Configure your preferences here.
     )
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def ui_alert_confirm():
     """Alert and Confirm dialogs - interactive dialogs for notifications and confirmations."""
     ui("# Dialog Components")
@@ -289,20 +289,20 @@ def ui_alert_confirm():
     ui("Show informational alerts with OK button:")
 
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Link(
+                typer2ui.Link(
                     "Simple Alert",
                     on_click=lambda: ui(
-                        tu.Alert("Information", "This is a simple alert message.")
+                        typer2ui.Alert("Information", "This is a simple alert message.")
                     ),
                 ),
-                tu.Link(
+                typer2ui.Link(
                     "Markdown Alert",
                     on_click=lambda: ui(
-                        tu.Alert(
+                        typer2ui.Alert(
                             "Formatted Content",
-                            tu.Md(
+                            typer2ui.Md(
                                 """
 ## Important Notice
 
@@ -330,12 +330,12 @@ This alert contains **formatted** content:
         ui("✗ User cancelled the action.")
 
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Link(
+                typer2ui.Link(
                     "Confirm Action",
                     on_click=lambda: ui(
-                        tu.Confirm(
+                        typer2ui.Confirm(
                             "Confirm Action",
                             "Are you sure you want to proceed with this operation?",
                             on_yes=on_confirmed,
@@ -343,12 +343,12 @@ This alert contains **formatted** content:
                         )
                     ),
                 ),
-                tu.Link(
+                typer2ui.Link(
                     "Delete Confirmation",
                     on_click=lambda: ui(
-                        tu.Confirm(
+                        typer2ui.Confirm(
                             "Delete Item",
-                            tu.Md(
+                            typer2ui.Md(
                                 "**Warning:** This action cannot be undone!\n\nAre you sure?"
                             ),
                             on_yes=lambda: ui("Item deleted."),
@@ -366,23 +366,23 @@ This alert contains **formatted** content:
     )
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def ui_nested():
     """Nested components - combining multiple components in a hierarchy."""
     ui("# Dashboard")
     ui("Example of nested component composition")
 
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Button("Refresh", on_click=lambda: print("Refreshing...")),
-                tu.Button("Export", on_click=lambda: print("Exporting...")),
+                typer2ui.Button("Refresh", on_click=lambda: print("Refreshing...")),
+                typer2ui.Button("Export", on_click=lambda: print("Exporting...")),
             ]
         )
     )
 
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Metric", "Value"],
             data=[
                 ["Users", "1,234"],
@@ -397,7 +397,7 @@ def ui_nested():
 
 
 if __name__ == "__main__":
-    upp()
+    app()
 
 
 """

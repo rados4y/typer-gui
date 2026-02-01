@@ -13,10 +13,10 @@ import asyncio
 import time
 from enum import Enum
 
-import typer2ui as tu
+import typer2ui
 from typer2ui import ui
 
-upp = tu.UiApp(
+app = typer2ui.Typer2Ui(
     title="Parameters & Outputs",
     description="Demonstrates arguments, UI components, and async commands.",
 )
@@ -31,7 +31,7 @@ class Priority(str, Enum):
     URGENT = "urgent"
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def welcome_screen():
     """
     Demonstrates a command that runs automatically when selected in the GUI.
@@ -49,7 +49,7 @@ It's a great way to present initial information or a dashboard without requiring
     )
 
 
-@upp.command(button=True)
+@app.command(button=True)
 def basic_parameters(
     name: str,
     times: int = 1,
@@ -71,7 +71,7 @@ def basic_parameters(
     ui(f"Task priority set to: {priority.value}")
 
 
-@upp.command(button=True)
+@app.command(button=True)
 def list_parameters(
     names: list[str],
     numbers: list[int] = [1, 2, 3],
@@ -82,7 +82,7 @@ def list_parameters(
     ui(f"## Priorities: {', '.join([p.value for p in priority])}")
 
 
-@upp.command(button=True, modal=True)
+@app.command(button=True, modal=True)
 def create_task(
     title: str,
     priority: Priority = Priority.MEDIUM,
@@ -108,7 +108,7 @@ def create_task(
 
     # Show task details in a table
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Field", "Value"],
             data=[
                 ["Title", title],
@@ -123,7 +123,7 @@ def create_task(
     return {"id": task_id, "title": title, "priority": priority.value}
 
 
-@upp.command(view=True, modal=True)
+@app.command(view=True, modal=True)
 def output_types():
     """Demonstrates shortcuts and different output methods."""
     # Shortcut: ui(str) renders as Markdown
@@ -152,7 +152,7 @@ You can use **bold**, *italic*, and `code` formatting.
 
     # Use Table component for structured data (no shortcut for this)
     ui(
-        tu.Table(
+        typer2ui.Table(
             title="Output Methods Comparison",
             cols=["Method", "Code", "Use Case"],
             data=[
@@ -160,13 +160,13 @@ You can use **bold**, *italic*, and `code` formatting.
                 ["UI Shortcut", "ui(str)", "Markdown-formatted content"],
                 ["UI Empty", "ui()", "Add spacing/empty lines"],
                 ["UI Object", "ui(42)", "Display any object as text"],
-                ["Table", "ui(tu.Table(...))", "Structured data"],
+                ["Table", "ui(typer2ui.Table(...))", "Structured data"],
             ],
         )
     )
 
 
-@upp.command(threaded=True)
+@app.command(threaded=True)
 def long_running_task(steps: int = 5):
     """Demonstrates a long-running task with real-time table updates."""
     # Shortcut: ui(str) renders as Markdown
@@ -180,7 +180,7 @@ def long_running_task(steps: int = 5):
     ui("[OK] **All steps completed!**")
 
 
-@upp.command(threaded=True)
+@app.command(threaded=True)
 async def async_task(delay: float = 1.0):
     """
     Demonstrates an async command.
@@ -202,7 +202,7 @@ async def async_task(delay: float = 1.0):
 
 
 if __name__ == "__main__":
-    upp()
+    app()
 
 
 """

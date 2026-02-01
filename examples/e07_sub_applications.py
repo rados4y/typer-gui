@@ -1,26 +1,26 @@
 """Example 7: Sub-Applications with Tab Navigation
 
 This example demonstrates:
-- Creating sub-applications with tu.UiApp()
-- Adding sub-apps with upp.add_typer()
+- Creating sub-applications with typer2ui.Typer2Ui()
+- Adding sub-apps with app.add_typer()
 - Automatic tab-based GUI layout
 - Qualified command names (e.g., "users:create")
 - Tab-aware command execution
 """
 
-import typer2ui as tu
+import typer2ui
 from typer2ui import ui
 
 # Main app
-upp = tu.UiApp(
+app = typer2ui.Typer2Ui(
     title="Business Management System",
     description="Manage users, orders, and view reports",
 )
 
 # Sub-applications (each gets its own tab)
-users_upp = tu.UiApp()
-orders_upp = tu.UiApp()
-reports_upp = tu.UiApp()
+users_app = typer2ui.Typer2Ui()
+orders_app = typer2ui.Typer2Ui()
+reports_app = typer2ui.Typer2Ui()
 
 
 # ============================================================================
@@ -28,7 +28,7 @@ reports_upp = tu.UiApp()
 # ============================================================================
 
 
-@upp.command()
+@app.command()
 def create(name: str, email: str = ""):
     """Create a new user."""
     ui("# Create User")
@@ -38,7 +38,7 @@ def create(name: str, email: str = ""):
 
     ui()
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Field", "Value"],
             data=[
                 ["Name", name],
@@ -58,7 +58,7 @@ def create(name: str, email: str = ""):
 # ============================================================================
 
 
-@users_upp.command()
+@users_app.command()
 def list_users(status: str = "all"):
     """List all users."""
     ui("# User List")
@@ -75,7 +75,7 @@ def list_users(status: str = "all"):
         users_data = [u for u in users_data if u[2].lower() == status.lower()]
 
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Name", "Email", "Status"],
             data=users_data,
             title=f"Users ({len(users_data)} total)",
@@ -83,7 +83,7 @@ def list_users(status: str = "all"):
     )
 
 
-@users_upp.command()
+@users_app.command()
 def update(user_id: int, name: str = "", email: str = ""):
     """Update user information."""
     ui("# Update User")
@@ -106,7 +106,7 @@ def update(user_id: int, name: str = "", email: str = ""):
         ui("⚠️ No changes specified")
 
 
-@users_upp.command()
+@users_app.command()
 def delete(user_id: int, confirm: bool = False):
     """Delete a user."""
     ui("# Delete User")
@@ -127,7 +127,7 @@ def delete(user_id: int, confirm: bool = False):
 # ============================================================================
 
 
-@orders_upp.command()
+@orders_app.command()
 def create_order(product: str, quantity: int = 1):
     """Create a new order."""
     ui("# Create Order")
@@ -136,7 +136,7 @@ def create_order(product: str, quantity: int = 1):
     total = price_per_item * quantity
 
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Field", "Value"],
             data=[
                 ["Product", product],
@@ -152,7 +152,7 @@ def create_order(product: str, quantity: int = 1):
     ui("✅ Order created successfully!")
 
 
-@orders_upp.command()
+@orders_app.command()
 def list_orders(status: str = "all"):
     """List all orders."""
     ui("# Order List")
@@ -170,7 +170,7 @@ def list_orders(status: str = "all"):
         orders_data = [o for o in orders_data if o[3].lower() == status.lower()]
 
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Order ID", "Product", "Qty", "Status"],
             data=orders_data,
             title=f"Orders ({len(orders_data)} total)",
@@ -178,7 +178,7 @@ def list_orders(status: str = "all"):
     )
 
 
-@orders_upp.command()
+@orders_app.command()
 def update_status(order_id: int, status: str):
     """Update order status."""
     ui("# Update Order Status")
@@ -193,7 +193,7 @@ def update_status(order_id: int, status: str):
 # ============================================================================
 
 
-@reports_upp.command(view=True)
+@reports_app.command(view=True)
 def sales_report():
     """View sales report dashboard."""
     ui("# Sales Report")
@@ -201,7 +201,7 @@ def sales_report():
     ui()
 
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Month", "Orders", "Revenue"],
             data=[
                 ["January", "145", "$12,450"],
@@ -217,23 +217,23 @@ def sales_report():
     ui("**Average Order Value:** $87.23")
 
 
-@reports_upp.command(view=True)
+@reports_app.command(view=True)
 def user_stats():
     """View user statistics dashboard."""
     ui("# User Statistics")
     ui()
 
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Column(
-                    [tu.Text("Total Users"), tu.Text("1,234", size=32, weight="bold")]
+                typer2ui.Column(
+                    [typer2ui.Text("Total Users"), typer2ui.Text("1,234", size=32, weight="bold")]
                 ),
-                tu.Column(
-                    [tu.Text("Active Users"), tu.Text("987", size=32, weight="bold")]
+                typer2ui.Column(
+                    [typer2ui.Text("Active Users"), typer2ui.Text("987", size=32, weight="bold")]
                 ),
-                tu.Column(
-                    [tu.Text("New This Month"), tu.Text("156", size=32, weight="bold")]
+                typer2ui.Column(
+                    [typer2ui.Text("New This Month"), typer2ui.Text("156", size=32, weight="bold")]
                 ),
             ]
         )
@@ -242,7 +242,7 @@ def user_stats():
     ui()
 
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Status", "Count", "Percentage"],
             data=[
                 ["Active", "987", "80%"],
@@ -253,7 +253,7 @@ def user_stats():
     )
 
 
-@reports_upp.command()
+@reports_app.command()
 def generate_report(report_type: str = "summary"):
     """Generate a custom report."""
     ui("# Generate Report")
@@ -275,9 +275,9 @@ def generate_report(report_type: str = "summary"):
 # Add sub-applications to main app using add_typer()
 # ============================================================================
 
-upp.add_typer(users_upp, name="users", help="User management")
-upp.add_typer(orders_upp, name="orders", help="Order management")
-upp.add_typer(reports_upp, name="reports", help="Reports and analytics")
+app.add_typer(users_app, name="users", help="User management")
+app.add_typer(orders_app, name="orders", help="Order management")
+app.add_typer(reports_app, name="reports", help="Reports and analytics")
 
 
 # ============================================================================
@@ -286,13 +286,13 @@ upp.add_typer(reports_upp, name="reports", help="Reports and analytics")
 
 # Note: This would be used programmatically, not in the GUI
 # Example usage:
-# - upp.get_command("users:list-users").run(status="active")
-# - upp.get_command("orders:list-orders").run(status="processing")
-# - upp.get_command("reports:sales-report").select()  # Switch to that tab and command
+# - app.get_command("users:list-users").run(status="active")
+# - app.get_command("orders:list-orders").run(status="processing")
+# - app.get_command("reports:sales-report").select()  # Switch to that tab and command
 
 
 if __name__ == "__main__":
-    upp()
+    app()
 
 
 """
@@ -325,13 +325,13 @@ CLI Mode:
 
 Programmatic Command Control:
     from typer2ui import ui
-    import typer2ui as tu
+    import typer2ui
 
     # In your code, you can programmatically control commands:
 
     # Execute command with qualified name
-    upp.get_command("users:list-users").run(status="active")
+    app.get_command("users:list-users").run(status="active")
 
     # Switch tabs and commands
-    upp.get_command("orders:list-orders").select()  # Switches to orders tab and selects command
+    app.get_command("orders:list-orders").select()  # Switches to orders tab and selects command
 """

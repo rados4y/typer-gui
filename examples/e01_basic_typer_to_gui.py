@@ -5,19 +5,18 @@ Typer CLI application. The application works in both GUI and CLI modes.
 
 This pattern is useful when:
 - You have an existing Typer app you want to add GUI to
-- You want to use the app as a sub-app in another UiApp via add_subapp()
+- You want to use the app as a sub-app in another Typer2Ui via add_subapp()
 """
 
 import typer
-import typer2ui as tu
+import typer2ui
 
 # Step 1: Create your Typer app as usual
-tapp = typer.Typer()
+typer_app = typer.Typer()
 
 
 # Step 3: Define commands with standard Typer decorator
-# Optionally add @upp.def_command() for GUI-specific options
-@tapp.command()
+@typer_app.command()
 def add(a: int, b: int):
     """Add two numbers together."""
     result = a + b
@@ -25,7 +24,7 @@ def add(a: int, b: int):
     return result
 
 
-@tapp.command()
+@typer_app.command()
 def subtract(a: int, b: int):
     """Subtract b from a."""
     result = a - b
@@ -33,7 +32,7 @@ def subtract(a: int, b: int):
     return result
 
 
-@tapp.command()
+@typer_app.command()
 def multiply(a: int, b: int):
     """Multiply two numbers."""
     result = a * b
@@ -41,7 +40,7 @@ def multiply(a: int, b: int):
     return result
 
 
-@tapp.command()
+@typer_app.command()
 def divide(a: float, b: float):
     """Divide a by b."""
     if b == 0:
@@ -52,19 +51,19 @@ def divide(a: float, b: float):
     return result
 
 
-@tapp.command()
+@typer_app.command()
 def gui():
-    upp = tu.UiApp(
-        tapp, title="My First GUI App", description="A simple calculator with GUI"
+    app = typer2ui.Typer2Ui(
+        typer_app, title="My First GUI App", description="A simple calculator with GUI"
     )
-    upp()
+    app()
 
 
 # Step 4: Launch the app
 if __name__ == "__main__":
     # GUI mode: python e01_basic_typer_to_gui.py
     # CLI mode: python e01_basic_typer_to_gui.py --cli add 5 3
-    tapp()
+    typer_app()
 
 
 """
@@ -73,6 +72,6 @@ Key Points:
 1. The app works in BOTH GUI and CLI modes automatically
 2. Run without --cli for GUI: python e01_basic_typer_to_gui.py
 3. Run with --cli for CLI: python e01_basic_typer_to_gui.py --cli add 5 3
-4. Existing Typer apps can be wrapped with UiApp(tapp, ...) for GUI support
-5. This UiApp can be added to another app via: main_upp.add_subapp(upp, name="calc")
+4. Existing Typer apps can be wrapped with Typer2Ui(typer_app, ...) for GUI support
+5. This Typer2Ui can be added to another app via: main_app.add_subapp(app, name="calc")
 """

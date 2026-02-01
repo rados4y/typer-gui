@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 class Hold:
     """Provides access to GUI internals for advanced customization.
 
-    Available as `ui.hold` on the UiApp instance.
+    Available as `ui.hold` on the Typer2Ui instance.
 
     Attributes:
         page: Access to Flet Page object (GUI mode only)
@@ -26,10 +26,10 @@ class Hold:
     """
 
     def __init__(self, ui_app: Any):
-        """Initialize Hold with reference to UiApp.
+        """Initialize Hold with reference to Typer2Ui.
 
         Args:
-            ui_app: Parent UiApp instance
+            ui_app: Parent Typer2Ui instance
         """
         self._ui_app = ui_app
 
@@ -58,10 +58,10 @@ class ResultAccessor:
     """Dict-like accessor for command output controls."""
 
     def __init__(self, ui_app: Any):
-        """Initialize with reference to UiApp.
+        """Initialize with reference to Typer2Ui.
 
         Args:
-            ui_app: Parent UiApp instance
+            ui_app: Parent Typer2Ui instance
         """
         self._ui_app = ui_app
 

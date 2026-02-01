@@ -10,12 +10,12 @@ Run in CLI mode: python examples/e06_data_table.py --cli browse-users
 Run in GUI mode: python examples/e06_data_table.py
 """
 
-import typer2ui as tu
+import typer2ui
 from typer2ui import ui
 from typing import List, Tuple, Optional, Any
 
-# Create UiApp wrapper
-upp = tu.UiApp(
+# Create Typer2Ui wrapper
+app = typer2ui.Typer2Ui(
     title="DataTable Demo",
     description="Demonstrates dynamic data loading with pagination, sorting, and filtering",
 )
@@ -26,7 +26,7 @@ upp = tu.UiApp(
 # ============================================================================
 
 
-class UserDataSource(tu.DataSource):
+class UserDataSource(typer2ui.DataSource):
     """Mock data source with in-memory user data.
 
     Demonstrates how to implement the DataSource interface with:
@@ -156,7 +156,7 @@ class UserDataSource(tu.DataSource):
 # ============================================================================
 
 
-@upp.command(button=True, view=True)
+@app.command(button=True, view=True)
 def browse_users():
     """Browse users with pagination, sorting, and filtering.
 
@@ -169,7 +169,7 @@ def browse_users():
     ui("")
 
     # Create DataTable
-    table = tu.DataTable(
+    table = typer2ui.DataTable(
         cols=["Name", "Email", "Role", "Status"],
         page_size=10,
         title="Users",
@@ -183,7 +183,7 @@ def browse_users():
     ui(table)
 
 
-@upp.command(button=True, view=True)
+@app.command(button=True, view=True)
 def large_dataset():
     """Browse a larger dataset (500 records) with smaller page size.
 
@@ -198,7 +198,7 @@ def large_dataset():
         def __init__(self):
             self.users = self._generate_mock_users(500)
 
-    table = tu.DataTable(
+    table = typer2ui.DataTable(
         cols=["Name", "Email", "Role", "Status"],
         page_size=25,
         title="Large User Database (500 records)",
@@ -208,7 +208,7 @@ def large_dataset():
     ui(table)
 
 
-@upp.command(button=True, view=True)
+@app.command(button=True, view=True)
 def admin_only():
     """View only admin users (pre-filtered data source).
 
@@ -235,7 +235,7 @@ def admin_only():
             # Apply normal fetch logic
             return super().fetch(offset, limit, sort_by, ascending, filter_text)
 
-    table = tu.DataTable(
+    table = typer2ui.DataTable(
         cols=["Name", "Email", "Role", "Status"],
         page_size=10,
         title="Admin Users",
@@ -250,4 +250,4 @@ def admin_only():
 # ============================================================================
 
 if __name__ == "__main__":
-    upp()
+    app()

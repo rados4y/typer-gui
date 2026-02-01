@@ -2,8 +2,9 @@
 
 This module provides the primary API for displaying UI components:
 - ui() - Universal output function (str input is treated as markdown)
-- text() - Plain text shortcut
-- dx() - Dynamic/reactive content
+- ui.print() - Plain text output
+- ui.dx() - Dynamic/reactive content
+- ui.md() - Explicit markdown output
 """
 
 from typing import Any, Callable, Optional
@@ -124,100 +125,108 @@ class DynamicBlock(UiBlock):
         return self._container
 
 
-def dx(renderer: Callable, *dependencies) -> DynamicBlock:
-    """Create a dynamic UI block that re-renders when dependencies change.
+class UiOutput:
+    """Callable object providing the ui() API with methods.
 
-    The renderer can:
-    - Return a UiBlock component
-    - Return a string (converted to Markdown)
-    - Return None (empty)
-    - Call ui() internally to build content
-
-    Args:
-        renderer: Function that builds the UI content
-        *dependencies: State objects to observe for changes
-
-    Returns:
-        DynamicBlock that can be passed to ui()
-
-    Examples:
-        >>> state = app.state(0)
-        >>> ui(dx(lambda: f"Count: {state.value}", state))
-        >>>
-        >>> # Or return a component
-        >>> ui(dx(lambda: tu.Table(...), state1, state2))
-        >>>
-        >>> # Or use ui() inside renderer
-        >>> def render():
-        ...     ui("### Dynamic Section")
-        ...     ui(tu.Table(...))
-        >>> ui(dx(render, state))
+    Usage:
+        ui(component)       # Display component (strings as markdown)
+        ui.print(value)     # Display plain text
+        ui.dx(fn, *deps)    # Create dynamic/reactive block
+        ui.md(value)        # Explicit markdown
     """
-    return DynamicBlock(renderer=renderer, dependencies=dependencies)
+
+    def __call__(self, component_or_value: Any = None) -> Any:
+        """Present a UI component or value.
+
+        Automatic conversions (handled by build_child):
+        - None → Text("") (empty line)
+        - str → Md(str) (markdown - default behavior)
+        - int/float/etc → Text(str(value))
+        - UiBlock → unchanged
+        - DynamicBlock → setup reactive rendering
+        - Callable → captured and rendered
+
+        Args:
+            component_or_value: Component, string, callable, or value to display
+
+        Returns:
+            The input value (for chaining/context manager support)
+
+        Raises:
+            RuntimeError: If called outside command execution context
+        """
+        from .context import UIRunnerCtx
+
+        ctx = UIRunnerCtx.instance()
+        if ctx is None:
+            raise RuntimeError("ui() can only be called during command execution.")
+
+        ctx.ui(component_or_value)
+        return component_or_value
+
+    def print(self, value: Any = "") -> Text:
+        """Present plain text content.
+
+        Unlike ui() which treats strings as markdown, this displays
+        plain text without markdown rendering.
+
+        Args:
+            value: Value to display as plain text (converted to string)
+
+        Returns:
+            The Text component
+        """
+        component = Text(str(value))
+        return self(component)
+
+    def dx(self, renderer: Callable, *dependencies) -> DynamicBlock:
+        """Create a dynamic UI block that re-renders when dependencies change.
+
+        The renderer can:
+        - Return a UiBlock component
+        - Return a string (converted to Markdown)
+        - Return None (empty)
+        - Call ui() internally to build content
+
+        Args:
+            renderer: Function that builds the UI content
+            *dependencies: State objects to observe for changes
+
+        Returns:
+            DynamicBlock that can be passed to ui()
+        """
+        return DynamicBlock(renderer=renderer, dependencies=dependencies)
+
+    def md(self, value: str) -> Md:
+        """Present explicit markdown content.
+
+        Same as ui(string), but makes the intent explicit.
+
+        Args:
+            value: Markdown string to display
+
+        Returns:
+            The Md component
+        """
+        component = Md(str(value))
+        return self(component)
 
 
-def ui(component_or_value: Any = None) -> Any:
-    """Present a UI component or value.
-
-    Uses the new stack-based architecture. Simply appends the value to the
-    current UI stack. Conversion from strings/values to UI components happens
-    later in build_child().
-
-    Automatic conversions (handled by build_child):
-    - None → Text("") (empty line)
-    - str → Md(str) (markdown - default behavior)
-    - int/float/etc → Text(str(value))
-    - UiBlock → unchanged
-    - DynamicBlock → setup reactive rendering
-    - Callable → captured and rendered
-
-    Args:
-        component_or_value: Component, string, callable, or value to display
-
-    Returns:
-        The input value (for chaining/context manager support)
-
-    Raises:
-        RuntimeError: If called outside command execution context
-
-    Examples:
-        >>> ui("# Hello")  # Markdown (default for strings)
-        >>> ui("**Bold**")  # Markdown
-        >>> ui()  # Empty line
-        >>> ui(tu.Table(...))  # Component
-        >>> ui(dx(lambda: "...", state))  # Dynamic content
-        >>> print("plain text")  # Use print() for plain text
-    """
-    from .context import UIRunnerCtx
-
-    # Get current context
-    ctx = UIRunnerCtx.instance()
-    if ctx is None:
-        raise RuntimeError("ui() can only be called during command execution.")
-
-    # Simply append to stack - all conversion logic is in build_child()
-    ctx.ui(component_or_value)
-
-    # Return the component for context manager support
-    return component_or_value
+ui = UiOutput()
 
 
+# Keep backwards-compatible standalone functions
 def text(value: Any = "") -> Text:
     """Present plain text content.
 
-    Shortcut for ui(tu.Text(...)). Unlike ui() which treats strings
-    as markdown, this displays plain text without markdown rendering.
-
-    Args:
-        value: Value to display as plain text (converted to string)
-
-    Returns:
-        The Text component
-
-    Examples:
-        >>> text("Plain text output")
-        >>> text(42)
-        >>> text()  # Empty line
+    DEPRECATED: Use ui.print() instead.
     """
-    component = Text(str(value))
-    return ui(component)
+    return ui.print(value)
+
+
+def dx(renderer: Callable, *dependencies) -> DynamicBlock:
+    """Create a dynamic UI block.
+
+    DEPRECATED: Use ui.dx() instead.
+    """
+    return ui.dx(renderer, *dependencies)

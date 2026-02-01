@@ -1,22 +1,22 @@
-"""Example 4: Application Control with upp.get_command() API
+"""Example 4: Application Control with app.get_command() API
 
 This example demonstrates:
-- upp.get_command("name").run(**kwargs) - Execute with output capture
-- upp.get_command("name").include(**kwargs) - Execute inline
-- upp.get_command("name").select() - Select a command (GUI mode)
-- upp.hold.page - Access to Flet Page for customization
-- upp.hold.result['command-name'] - Access to command output controls
-- @upp.init() - Decorator for initialization code (runs when GUI starts)
+- app.get_command("name").run(**kwargs) - Execute with output capture
+- app.get_command("name").include(**kwargs) - Execute inline
+- app.get_command("name").select() - Select a command (GUI mode)
+- app.hold.page - Access to Flet Page for customization
+- app.hold.result['command-name'] - Access to command output controls
+- @app.init() - Decorator for initialization code (runs when GUI starts)
 """
 
 import time
 
-import typer2ui as tu
-from typer2ui import ui, text, dx
+import typer2ui
+from typer2ui import ui
 
-upp = tu.UiApp(
+app = typer2ui.Typer2Ui(
     title="App Control Demo",
-    description="Interactive demo of upp.get_command() operations",
+    description="Interactive demo of app.get_command() operations",
 )
 
 
@@ -25,21 +25,21 @@ upp = tu.UiApp(
 # ============================================================================
 
 
-@upp.command()
+@app.command()
 def show_welcome_dialog():
     """Show welcome dialog when GUI starts (GUI only)."""
     import flet as ft
 
-    if upp.hold.page:
+    if app.hold.page:
         print("executed")
         dlg = ft.AlertDialog(
             title=ft.Text("Welcome to App Control Demo!"),
             content=ft.Text(
                 "This example demonstrates advanced app control features:\n\n"
                 "• Command execution with .run() and .include()\n"
-                "• GUI customization with upp.hold.page\n"
-                "• Output control access with upp.hold.result\n"
-                "• Initialization with @upp.init()\n\n"
+                "• GUI customization with app.hold.page\n"
+                "• Output control access with app.hold.result\n"
+                "• Initialization with @app.init()\n\n"
                 "Explore the commands to see these features in action!"
             ),
             actions=[
@@ -47,14 +47,14 @@ def show_welcome_dialog():
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        upp.hold.page.show_dialog(dlg)
+        app.hold.page.show_dialog(dlg)
 
 
 def close_dialog(dialog):
     """Helper to close dialog."""
     dialog.open = False
-    if upp.hold.page:
-        upp.hold.page.update()
+    if app.hold.page:
+        app.hold.page.update()
 
 
 # ============================================================================
@@ -62,7 +62,7 @@ def close_dialog(dialog):
 # ============================================================================
 
 
-@upp.command()
+@app.command()
 def fetch_data(source: str = "database"):
     """Fetch data from a source."""
     ui(f"### Fetching from {source}")
@@ -70,12 +70,12 @@ def fetch_data(source: str = "database"):
     return {"records": 150, "source": source}
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def generate_report():
     """Generate a final report."""
     ui("### Final Report")
     ui(
-        tu.Table(
+        typer2ui.Table(
             cols=["Metric", "Value"],
             data=[
                 ["Total Records", "150"],
@@ -93,13 +93,13 @@ def generate_report():
 # ============================================================================
 
 
-@upp.command()
+@app.command()
 def hold_demo():
-    """Demo of upp.hold for GUI customization (GUI only)."""
-    ui("# GUI Customization with upp.hold")
+    """Demo of app.hold for GUI customization (GUI only)."""
+    ui("# GUI Customization with app.hold")
 
     # Check if we're in GUI mode
-    if upp.hold.page is None:
+    if app.hold.page is None:
         ui("**Note:** This demo only works in GUI mode")
         ui("Run: `python examples/e04_app_control.py`")
         return
@@ -108,14 +108,14 @@ def hold_demo():
     ui("Customize the Flet page directly:")
 
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Button(
+                typer2ui.Button(
                     "Toggle Dark Mode",
                     on_click=lambda: toggle_theme(),
                     icon="dark_mode",
                 ),
-                tu.Button(
+                typer2ui.Button(
                     "Change Window Title", on_click=lambda: change_title(), icon="title"
                 ),
             ]
@@ -126,14 +126,14 @@ def hold_demo():
     ui("Modify output areas of other commands:")
 
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Button(
+                typer2ui.Button(
                     "Style Fetch Output",
                     on_click=lambda: customize_fetch_output(),
                     icon="palette",
                 ),
-                tu.Button(
+                typer2ui.Button(
                     "Clear Report Output",
                     on_click=lambda: clear_report_output(),
                     icon="clear",
@@ -147,20 +147,20 @@ def hold_demo():
         """
 ### Code Examples
 
-**Initialize with @upp.init():**
+**Initialize with @app.init():**
 ```python
-@upp.init()
+@app.init()
 def show_welcome_dialog():
     import flet as ft
-    if upp.hold.page:
+    if app.hold.page:
         dlg = ft.AlertDialog(
             title=ft.Text("Welcome!"),
             content=ft.Text("Welcome to the app!"),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dlg(dlg))]
         )
-        upp.hold.page.dialog = dlg
+        app.hold.page.dialog = dlg
         dlg.open = True
-        upp.hold.page.update()
+        app.hold.page.update()
 ```
 
 **Access Flet Page:**
@@ -168,7 +168,7 @@ def show_welcome_dialog():
 import flet as ft
 
 # Toggle theme
-page = upp.hold.page
+page = app.hold.page
 page.theme_mode = (
     ft.ThemeMode.DARK
     if page.theme_mode == ft.ThemeMode.LIGHT
@@ -180,7 +180,7 @@ page.update()
 **Access Command Output:**
 ```python
 # Get output control for a command
-output = upp.hold.result['fetch-data']
+output = app.hold.result['fetch-data']
 if output:
     # Modify the ListView directly
     output.scroll = ft.ScrollMode.ALWAYS
@@ -194,7 +194,7 @@ def toggle_theme():
     """Toggle between light and dark mode."""
     import flet as ft
 
-    page = upp.hold.page
+    page = app.hold.page
     if page:
         page.theme_mode = (
             ft.ThemeMode.DARK
@@ -206,7 +206,7 @@ def toggle_theme():
 
 def change_title():
     """Change the window title."""
-    page = upp.hold.page
+    page = app.hold.page
     if page:
         page.title = f"Custom Title - {time.strftime('%H:%M:%S')}"
         page.update()
@@ -216,7 +216,7 @@ def customize_fetch_output():
     """Customize the fetch-data command output style."""
     import flet as ft
 
-    output = upp.hold.result["fetch-data"]
+    output = app.hold.result["fetch-data"]
     if output:
         # Customize the output ListView
         output.bgcolor = ft.colors.GREEN_50
@@ -224,8 +224,8 @@ def customize_fetch_output():
         output.border = ft.border.all(2, ft.colors.GREEN_400)
         output.border_radius = 10
 
-        if upp.hold.page:
-            upp.hold.page.update()
+        if app.hold.page:
+            app.hold.page.update()
             ui("✓ Styled fetch-data output!")
     else:
         ui("⚠ Run fetch-data command first")
@@ -233,17 +233,17 @@ def customize_fetch_output():
 
 def clear_report_output():
     """Clear the generate-report command output."""
-    output = upp.hold.result["generate-report"]
+    output = app.hold.result["generate-report"]
     if output:
         output.controls.clear()
-        if upp.hold.page:
-            upp.hold.page.update()
+        if app.hold.page:
+            app.hold.page.update()
             ui("✓ Cleared generate-report output!")
     else:
         ui("⚠ Run generate-report command first")
 
 
-@upp.command(view=True)
+@app.command(view=True)
 def control_demo():
     """Interactive demo of run(), include(), and select()."""
     ui("# Command Control Demo")
@@ -252,23 +252,23 @@ def control_demo():
 
     # Interactive buttons
     ui(
-        tu.Row(
+        typer2ui.Row(
             [
-                tu.Button(
+                typer2ui.Button(
                     "Demo .run()",
-                    on_click=lambda: upp.get_command("fetch-data").run(source="api"),
+                    on_click=lambda: app.get_command("fetch-data").run(source="api"),
                 ),
-                tu.Button(
+                typer2ui.Button(
                     "Demo .include()",
-                    on_click=lambda: upp.get_command("generate-report").include(),
+                    on_click=lambda: app.get_command("generate-report").include(),
                 ),
-                tu.Button(
+                typer2ui.Button(
                     "Demo .clear()",
-                    on_click=lambda: upp.get_command().clear(),
+                    on_click=lambda: app.get_command().clear(),
                 ),
-                tu.Button(
+                typer2ui.Button(
                     "Demo .select()",
-                    on_click=lambda: upp.get_command("fetch-data").select(),
+                    on_click=lambda: app.get_command("fetch-data").select(),
                 ),
             ]
         )
@@ -281,14 +281,14 @@ def control_demo():
 
 **`.run(**kwargs)`** - Execute and capture output separately
 ```python
-cmd = upp.get_command("fetch-data").run(source="api")
+cmd = app.get_command("fetch-data").run(source="api")
 output = cmd.out      # Captured text output
 result = cmd.result   # Return value
 ```
 
 **`.include(**kwargs)`** - Execute inline (output appears in current context)
 ```python
-result = upp.get_command("generate-report").include()
+result = app.get_command("generate-report").include()
 ```
 
 **`.select()`** - Select command in GUI (changes form)
@@ -300,7 +300,7 @@ app.get_command("fetch-data").select()
 
 
 if __name__ == "__main__":
-    upp()
+    app()
 
 
 """
