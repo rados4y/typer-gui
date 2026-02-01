@@ -1,6 +1,6 @@
 """UiApp and UICommand - Main UI classes for typer-ui."""
 
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING, Union
 import sys
 import typer
 import flet as ft
@@ -251,36 +251,40 @@ class UICommand:
 
 
 class UiApp:
-    """Main entry point for typer-ui - extension API for Typer apps.
+    """Main entry point for typer2ui - creates GUI applications with Typer CLI support.
 
-    This class provides GUI-specific configuration on top of existing Typer applications.
-    It works alongside Typer's decorators, not as a replacement.
+    UiApp owns a Typer instance internally and provides a unified API for defining
+    commands with both CLI and GUI capabilities.
 
     Example:
-        >>> import typer
         >>> import typer2ui as tu
-        >>> from typer2ui import ui, md, dx
+        >>> from typer2ui import ui
         >>>
-        >>> typer_app = typer.Typer()
-        >>> app = tu.UiApp(
-        >>>     typer_app,
-        >>>     title="My Application",
-        >>>     description="A demo app"
-        >>> )
+        >>> # Create app (Typer instance created internally)
+        >>> upp = tu.UiApp(title="My Application", description="A demo app")
         >>>
-        >>> @typer_app.command()
-        >>> @app.def_command(button=True)
+        >>> # Define commands with single decorator
+        >>> @upp.command(button=True)
         >>> def greet(name: str):
-        >>>     ui("# Hello!")
-        >>>     print(f"Hello {name}!")
+        >>>     ui(f"# Hello, {name}!")
+        >>>
+        >>> # Access internal Typer if needed
+        >>> upp.typer  # The underlying typer.Typer instance
+        >>>
+        >>> # Add sub-applications
+        >>> sub_upp = tu.UiApp(title="Sub App")
+        >>> @sub_upp.command()
+        >>> def sub_cmd():
+        >>>     ui("Sub command")
+        >>> upp.add_subapp(sub_upp, name="sub")
         >>>
         >>> if __name__ == "__main__":
-        >>>     app()  # Callable pattern
+        >>>     upp()  # Launches GUI or CLI based on flags
     """
 
     def __init__(
         self,
-        typer_app: typer.Typer,
+        typer_app: Optional[typer.Typer] = None,
         *,
         title: Optional[str] = None,
         description: Optional[str] = None,
@@ -288,10 +292,11 @@ class UiApp:
         print2ui: bool = True,
         main_label: str = "main",
     ):
-        """Initialize the UI wrapper for a Typer app.
+        """Initialize the UiApp.
 
         Args:
-            typer_app: The Typer application instance to extend
+            typer_app: Optional existing Typer app to wrap (for backwards compatibility).
+                       If None, creates a new Typer instance internally.
             title: Window title for the GUI
             description: Description text shown at the top of the GUI
             runner: Default runner mode - "gui" (default, use --cli to switch) or "cli" (use --gui to switch)
@@ -304,11 +309,22 @@ class UiApp:
 
         self.title = title
         self.description = description
-        self._typer_app = typer_app
         self._runner_mode = runner
         self.print2ui = print2ui
         self.main_label = main_label
         self._cli_mode = False
+
+        # Create or use provided Typer instance
+        if typer_app is None:
+            self._typer_app = typer.Typer()
+        else:
+            self._typer_app = typer_app
+
+        # Store reference to self on the Typer app for discovery
+        setattr(self._typer_app, '_ui_app', self)
+
+        # Track registered sub-apps (UiApp instances)
+        self._sub_apps: list[tuple['UiApp', str, Optional[str]]] = []  # (upp, name, help)
 
         # Runtime attributes (initialized when app starts)
         self.app_spec: Optional[AppSpec] = None
@@ -321,6 +337,66 @@ class UiApp:
 
         # Init callback (called when GUI starts)
         self._init_callback: Optional[Callable] = None
+
+    @property
+    def typer(self) -> "typer.Typer":
+        """Access the underlying Typer application.
+
+        This allows advanced usage if you need direct access to the Typer app,
+        for example to use Typer-specific features not exposed by UiApp.
+
+        Example:
+            >>> upp = tu.UiApp(title="My App")
+            >>> upp.typer.add_typer(other_typer_app, name="other")
+        """
+        return self._typer_app
+
+    def add_typer(
+        self,
+        sub_app: Union['UiApp', 'typer.Typer'],
+        *,
+        name: str,
+        help: Optional[str] = None
+    ) -> None:
+        """Add a sub-application with its own commands.
+
+        Creates a tab in the GUI for the sub-application's commands.
+
+        Args:
+            sub_app: UiApp instance or raw typer.Typer app to add as sub-application
+            name: Name for the sub-app (used in CLI as command group and in GUI as tab)
+            help: Optional help text for the sub-app
+
+        Example:
+            >>> main_upp = tu.UiApp(title="Main App")
+            >>> users_upp = tu.UiApp(title="Users")
+            >>>
+            >>> @users_upp.command()
+            >>> def create(name: str):
+            >>>     ui(f"Created user: {name}")
+            >>>
+            >>> main_upp.add_typer(users_upp, name="users", help="User management")
+            >>>
+            >>> # Also works with raw Typer apps:
+            >>> import typer
+            >>> tapp = typer.Typer()
+            >>> main_upp.add_typer(tapp, name="legacy", help="Legacy commands")
+        """
+        # Determine the Typer app to add
+        if isinstance(sub_app, UiApp):
+            typer_app = sub_app._typer_app
+            # Track the sub-app for later spec building
+            self._sub_apps.append((sub_app, name, help))
+        else:
+            # Raw Typer app
+            typer_app = sub_app
+            # Check if it has a UiApp wrapper attached
+            ui_app = getattr(sub_app, '_ui_app', None)
+            if ui_app:
+                self._sub_apps.append((ui_app, name, help))
+
+        # Add to underlying Typer
+        self._typer_app.add_typer(typer_app, name=name, help=help)
 
     def clipboard(self, text: str) -> None:
         """Copy text to clipboard.
@@ -424,6 +500,118 @@ class UiApp:
             # Called without parentheses: @upp.init
             return decorator(func)
 
+    def command(
+        self,
+        name: Optional[str] = None,
+        *,
+        # GUI-specific options
+        button: bool = False,
+        threaded: bool = True,
+        auto: bool = False,
+        header: bool = True,
+        submit_name: str = "Run Command",
+        on_select: Optional[Callable] = None,
+        auto_scroll: bool = True,
+        view: bool = False,
+        modal: bool = False,
+        # Typer options
+        help: Optional[str] = None,
+    ):
+        """Decorator to define a command with both CLI and GUI support.
+
+        This single decorator registers the command with Typer and stores
+        GUI-specific options. No need for separate @typer.command() decorator.
+
+        Args:
+            name: Command name (defaults to function name with underscores as dashes)
+
+            GUI Options:
+            button: Display as a button in the left panel
+            threaded: Run in background thread with real-time output streaming (default: True)
+            auto: Execute automatically when selected, hide submit button
+            header: Show command name and description (default: True)
+            submit_name: Text for the submit button (default: "Run Command")
+            on_select: Callback function called when command is selected
+            auto_scroll: Automatically scroll to end of output (default: True)
+            view: Convenience flag - sets auto=True, auto_scroll=False, header=False
+            modal: Display parameters and results in a modal dialog (GUI only)
+
+            Typer Options:
+            help: Help text for the command (overrides docstring)
+
+        Example:
+            >>> @upp.command(button=True)
+            >>> def greet(name: str):
+            >>>     '''Greet someone by name.'''
+            >>>     ui(f"Hello, {name}!")
+            >>>
+            >>> @upp.command(view=True)
+            >>> def dashboard():
+            >>>     '''Auto-executing dashboard view.'''
+            >>>     ui("# Dashboard")
+            >>>
+            >>> @upp.command("custom-name", modal=True)
+            >>> def my_func():
+            >>>     ui("This command has a custom CLI name")
+        """
+        def decorator(func: Callable) -> Callable:
+            import asyncio
+            import inspect
+
+            # Handle view flag - overrides auto, header, and auto_scroll
+            final_auto = auto
+            final_header = header
+            final_auto_scroll = auto_scroll
+
+            if view:
+                final_auto = True
+                final_header = False
+                final_auto_scroll = False
+
+            # Store GUI options on the function
+            setattr(
+                func,
+                _GUI_OPTIONS_ATTR,
+                CommandUiSpec(
+                    button=button,
+                    threaded=threaded,
+                    auto=final_auto,
+                    header=final_header,
+                    submit_name=submit_name,
+                    on_select=on_select,
+                    auto_scroll=final_auto_scroll,
+                    modal=modal,
+                ),
+            )
+
+            # Handle async functions
+            if inspect.iscoroutinefunction(func):
+                def sync_wrapper(*args, **kwargs):
+                    return asyncio.run(func(*args, **kwargs))
+
+                # Copy over the GUI options to the wrapper
+                setattr(sync_wrapper, _GUI_OPTIONS_ATTR, getattr(func, _GUI_OPTIONS_ATTR))
+
+                # Store reference to original async function
+                setattr(sync_wrapper, '_original_async_func', func)
+
+                # Copy function metadata
+                sync_wrapper.__name__ = func.__name__
+                sync_wrapper.__doc__ = func.__doc__
+                sync_wrapper.__annotations__ = func.__annotations__
+                sync_wrapper.__signature__ = inspect.signature(func)
+
+                target_func = sync_wrapper
+            else:
+                target_func = func
+
+            # Register with Typer
+            self._typer_app.command(name=name, help=help)(target_func)
+
+            return func  # Return original function
+
+        return decorator
+
     def def_command(
         self,
         *,
@@ -439,8 +627,10 @@ class UiApp:
     ):
         """Decorator to add GUI-specific options to a Typer command.
 
-        This decorator should be used alongside @app.command(), not instead of it.
-        It only stores GUI metadata and doesn't affect Typer's behavior.
+        DEPRECATED: Use @upp.command() instead for new code.
+
+        This decorator is kept for backwards compatibility. It should be used
+        alongside @typer_app.command(), not instead of it.
 
         Args:
             button: Display as a button in the left panel
@@ -451,26 +641,7 @@ class UiApp:
             on_select: Callback function called when command is selected
             auto_scroll: Automatically scroll to end of output (default: True)
             view: Convenience flag - sets auto=True, auto_scroll=False, header=False
-                  (useful for dashboard/info screens)
             modal: Display parameters and results in a modal dialog (GUI only)
-
-        Example:
-            >>> @typer_app.command()
-            >>> @app.def_command(button=True, threaded=True)
-            >>> def process():
-            >>>     for i in range(10):
-            >>>         print(f"Step {i}")
-            >>>         time.sleep(1)
-            >>>
-            >>> @typer_app.command()
-            >>> @app.def_command(view=True)
-            >>> def dashboard():
-            >>>     ui("# Dashboard")  # Auto-executes, no header, no auto-scroll
-            >>>
-            >>> @typer_app.command()
-            >>> @app.def_command(auto=True, header=False, auto_scroll=False)
-            >>> def status():
-            >>>     ui("# Status")  # Equivalent to view=True
         """
 
         def decorator(func: Callable) -> Callable:
@@ -504,7 +675,6 @@ class UiApp:
             )
 
             # If the function is async, wrap it for Typer compatibility
-            # Typer will call it synchronously, so we need to handle async execution
             if inspect.iscoroutinefunction(func):
                 def sync_wrapper(*args, **kwargs):
                     return asyncio.run(func(*args, **kwargs))
@@ -527,7 +697,7 @@ class UiApp:
 
         return decorator
 
-    def command(self, name: Optional[str] = None):
+    def get_command(self, name: Optional[str] = None):
         """Get a command by name or return the current command.
 
         Supports qualified names to specify sub-app (e.g., "users:create").
@@ -542,13 +712,13 @@ class UiApp:
 
         Examples:
             >>> # Get command by name (uses current tab)
-            >>> app.command("fetch-data").run(source="api")
+            >>> app.get_command("fetch-data").run(source="api")
             >>>
             >>> # Get command with qualified name
-            >>> app.command("users:create").run(name="John")
+            >>> app.get_command("users:create").run(name="John")
             >>>
             >>> # Get current command
-            >>> current = app.command()
+            >>> current = app.get_command()
         """
         if name is None:
             # Return current command
@@ -642,12 +812,12 @@ class UiApp:
 
         Example:
             >>> # Default GUI mode
-            >>> app = tu.UiApp(tapp, runner="gui")
+            >>> app = tu.UiApp(title="My App")
             >>> app()  # Launches GUI
             >>> # Or use: python script.py --cli command arg1 arg2
             >>>
             >>> # Default CLI mode
-            >>> app = tu.UiApp(tapp, runner="cli")
+            >>> app = tu.UiApp(runner="cli")
             >>> app()  # Launches CLI
             >>> # Or use: python script.py --gui
         """
@@ -722,9 +892,9 @@ class UiApp:
         return self._cli_mode
 
     @property
-    def typer_app(self) -> typer.Typer:
+    def typer_app(self) -> "typer.Typer":
         """Access the underlying Typer application.
 
-        This allows advanced usage if you need direct access to the Typer app.
+        DEPRECATED: Use .typer property instead.
         """
         return self._typer_app

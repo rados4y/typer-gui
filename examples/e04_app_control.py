@@ -1,24 +1,22 @@
-"""Example 4: Application Control with upp.command() API
+"""Example 4: Application Control with upp.get_command() API
 
 This example demonstrates:
-- upp.command("name").run(**kwargs) - Execute with output capture
-- upp.command("name").include(**kwargs) - Execute inline
-- upp.command("name").select() - Select a command (GUI mode)
+- upp.get_command("name").run(**kwargs) - Execute with output capture
+- upp.get_command("name").include(**kwargs) - Execute inline
+- upp.get_command("name").select() - Select a command (GUI mode)
 - upp.hold.page - Access to Flet Page for customization
 - upp.hold.result['command-name'] - Access to command output controls
 - @upp.init() - Decorator for initialization code (runs when GUI starts)
 """
 
-import typer
-import typer2ui as tu
-from typer2ui import ui, text, dx
 import time
 
-tapp = typer.Typer()
+import typer2ui as tu
+from typer2ui import ui, text, dx
+
 upp = tu.UiApp(
-    tapp,
     title="App Control Demo",
-    description="Interactive demo of upp.command() operations",
+    description="Interactive demo of upp.get_command() operations",
 )
 
 
@@ -27,7 +25,7 @@ upp = tu.UiApp(
 # ============================================================================
 
 
-@tapp.command()
+@upp.command()
 def show_welcome_dialog():
     """Show welcome dialog when GUI starts (GUI only)."""
     import flet as ft
@@ -50,9 +48,6 @@ def show_welcome_dialog():
             actions_alignment=ft.MainAxisAlignment.END,
         )
         upp.hold.page.show_dialog(dlg)
-        # upp.hold.page.dialog = dlg
-        # dlg.open = True
-        # upp.hold.page.update()
 
 
 def close_dialog(dialog):
@@ -67,7 +62,7 @@ def close_dialog(dialog):
 # ============================================================================
 
 
-@tapp.command()
+@upp.command()
 def fetch_data(source: str = "database"):
     """Fetch data from a source."""
     ui(f"### Fetching from {source}")
@@ -75,8 +70,7 @@ def fetch_data(source: str = "database"):
     return {"records": 150, "source": source}
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def generate_report():
     """Generate a final report."""
     ui("### Final Report")
@@ -99,8 +93,7 @@ def generate_report():
 # ============================================================================
 
 
-@tapp.command()
-@upp.def_command()
+@upp.command()
 def hold_demo():
     """Demo of upp.hold for GUI customization (GUI only)."""
     ui("# GUI Customization with upp.hold")
@@ -108,7 +101,7 @@ def hold_demo():
     # Check if we're in GUI mode
     if upp.hold.page is None:
         ui("**Note:** This demo only works in GUI mode")
-        ui("Run: `python examples/04_app_control.py`")
+        ui("Run: `python examples/e04_app_control.py`")
         return
 
     ui("## 1. Access Flet Page")
@@ -250,8 +243,7 @@ def clear_report_output():
         ui("⚠ Run generate-report command first")
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def control_demo():
     """Interactive demo of run(), include(), and select()."""
     ui("# Command Control Demo")
@@ -264,19 +256,19 @@ def control_demo():
             [
                 tu.Button(
                     "Demo .run()",
-                    on_click=lambda: upp.command("fetch-data").run(source="api"),
+                    on_click=lambda: upp.get_command("fetch-data").run(source="api"),
                 ),
                 tu.Button(
                     "Demo .include()",
-                    on_click=lambda: upp.command("generate-report").include(),
+                    on_click=lambda: upp.get_command("generate-report").include(),
                 ),
                 tu.Button(
                     "Demo .clear()",
-                    on_click=lambda: upp.command().clear(),
+                    on_click=lambda: upp.get_command().clear(),
                 ),
                 tu.Button(
                     "Demo .select()",
-                    on_click=lambda: upp.command("fetch-data").select(),
+                    on_click=lambda: upp.get_command("fetch-data").select(),
                 ),
             ]
         )
@@ -289,19 +281,19 @@ def control_demo():
 
 **`.run(**kwargs)`** - Execute and capture output separately
 ```python
-cmd = upp.command("fetch-data").run(source="api")
+cmd = upp.get_command("fetch-data").run(source="api")
 output = cmd.out      # Captured text output
 result = cmd.result   # Return value
 ```
 
 **`.include(**kwargs)`** - Execute inline (output appears in current context)
 ```python
-result = upp.command("generate-report").include()
+result = upp.get_command("generate-report").include()
 ```
 
 **`.select()`** - Select command in GUI (changes form)
 ```python
-app.command("fetch-data").select()
+app.get_command("fetch-data").select()
 ```
     """
     )
@@ -315,10 +307,10 @@ if __name__ == "__main__":
 CLI Examples:
 -------------
 # Interactive demo (best viewed in GUI)
-python examples/04_app_control.py
+python examples/e04_app_control.py
 
 # CLI mode
-python examples/04_app_control.py --cli control-demo
-python examples/04_app_control.py --cli fetch-data --source api
-python examples/04_app_control.py --cli generate-report
+python examples/e04_app_control.py --cli control-demo
+python examples/e04_app_control.py --cli fetch-data --source api
+python examples/e04_app_control.py --cli generate-report
 """

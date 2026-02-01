@@ -9,19 +9,17 @@ This example demonstrates individual UI components:
 - Nested composition
 """
 
-import typer
-import typer2ui as tu
-from typer2ui import ui, text, dx
 import time
 
-tapp = typer.Typer()
+import typer2ui as tu
+from typer2ui import ui, text, dx
+
 upp = tu.UiApp(
-    tapp, title="UI Components", description="Demonstrations of each UI component"
+    title="UI Components", description="Demonstrations of each UI component"
 )
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def ui_text_md():
     """Text and Markdown components - simple text display and rich formatting."""
     # Plain text
@@ -42,8 +40,7 @@ You can use **bold**, *italic*, and `code` formatting.
     )
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def ui_table():
     """Table component - display tabular data."""
     ui(
@@ -59,8 +56,7 @@ def ui_table():
     )
 
 
-@tapp.command()
-@upp.def_command(threaded=True)
+@upp.command(threaded=True)
 def ui_table_progressive():
     """Table with progressive rendering - add rows dynamically with context manager."""
     ui("## Progressive Table")
@@ -73,8 +69,7 @@ def ui_table_progressive():
             time.sleep(0.5)
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def ui_row_column():
     """Row and Column layout - arrange components horizontally and vertically."""
     ui("# Layout Components")
@@ -104,8 +99,7 @@ def ui_row_column():
     )
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def ui_button_link():
     """Button and Link components - interactive elements (GUI only)."""
     ui("# Interactive Components")
@@ -135,8 +129,7 @@ def ui_button_link():
     ui("*Note: Buttons and Links are GUI-only and won't appear in CLI mode.*")
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def ui_tabs():
     """Tabs component - organize content in tabbed interface."""
     ui("# Tabs Component")
@@ -288,8 +281,7 @@ Configure your preferences here.
     )
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def ui_alert_confirm():
     """Alert and Confirm dialogs - interactive dialogs for notifications and confirmations."""
     ui("# Dialog Components")
@@ -374,8 +366,7 @@ This alert contains **formatted** content:
     )
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def ui_nested():
     """Nested components - combining multiple components in a hierarchy."""
     ui("# Dashboard")
@@ -412,12 +403,12 @@ if __name__ == "__main__":
 """
 CLI Examples:
 -------------
-python examples/03_ui_blocks.py --cli ui-text-md
-python examples/03_ui_blocks.py --cli ui-table
-python examples/03_ui_blocks.py --cli ui-table-progressive
-python examples/03_ui_blocks.py --cli ui-row-column
-python examples/03_ui_blocks.py --cli ui-button-link
-python examples/03_ui_blocks.py --cli ui-tabs
-python examples/03_ui_blocks.py --cli ui-alert-confirm
-python examples/03_ui_blocks.py --cli ui-nested
+python examples/e03_ui_blocks.py --cli ui-text-md
+python examples/e03_ui_blocks.py --cli ui-table
+python examples/e03_ui_blocks.py --cli ui-table-progressive
+python examples/e03_ui_blocks.py --cli ui-row-column
+python examples/e03_ui_blocks.py --cli ui-button-link
+python examples/e03_ui_blocks.py --cli ui-tabs
+python examples/e03_ui_blocks.py --cli ui-alert-confirm
+python examples/e03_ui_blocks.py --cli ui-nested
 """

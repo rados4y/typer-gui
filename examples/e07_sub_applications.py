@@ -1,39 +1,34 @@
-"""Example 6: Sub-Applications with Tab Navigation
+"""Example 7: Sub-Applications with Tab Navigation
 
 This example demonstrates:
-- Creating sub-applications with typer.Typer()
-- Adding sub-apps to main app with add_typer()
+- Creating sub-applications with tu.UiApp()
+- Adding sub-apps with upp.add_typer()
 - Automatic tab-based GUI layout
 - Qualified command names (e.g., "users:create")
 - Tab-aware command execution
 """
 
-import typer
 import typer2ui as tu
 from typer2ui import ui
 
 # Main app
-app = typer.Typer()
-
-# Sub-applications
-users_app = typer.Typer()
-orders_app = typer.Typer()
-reports_app = typer.Typer()
-
-# Create GUI wrapper early (needed for decorators)
 upp = tu.UiApp(
-    app,
     title="Business Management System",
     description="Manage users, orders, and view reports",
 )
 
+# Sub-applications (each gets its own tab)
+users_upp = tu.UiApp()
+orders_upp = tu.UiApp()
+reports_upp = tu.UiApp()
+
 
 # ============================================================================
-# Users Sub-Application
+# Main App Commands
 # ============================================================================
 
 
-@app.command()
+@upp.command()
 def create(name: str, email: str = ""):
     """Create a new user."""
     ui("# Create User")
@@ -58,7 +53,12 @@ def create(name: str, email: str = ""):
     ui("✅ User created successfully!")
 
 
-@users_app.command()
+# ============================================================================
+# Users Sub-Application
+# ============================================================================
+
+
+@users_upp.command()
 def list_users(status: str = "all"):
     """List all users."""
     ui("# User List")
@@ -83,7 +83,7 @@ def list_users(status: str = "all"):
     )
 
 
-@users_app.command()
+@users_upp.command()
 def update(user_id: int, name: str = "", email: str = ""):
     """Update user information."""
     ui("# Update User")
@@ -106,7 +106,7 @@ def update(user_id: int, name: str = "", email: str = ""):
         ui("⚠️ No changes specified")
 
 
-@users_app.command()
+@users_upp.command()
 def delete(user_id: int, confirm: bool = False):
     """Delete a user."""
     ui("# Delete User")
@@ -127,7 +127,7 @@ def delete(user_id: int, confirm: bool = False):
 # ============================================================================
 
 
-@orders_app.command()
+@orders_upp.command()
 def create_order(product: str, quantity: int = 1):
     """Create a new order."""
     ui("# Create Order")
@@ -152,7 +152,7 @@ def create_order(product: str, quantity: int = 1):
     ui("✅ Order created successfully!")
 
 
-@orders_app.command()
+@orders_upp.command()
 def list_orders(status: str = "all"):
     """List all orders."""
     ui("# Order List")
@@ -178,7 +178,7 @@ def list_orders(status: str = "all"):
     )
 
 
-@orders_app.command()
+@orders_upp.command()
 def update_status(order_id: int, status: str):
     """Update order status."""
     ui("# Update Order Status")
@@ -193,8 +193,7 @@ def update_status(order_id: int, status: str):
 # ============================================================================
 
 
-@reports_app.command()
-@upp.def_command(view=True)
+@reports_upp.command(view=True)
 def sales_report():
     """View sales report dashboard."""
     ui("# Sales Report")
@@ -218,8 +217,7 @@ def sales_report():
     ui("**Average Order Value:** $87.23")
 
 
-@reports_app.command()
-@upp.def_command(view=True)
+@reports_upp.command(view=True)
 def user_stats():
     """View user statistics dashboard."""
     ui("# User Statistics")
@@ -255,7 +253,7 @@ def user_stats():
     )
 
 
-@reports_app.command()
+@reports_upp.command()
 def generate_report(report_type: str = "summary"):
     """Generate a custom report."""
     ui("# Generate Report")
@@ -274,12 +272,12 @@ def generate_report(report_type: str = "summary"):
 
 
 # ============================================================================
-# Add sub-applications to main app
+# Add sub-applications to main app using add_typer()
 # ============================================================================
 
-app.add_typer(users_app, name="users", help="User management")
-app.add_typer(orders_app, name="orders", help="Order management")
-app.add_typer(reports_app, name="reports", help="Reports and analytics")
+upp.add_typer(users_upp, name="users", help="User management")
+upp.add_typer(orders_upp, name="orders", help="Order management")
+upp.add_typer(reports_upp, name="reports", help="Reports and analytics")
 
 
 # ============================================================================
@@ -288,9 +286,9 @@ app.add_typer(reports_app, name="reports", help="Reports and analytics")
 
 # Note: This would be used programmatically, not in the GUI
 # Example usage:
-# - upp.command("users:create").run(name="John", email="john@example.com")
-# - upp.command("orders:list-orders").run(status="processing")
-# - upp.command("reports:sales-report").select()  # Switch to that tab and command
+# - upp.get_command("users:list-users").run(status="active")
+# - upp.get_command("orders:list-orders").run(status="processing")
+# - upp.get_command("reports:sales-report").select()  # Switch to that tab and command
 
 
 if __name__ == "__main__":
@@ -302,26 +300,28 @@ Usage Examples:
 ---------------
 
 GUI Mode (default):
-    python examples/06_sub_applications.py
+    python examples/e07_sub_applications.py
 
-    - You'll see tabs for: users | orders | reports
+    - You'll see tabs for: main | users | orders | reports
     - Click tabs to switch between sub-applications
     - Each tab has its own set of commands
     - Commands are scoped to the current tab
 
 CLI Mode:
+    # Main app command
+    python examples/e07_sub_applications.py --cli create --name "Alice" --email "alice@example.com"
+
     # User commands
-    python examples/06_sub_applications.py --cli users create --name "Alice" --email "alice@example.com"
-    python examples/06_sub_applications.py --cli users list-users
-    python examples/06_sub_applications.py --cli users delete --user-id 5 --confirm
+    python examples/e07_sub_applications.py --cli users list-users
+    python examples/e07_sub_applications.py --cli users delete --user-id 5 --confirm
 
     # Order commands
-    python examples/06_sub_applications.py --cli orders create-order --product "Laptop" --quantity 2
-    python examples/06_sub_applications.py --cli orders list-orders --status processing
+    python examples/e07_sub_applications.py --cli orders create-order --product "Laptop" --quantity 2
+    python examples/e07_sub_applications.py --cli orders list-orders --status processing
 
     # Report commands
-    python examples/06_sub_applications.py --cli reports sales-report
-    python examples/06_sub_applications.py --cli reports generate-report --report-type detailed
+    python examples/e07_sub_applications.py --cli reports sales-report
+    python examples/e07_sub_applications.py --cli reports generate-report --report-type detailed
 
 Programmatic Command Control:
     from typer2ui import ui
@@ -330,14 +330,8 @@ Programmatic Command Control:
     # In your code, you can programmatically control commands:
 
     # Execute command with qualified name
-    upp.command("users:create").run(name="Bob", email="bob@example.com")
-
-    # Execute in current tab context
-    upp.command("create").run(name="Charlie")  # Uses current tab
+    upp.get_command("users:list-users").run(status="active")
 
     # Switch tabs and commands
-    upp.command("orders:list-orders").select()  # Switches to orders tab and selects command
-
-    # Chain operations
-    result = upp.command("reports:generate-report").run(report_type="summary").result
+    upp.get_command("orders:list-orders").select()  # Switches to orders tab and selects command
 """

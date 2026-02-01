@@ -6,21 +6,16 @@ This example demonstrates the DataTable component with:
 - Sorting (by any column)
 - Full-text filtering (search across all columns)
 
-Run in CLI mode: python examples/06_data_table.py --cli browse-users
-Run in GUI mode: python examples/06_data_table.py
+Run in CLI mode: python examples/e06_data_table.py --cli browse-users
+Run in GUI mode: python examples/e06_data_table.py
 """
 
-import typer
 import typer2ui as tu
 from typer2ui import ui
 from typing import List, Tuple, Optional, Any
 
-# Create Typer app
-tapp = typer.Typer()
-
 # Create UiApp wrapper
 upp = tu.UiApp(
-    tapp,
     title="DataTable Demo",
     description="Demonstrates dynamic data loading with pagination, sorting, and filtering",
 )
@@ -161,8 +156,7 @@ class UserDataSource(tu.DataSource):
 # ============================================================================
 
 
-@tapp.command()
-@upp.def_command(button=True, view=True)
+@upp.command(button=True, view=True)
 def browse_users():
     """Browse users with pagination, sorting, and filtering.
 
@@ -189,8 +183,7 @@ def browse_users():
     ui(table)
 
 
-@tapp.command()
-@upp.def_command(button=True, view=True)
+@upp.command(button=True, view=True)
 def large_dataset():
     """Browse a larger dataset (500 records) with smaller page size.
 
@@ -215,8 +208,7 @@ def large_dataset():
     ui(table)
 
 
-@tapp.command()
-@upp.def_command(button=True, view=True)
+@upp.command(button=True, view=True)
 def admin_only():
     """View only admin users (pre-filtered data source).
 

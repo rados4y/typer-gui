@@ -1,13 +1,11 @@
 """Example 5: State Management"""
 
 from dataclasses import dataclass
-import typer
+
 import typer2ui as tu
 from typer2ui import ui, text, dx
 
-tapp = typer.Typer()
 upp = tu.UiApp(
-    tapp,
     title="State Management Demo",
     description="Demonstrates reactive UI based on application state.",
 )
@@ -21,13 +19,12 @@ class Order:
     total: float
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def state_demo():
     """Demonstrates reactive UI components tied to state."""
     counter = upp.state(0)
     # --- Counter Example ---
-    ui("## 🔢 Counter")
+    ui("## Counter")
     # Reactive shortcut: lambda returns string → auto-converted to Markdown
     ui(dx(lambda: f"### **Current Count:** {counter.value}", counter))
 
@@ -46,8 +43,7 @@ def state_demo():
     )
 
 
-@tapp.command()
-@upp.def_command(view=True)
+@upp.command(view=True)
 def orders_demo():
     """Demonstrates a master-detail view using state."""
 
@@ -62,7 +58,7 @@ def orders_demo():
     selected_order_id = upp.state(None)
 
     # --- Display List of Orders ---
-    ui("## 📦 Orders")
+    ui("## Orders")
 
     # The table of orders. We add a "Select" link to each row.
     table_data = [
@@ -81,7 +77,7 @@ def orders_demo():
     ui("---")
 
     # --- Display Details of Selected Order ---
-    ui("## ℹ️ Order Details")
+    ui("## Order Details")
 
     # Reactive renderer that calls ui() internally with shortcuts
     # When `selected_order_id` changes, this function is re-executed.
