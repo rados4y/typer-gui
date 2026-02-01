@@ -27,7 +27,7 @@ from .ui_blocks import (
 # Backwards compatibility
 UiApp = Typer2Ui
 
-__version__ = "0.15.1"
+__version__ = "0.16.0"
 __all__ = [
     "build_app_spec",
     "State",
